@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/ssgreg/bottleneck"
+	"github.com/ssgreg/logf"
 	// "github.com/ssgreg/logf"
 )
 
@@ -62,15 +62,15 @@ func main() {
 	// }
 	// lgr.Info("test")
 
-	// logger := logf.New(logf.LoggerParams{
-	// 	Level:    logf.InfoLevel,
-	// 	Capacity: 100,
-	// 	Appender: logf.NewFileAppender("dat",
-	// 		&logf.JSONFormatter{
-	// 			TimestampFormat: time.RFC3339Nano,
-	// 		}),
-	// }) //.WithField("Greg", 5.4)
-	// defer logger.Close()
+	logger := logf.New(logf.LoggerParams{
+		Level:    logf.InfoLevel,
+		Capacity: 100000000,
+		Appender: logf.NewFileAppender("dat",
+			&logf.JSONFormatter{
+				TimestampFormat: time.RFC3339Nano,
+			}),
+	}) //.WithField("Greg", 5.4)
+	defer logger.Close()
 
 	// logger.Info().Msgf("%v", errors.New("Test"))
 
@@ -101,12 +101,12 @@ func main() {
 	// defer logger.Sync()
 
 	// logger := zerolog.New(w).With().Timestamp().Logger().Level(zerolog.ErrorLevel)
-	logger := zerolog.New(w).With().Timestamp().Logger().Level(zerolog.DebugLevel)
+	// logger := zerolog.New(w).With().Timestamp().Logger().Level(zerolog.DebugLevel)
 
-	lg := logger.With().Str("string", "123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,").Logger()
+	// lg := logger.With().Str("string", "123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,123456789,").Logger()
 
-	lg.Info().Msg("1")
-	lg.Info().Msg("2")
+	// lg.Info().Msg("1")
+	// lg.Info().Msg("2")
 
 	wgs := sync.WaitGroup{}
 	wgs.Add(1)
@@ -120,7 +120,7 @@ func main() {
 	for j := 0; j < 1; j++ {
 		go func(j1 int) {
 			wgs.Wait()
-			for i := 0; i < 0; i++ {
+			for i := 0; i < 10000000; i++ {
 				//				logger.WithField("Field", &Greg{j1*100000 + i}).Infof(fmt.Sprint(j1*100000 + i))
 				// logger.WithFields([]logf.Field{{"Uint", j1*100000 + i}, {"Float", 34875.3459}}...).Info("Test")
 
@@ -139,7 +139,7 @@ func main() {
 
 				// logger.Info().Int("Uint", j1*100000+i).Float64("Float", 34875.3459).Msg("Test")
 
-				// logger.Pinfo().WithInt("Uint", i).WithFloat64("Float", 34875.3485).Msg("Test")
+				logger.Info().WithInt("Uint", i).WithFloat64("Float", 34875.3485).Msg("Test")
 				// bc.TimeSlice(1)
 				// logger.Pinfo().Msg("Test")
 				// bc.TimeSlice(0)

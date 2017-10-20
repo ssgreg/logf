@@ -76,34 +76,37 @@ type Logger interface {
 	// Warnf(string, ...interface{})
 	// Errorf(string, ...interface{})
 
-	Fields() ([]Field, Logger)
+	Info() FieldLogger
+	WithContext() Context
+
 	Level() Level
 	Close()
 }
 
-// FieldLogger TODO
-type FieldLogger interface {
-	Logger
-	// WithField(key string, v interface{}) FieldLogger
-	// WithField2(k1 string, v1 interface{}, k2 string, v2 interface{}) FieldLogger
-	// WithField10(k1 string, v1 interface{}, k2 string, v2 interface{}, k3 string, v3 interface{}, k4 string, v4 interface{}, k5 string, v5 interface{}, k6 string, v6 interface{}, k7 string, v7 interface{}, k8 string, v8 interface{}, k9 string, v9 interface{}, k10 string, v10 interface{}) FieldLogger
-
-	// WithFields(field ...Field) FieldLogger
-	// WithFields(fields Fields) FieldLogger
-	// WithError(err error)
-
-	// WithFields1(func() []Field) FieldLogger
+type ContextBuilder interface {
 	WithInt(key string, v int) FieldLogger
+	WithInts(key string, v []int) FieldLogger
 	WithFloat64(key string, v float64) FieldLogger
 	WithAny(k string, v interface{}) FieldLogger
 	WithStr(k string, v string) FieldLogger
+	WithStrs(k string, v []string) FieldLogger
 	WithTime(k string, v time.Time) FieldLogger
+	WithTimes(k string, v []time.Time) FieldLogger
 	WithErr(v error) FieldLogger
+	WithSnapshot(string, Greger) FieldLogger
+}
 
-	Info() FieldLogger
+type Context interface {
+	ContextBuilder
+	Logger() Logger
+}
+
+// FieldLogger TODO
+type FieldLogger interface {
+	ContextBuilder
+	Fields() ([]Field, FieldLogger)
 	Msg(string)
 	Msgf(string, ...interface{})
-	Logger() FieldLogger
 }
 
 // Formatter TODO

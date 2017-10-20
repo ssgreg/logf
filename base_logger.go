@@ -24,7 +24,7 @@ type LoggerParams struct {
 }
 
 type FieldGetter interface {
-	Fields() ([]Field, Logger)
+	Fields() ([]Field, FieldLogger)
 }
 
 type baseLogger interface {

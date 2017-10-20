@@ -10,6 +10,10 @@ type Snapshotter interface {
 	TakeSnapshot() interface{}
 }
 
+type Greger interface {
+	MyGreg()
+}
+
 func TakeSnapshot(v interface{}) interface{} {
 	if v == nil {
 		return nil

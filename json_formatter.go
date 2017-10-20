@@ -1,6 +1,7 @@
 package logf
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -58,13 +59,13 @@ func (f *JSONFormatter) Format(buf *Buffer, entry *Entry) error {
 			EscapeString(buf, field.Key)
 			buf.AppendString(":")
 
-			// if !KnownTypeToBuf(buf, field.Value) {
-			// 	b, err := json.Marshal(field.Value)
-			// 	if err != nil {
-			// 		return err
-			// 	}
-			// 	buf.AppendBytes(b)
-			// }
+			if !KnownTypeToBuf(buf, field.Value) {
+				b, err := json.Marshal(field.Value)
+				if err != nil {
+					return err
+				}
+				buf.AppendBytes(b)
+			}
 		}
 	}
 

@@ -3,7 +3,6 @@ package logf
 import (
 	"fmt"
 	"os"
-	"sync"
 	"time"
 )
 
@@ -14,129 +13,54 @@ type formatArguments struct {
 
 // extLogger TODO
 type extLogger struct {
-	parent Logger
+	parent FieldLogger
 	base   baseLogger
 	fields []Field
 }
 
-var CounterPool = 0
+// var CounterPool = 0
 
-var loggerPool = &sync.Pool{
-	New: func() interface{} {
-		// fmt.Println("Pool")
-		CounterPool++
-		return &extLogger{nil, nil, make([]Field, 0, 10)}
-	},
-}
-
-// TODO make a different FieldLogger interface implementation, if l == extlogger can be removed
-var emptyLogger = &disabledLogger{}
+// var loggerPool = &sync.Pool{
+// 	New: func() interface{} {
+// 		// fmt.Println("Pool")
+// 		CounterPool++
+// 		return &extLogger{nil, nil, make([]Field, 0, 10)}
+// 	},
+// }
 
 // New TODO
-func New(params LoggerParams) FieldLogger {
+func New(params LoggerParams) Logger {
 	return &extLogger{base: newBaseLogger(params)}
 }
 
-type disabledLogger struct {
+func (l *extLogger) WithContext() Context {
+	return &extLogger{base: l.base, parent: l}
 }
 
-func NewDisabled() FieldLogger {
-	return &disabledLogger{}
-}
-
-func (l *disabledLogger) WithInt(key string, v int) FieldLogger {
-	return l
-}
-
-func (l *disabledLogger) WithFloat64(key string, v float64) FieldLogger {
-	return l
-}
-
-func (l *disabledLogger) WithAny(k string, v interface{}) FieldLogger {
-	return l
-}
-
-func (l *disabledLogger) WithStr(k string, v string) FieldLogger {
-	return l
-}
-
-func (l *disabledLogger) WithTime(k string, v time.Time) FieldLogger {
-	return l
-}
-
-func (l *disabledLogger) WithErr(v error) FieldLogger {
-	return l
-}
-
-func (l *disabledLogger) Logger() FieldLogger {
-	return l
-}
-
-func (l *disabledLogger) Info() FieldLogger {
-	return l
-}
-
-func (l *disabledLogger) Msg(string) {
-}
-
-func (l *disabledLogger) Msgf(string, ...interface{}) {
-}
-
-func (l *disabledLogger) Fields() ([]Field, Logger) {
-	return nil, l
-}
-
-func (l *disabledLogger) Level() Level {
-	return PanicLevel
-}
-
-func (l *disabledLogger) Close() {
-}
-
-// FieldLogger interface.
-
-// WithField TODO
-func (l *extLogger) WithField(key string, v interface{}) FieldLogger {
-	// return &extLogger{base: l.base, parent: l, fields: []Field{{key, TakeSnapshot(v), nil}}}
-	return nil
-}
-
-func (l *extLogger) WithField2(k1 string, v1 interface{}, k2 string, v2 interface{}) FieldLogger {
-	// return &extLogger{base: l.base, parent: l, fields: []Field{
-	// 	{k1, TakeSnapshot(v1)}, {k2, TakeSnapshot(v2)}},
-	// }
-	return nil
-}
-
-func (l *extLogger) WithField10(k1 string, v1 interface{}, k2 string, v2 interface{}, k3 string, v3 interface{}, k4 string, v4 interface{}, k5 string, v5 interface{}, k6 string, v6 interface{}, k7 string, v7 interface{}, k8 string, v8 interface{}, k9 string, v9 interface{}, k10 string, v10 interface{}) FieldLogger {
-	// return &extLogger{base: l.base, parent: l, fields: []Field{
-	// 	{k1, TakeSnapshot(v1)}, {k2, TakeSnapshot(v2)}, {k3, TakeSnapshot(v3)}, {k4, TakeSnapshot(v4)},
-	// 	{k5, TakeSnapshot(v5)}, {k6, TakeSnapshot(v6)}, {k7, TakeSnapshot(v7)}, {k8, TakeSnapshot(v8)},
-	// 	{k9, TakeSnapshot(v9)}, {k10, TakeSnapshot(v10)},
-	// }}
-	return nil
-}
-
-func (l *extLogger) WithFields(fields ...Field) FieldLogger {
+func (l *extLogger) Info() FieldLogger {
 	if l.base.Level() < InfoLevel {
 		return emptyLogger
 	}
-	// return &extLogger{base: l.base, parent: l, fields: fields}
-	return l
+	// lp := loggerPool.Get().(*extLogger)
+	// lp.parent = l
+	// lp.base = l.base
+	// return lp
+
+	return &extLogger{base: l.base, parent: l}
 }
 
-type MyFunc func() []Field
-
-func (l *extLogger) WithFields1(a func() []Field) FieldLogger {
-	// return &extLogger{base: l.base, parent: l, fields: nil}
-	return nil
-}
+// FieldLogger interface.
 
 func (l *extLogger) WithInt(key string, v int) FieldLogger {
 	// if l == emptyLogger {
 	// 	return l
 	// }
 	l.fields = append(l.fields, Field{Key: key, Value: v})
+	return l
+}
+
+func (l *extLogger) WithInts(key string, v []int) FieldLogger {
+	l.fields = append(l.fields, Field{Key: key, Value: TakeSnapshot(v)})
 	return l
 }
 
@@ -149,7 +73,7 @@ func (l *extLogger) WithFloat64(key string, v float64) FieldLogger {
 }
 
 func (l *extLogger) WithAny(k string, v interface{}) FieldLogger {
-	l.fields = append(l.fields, Field{k, v})
+	l.fields = append(l.fields, Field{k, TakeSnapshot(v)})
 	return l
 }
 
@@ -158,8 +82,18 @@ func (l *extLogger) WithStr(k string, v string) FieldLogger {
 	return l
 }
 
+func (l *extLogger) WithStrs(k string, v []string) FieldLogger {
+	l.fields = append(l.fields, Field{k, TakeSnapshot(v)})
+	return l
+}
+
 func (l *extLogger) WithTime(k string, v time.Time) FieldLogger {
 	l.fields = append(l.fields, Field{k, v})
+	return l
+}
+
+func (l *extLogger) WithTimes(k string, v []time.Time) FieldLogger {
+	l.fields = append(l.fields, Field{k, TakeSnapshot(v)})
 	return l
 }
 
@@ -168,20 +102,13 @@ func (l *extLogger) WithErr(v error) FieldLogger {
 	return l
 }
 
-func (l *extLogger) Logger() FieldLogger {
-	return &extLogger{base: l.base, parent: l, fields: make([]Field, 0)}
+func (l *extLogger) WithSnapshot(string, Greger) FieldLogger {
+	panic("implement")
+	return l
 }
 
-func (l *extLogger) Info() FieldLogger {
-	if l.base.Level() < InfoLevel {
-		return emptyLogger
-	}
-	// lp := loggerPool.Get().(*extLogger)
-	// lp.parent = l
-	// lp.base = l.base
-	// return lp
-
-	return &extLogger{base: l.base, parent: l, fields: make([]Field, 0)}
+func (l *extLogger) Logger() Logger {
+	return l
 }
 
 func (l *extLogger) Msg(msg string) {
@@ -228,7 +155,7 @@ func (l *extLogger) Msgf(format string, args ...interface{}) {
 // Logger interface.
 
 // Fields TODO
-func (l *extLogger) Fields() ([]Field, Logger) {
+func (l *extLogger) Fields() ([]Field, FieldLogger) {
 	return l.fields, l.parent
 }
 
@@ -346,3 +273,40 @@ func (l *extLogger) Panicln(args ...interface{}) {
 	l.Close()
 	panic(fmt.Sprint(args...))
 }
+
+// // WithField TODO
+// func (l *extLogger) WithField(key string, v interface{}) FieldLogger {
+// 	// return &extLogger{base: l.base, parent: l, fields: []Field{{key, TakeSnapshot(v), nil}}}
+// 	return nil
+// }
+
+// func (l *extLogger) WithField2(k1 string, v1 interface{}, k2 string, v2 interface{}) FieldLogger {
+// 	// return &extLogger{base: l.base, parent: l, fields: []Field{
+// 	// 	{k1, TakeSnapshot(v1)}, {k2, TakeSnapshot(v2)}},
+// 	// }
+// 	return nil
+// }
+
+// func (l *extLogger) WithField10(k1 string, v1 interface{}, k2 string, v2 interface{}, k3 string, v3 interface{}, k4 string, v4 interface{}, k5 string, v5 interface{}, k6 string, v6 interface{}, k7 string, v7 interface{}, k8 string, v8 interface{}, k9 string, v9 interface{}, k10 string, v10 interface{}) FieldLogger {
+// 	// return &extLogger{base: l.base, parent: l, fields: []Field{
+// 	// 	{k1, TakeSnapshot(v1)}, {k2, TakeSnapshot(v2)}, {k3, TakeSnapshot(v3)}, {k4, TakeSnapshot(v4)},
+// 	// 	{k5, TakeSnapshot(v5)}, {k6, TakeSnapshot(v6)}, {k7, TakeSnapshot(v7)}, {k8, TakeSnapshot(v8)},
+// 	// 	{k9, TakeSnapshot(v9)}, {k10, TakeSnapshot(v10)},
+// 	// }}
+// 	return nil
+// }
+
+// func (l *extLogger) WithFields(fields ...Field) FieldLogger {
+// 	if l.base.Level() < InfoLevel {
+// 		return emptyLogger
+// 	}
+// 	// return &extLogger{base: l.base, parent: l, fields: fields}
+// 	return l
+// }
+
+// type MyFunc func() []Field
+
+// func (l *extLogger) WithFields1(a func() []Field) FieldLogger {
+// 	// return &extLogger{base: l.base, parent: l, fields: nil}
+// 	return nil
+// }

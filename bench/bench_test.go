@@ -122,6 +122,19 @@ func BenchmarkAccumulatedContext(b *testing.B) {
 	})
 }
 
+// func contextFields(logger) {
+// 	if logger.Checked {
+// 		return logger.In()
+// 	}
+// 	return logger
+// }
+
+// contextFields(logger.Info()).Int("sdf").Msg("sdf")
+
+// l := logger.Context().Int("sdf").Logger()
+
+// e := l.Info().Int("sdf").Int("a", 1)Msg(),
+
 func BenchmarkAddingFields(b *testing.B) {
 	b.Run("Logf", func(b *testing.B) {
 		logger := newDiscardLogger(logf.DebugLevel, 1000)
@@ -174,11 +187,11 @@ func getMessage(n int) string {
 func fakeFields(l logf.FieldLogger) logf.FieldLogger {
 	return l.
 		WithInt("int", tenInts[0]).
-		WithAny("ints", tenInts).
+		WithInts("ints", tenInts).
 		WithStr("string", tenStrings[0]).
-		WithAny("strings", tenStrings).
+		WithStrs("strings", tenStrings).
 		WithTime("time", tenTimes[0]).
-		WithAny("times", tenTimes).
+		WithTimes("times", tenTimes).
 		WithAny("user1", oneUser).
 		WithAny("user2", oneUser).
 		WithAny("users", tenUsers).
@@ -204,6 +217,13 @@ func fakeFmtArgs() []interface{} {
 
 func (u user) TakeSnapshot() interface{} {
 	return u
+}
+
+// func (u users) TakeSnapshot() interface{} {
+// 	return u
+// }
+
+func (u users) MyGreg() {
 }
 
 func newDiscardLogger(level logf.Level, capacity int) logf.FieldLogger {
