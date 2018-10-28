@@ -14,16 +14,17 @@ func NewDisabled() *Logger {
 func NewLogger(level Level, w ChannelWriter) *Logger {
 	return &Logger{
 		level: level,
+		id:    atomic.AddInt32(&nextID, 1),
 		ch:    w,
 	}
 }
 
 type Logger struct {
-	level  Level
-	id     int32
-	fields []Field
-	ch     ChannelWriter
+	level Level
+	id    int32
+	ch    ChannelWriter
 
+	fields     []Field
 	name       string
 	addCaller  bool
 	callerSkip int
@@ -119,10 +120,12 @@ func (l *Logger) log(lv Level, text string, fs []Field) {
 
 func (l *Logger) clone() *Logger {
 	return &Logger{
-		level:  l.level,
-		ch:     l.ch,
-		fields: nil,
-		id:     atomic.AddInt32(&nextID, 1),
-		name:   l.name,
+		level:      l.level,
+		id:         atomic.AddInt32(&nextID, 1),
+		ch:         l.ch,
+		fields:     l.fields,
+		name:       l.name,
+		addCaller:  l.addCaller,
+		callerSkip: l.callerSkip,
 	}
 }
