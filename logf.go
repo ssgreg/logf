@@ -1,312 +1,273 @@
 package logf
 
 import (
-	"fmt"
-	"os"
+	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
-type formatArguments struct {
-	format string
-	args   []interface{}
+var nextID int32
+
+func NewDisabled() *Logger {
+	return NewLogger(Discard, nil)
 }
 
-// extLogger TODO
-type extLogger struct {
-	parent FieldLogger
-	base   baseLogger
-	fields []Field
-}
-
-// var CounterPool = 0
-
-// var loggerPool = &sync.Pool{
-// 	New: func() interface{} {
-// 		// fmt.Println("Pool")
-// 		CounterPool++
-// 		return &extLogger{nil, nil, make([]Field, 0, 10)}
-// 	},
-// }
-
-// New TODO
-func New(params LoggerParams) Logger {
-	return &extLogger{base: newBaseLogger(params)}
-}
-
-func (l *extLogger) WithContext() Context {
-	return &extLogger{base: l.base, parent: l}
-}
-
-func (l *extLogger) Info() FieldLogger {
-	if l.base.Level() < InfoLevel {
-		return emptyLogger
+func NewLogger(level Level, w ChannelWriter) *Logger {
+	return &Logger{
+		level: level,
+		ch:    w,
 	}
-	// lp := loggerPool.Get().(*extLogger)
-	// lp.parent = l
-	// lp.base = l.base
-	// return lp
-
-	return &extLogger{base: l.base, parent: l}
 }
 
-// FieldLogger interface.
-
-func (l *extLogger) WithInt(key string, v int) FieldLogger {
-	// if l == emptyLogger {
-	// 	return l
-	// }
-	l.fields = append(l.fields, Field{Key: key, Value: v})
-	return l
+type Logger struct {
+	level      Level
+	name       string
+	id         int32
+	fields     []Field
+	ch         ChannelWriter
+	hasCaller  bool
+	callerSkip int
 }
 
-func (l *extLogger) WithInts(key string, v []int) FieldLogger {
-	l.fields = append(l.fields, Field{Key: key, Value: TakeSnapshot(v)})
-	return l
+func (l *Logger) WithName(n string) *Logger {
+	if n == "" {
+		return l
+	}
+
+	cc := l.clone()
+	if cc.name == "" {
+		cc.name = n
+	} else {
+		cc.name += "." + n
+	}
+
+	return cc
 }
 
-func (l *extLogger) WithFloat64(key string, v float64) FieldLogger {
-	// if l == emptyLogger {
-	// 	return l
-	// }
-	l.fields = append(l.fields, Field{key, v})
-	return l
+func (l *Logger) WithCaller() *Logger {
+	cc := l.clone()
+	cc.hasCaller = true
+
+	return cc
 }
 
-func (l *extLogger) WithAny(k string, v interface{}) FieldLogger {
-	l.fields = append(l.fields, Field{k, TakeSnapshot(v)})
-	return l
+func (l *Logger) WithCallerSkip(skip int) *Logger {
+	cc := l.clone()
+	cc.callerSkip = skip
+
+	return cc
 }
 
-func (l *extLogger) WithStr(k string, v string) FieldLogger {
-	l.fields = append(l.fields, Field{k, v})
-	return l
+func (l *Logger) With(fs ...Field) *Logger {
+	// This code attempts to archive optimum performance with minimum
+	// allocations count. Do not change it unless the folowing benchmarks
+	// will show a better performance:
+	// - BenchmarkCreateContextLogger
+	// - BenchmarkCreateContextWithAccumulatedContextLogger
+
+	var cc *Logger
+	if len(l.fields) == 0 {
+		// The fastest way. Use passed 'fs' as is.
+		cc = l.clone()
+		cc.fields = fs
+	} else {
+		// The less efficient path forces us to copy parent's fields.
+		c := make([]Field, 0, len(l.fields)+len(fs))
+		// TODO: change order
+		c = append(c, l.fields...)
+		c = append(c, fs...)
+
+		cc = l.clone()
+		cc.fields = c
+	}
+
+	for i := range cc.fields[len(l.fields):] {
+		snapshotField(&cc.fields[i])
+	}
+
+	return cc
 }
 
-func (l *extLogger) WithStrs(k string, v []string) FieldLogger {
-	l.fields = append(l.fields, Field{k, TakeSnapshot(v)})
-	return l
-}
-
-func (l *extLogger) WithTime(k string, v time.Time) FieldLogger {
-	l.fields = append(l.fields, Field{k, v})
-	return l
-}
-
-func (l *extLogger) WithTimes(k string, v []time.Time) FieldLogger {
-	l.fields = append(l.fields, Field{k, TakeSnapshot(v)})
-	return l
-}
-
-func (l *extLogger) WithErr(v error) FieldLogger {
-	l.fields = append(l.fields, Field{"error", v})
-	return l
-}
-
-func (l *extLogger) WithSnapshot(string, Greger) FieldLogger {
-	panic("implement")
-	return l
-}
-
-func (l *extLogger) Logger() Logger {
-	return l
-}
-
-func (l *extLogger) Msg(msg string) {
-	// loggerPool.Put(l)
-	// return
-	l.base.Log(InfoLevel, msg, nil, l)
-}
-
-func (l *extLogger) Msgf(format string, args ...interface{}) {
-	l.base.Log(InfoLevel, format, args, l)
-}
-
-// Добавление интерфейса с функции логирования ухудшает производительность.
-// Если сделать в Field поле с конкретным типом вместо интерфейс - станет быстрее, в производительности теряем на сохранение типа сохраняемого значения и незначительно в памяти.
-//
-// Существенно теряем на создание нового объекта extLogger для полей
-// ->
-// Идея - проверить сохранение полей под мьютесом.  - Фейл. Когда нет возможности удалять филды. В разных потоках они будут плодиться.
-// Идея - использовать пул Entry. - // Фейл и быстром добавлении логов и медленной записи  - при буфере 10 000 000
-
-// func FieldAny(key string, value interface{}) Field {
-// 	return Field{key, TakeSnapshot(value)}
-// }
-
-// func FieldInt(key string, value int) Field {
-// 	return Field{key, value}
-// }
-
-// func FieldFloat(key string, value float64) Field {
-// 	return Field{key, value}
-// }
-
-// WithFields TODO
-// func (l *extLogger) WithFields(fields Fields) FieldLogger {
-// 	new := make([]Field, len(fields))
-// 	i := 0
-// 	for k, v := range fields {
-// 		new[i] = Field{k, TakeSnapshot(v)}
-// 		i++
-// 	}
-// 	return &extLogger{base: l.base, parent: l, Fields: new}
-// }
-
-// Logger interface.
-
-// Fields TODO
-func (l *extLogger) Fields() ([]Field, FieldLogger) {
-	return l.fields, l.parent
-}
-
-// Level TODO
-func (l *extLogger) Level() Level {
-	return l.base.Level()
-}
-
-// Close TODO
-func (l *extLogger) Close() {
-	l.base.Close()
-}
-
-// Debug TODO
-func (l *extLogger) Debug(args ...interface{}) {
-	l.base.Log(DebugLevel, "", args, l)
-}
-
-// Info TODO
-// func (l *extLogger) Info(a string) {
-// 	if l.base.Level() < InfoLevel {
-// 		return
-// 	}
-// 	l.base.Log(InfoLevel, a, nil, l)
-// }
-
-// Warn TODO
-func (l *extLogger) Warn(args ...interface{}) {
-	l.base.Log(WarnLevel, "", args, l)
-}
-
-// Error TODO
-func (l *extLogger) Error(args ...interface{}) {
-	l.base.Log(ErrorLevel, "", args, l)
-}
-
-// Debugf TODO
-func (l *extLogger) Debugf(format string, args ...interface{}) {
-	l.base.Log(DebugLevel, format, args, l)
-}
-
-// Infof TODO
-func (l *extLogger) Infof(format string, args ...interface{}) {
-	if l.base.Level() < InfoLevel {
+func (l *Logger) Debug(text string, fs ...Field) {
+	if l.level < Debug {
 		return
 	}
-	l.base.Log(InfoLevel, format, args, l)
+
+	l.log(Debug, text, fs)
 }
 
-// Warnf TODO
-func (l *extLogger) Warnf(format string, args ...interface{}) {
-	l.base.Log(WarnLevel, format, args, l)
+func (l *Logger) Info(text string, fs ...Field) {
+	if l.level < Info {
+		return
+	}
+
+	l.log(Info, text, fs)
 }
 
-// Errorf TODO
-func (l *extLogger) Errorf(format string, args ...interface{}) {
-	l.base.Log(ErrorLevel, format, args, l)
+func (l *Logger) log(lv Level, text string, fs []Field) {
+	for i := range fs {
+		snapshotField(&fs[i])
+	}
+
+	e := Entry{l.id, l.fields, fs, lv, time.Now(), text, l.name, EntryCaller{}}
+	if l.hasCaller {
+		e.Caller = NewEntryCaller(2 + l.callerSkip)
+	}
+
+	l.ch.Write(e)
 }
 
-// StdLogger interface.
-
-// Printf TODO
-func (l *extLogger) Printf(format string, args ...interface{}) {
-	l.base.Log(InfoLevel, format, args, l)
+func (l *Logger) clone() *Logger {
+	return &Logger{
+		level:  l.level,
+		ch:     l.ch,
+		fields: nil,
+		id:     atomic.AddInt32(&nextID, 1),
+		name:   l.name,
+	}
 }
 
-// Fatalf TODO
-func (l *extLogger) Fatalf(format string, args ...interface{}) {
-	l.base.Log(FatalLevel, format, args, l)
-	l.Close()
-	os.Exit(1)
+func snapshotField(f *Field) {
+	if f.Type&FieldTypeRawMask != 0 {
+		switch f.Type {
+		case FieldTypeRawBytes:
+			snapshotRawBytes(f)
+		case FieldTypeRawBytesToBools:
+			snapshotRawBytesToBools(f)
+		case FieldTypeRawBytesToInts64:
+			snapshotRawBytesToInts64(f)
+		case FieldTypeRawBytesToInts32:
+			snapshotRawBytesToInts32(f)
+		case FieldTypeRawBytesToInts16:
+			snapshotRawBytesToInts16(f)
+		case FieldTypeRawBytesToInts8:
+			snapshotRawBytesToInts8(f)
+		case FieldTypeRawBytesToUints64:
+			snapshotRawBytesToUints64(f)
+		case FieldTypeRawBytesToUints32:
+			snapshotRawBytesToUints32(f)
+		case FieldTypeRawBytesToUints16:
+			snapshotRawBytesToUints16(f)
+		case FieldTypeRawBytesToUints8:
+			snapshotRawBytesToUints8(f)
+		case FieldTypeRawBytesToFloats64:
+			snapshotRawBytesToFloats64(f)
+		case FieldTypeRawBytesToFloats32:
+			snapshotRawBytesToFloats32(f)
+		case FieldTypeRawBytesToDurations:
+			snapshotRawBytesToDurations(f)
+		}
+	}
+	if f.Type == FieldTypeAny {
+		if f.Any == nil {
+			return
+		}
+		switch rv := f.Any.(type) {
+		case Snapshotter:
+			f.Any = rv.TakeSnapshot()
+		}
+	}
 }
 
-// Panicf TODO
-func (l *extLogger) Panicf(format string, args ...interface{}) {
-	l.base.Log(PanicLevel, format, args, l)
-	l.Close()
-	panic(fmt.Sprintf(format, args...))
+func snapshotRawBytes(f *Field) {
+	cc := make([]byte, len(f.Bytes))
+	copy(cc, f.Bytes)
+	f.Bytes = cc
+	f.Type = FieldTypeBytes
 }
 
-// Print TODO
-func (l *extLogger) Print(args ...interface{}) {
-	l.base.Log(InfoLevel, "", args, l)
+func snapshotRawBytesToBools(f *Field) {
+	s := *(*[]bool)(unsafe.Pointer(&f.Bytes))
+	cc := make([]bool, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToBools
 }
 
-// Fatal TODO
-func (l *extLogger) Fatal(args ...interface{}) {
-	l.base.Log(FatalLevel, "", args, l)
-	l.Close()
-	os.Exit(1)
+func snapshotRawBytesToInts64(f *Field) {
+	s := *(*[]int64)(unsafe.Pointer(&f.Bytes))
+	cc := make([]int64, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToInts64
 }
 
-// Panic TODO
-func (l *extLogger) Panic(args ...interface{}) {
-	l.base.Log(PanicLevel, "", args, l)
-	l.Close()
-	panic(fmt.Sprint(args...))
+func snapshotRawBytesToInts32(f *Field) {
+	s := *(*[]int32)(unsafe.Pointer(&f.Bytes))
+	cc := make([]int32, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToInts32
 }
 
-// Println TODO
-func (l *extLogger) Println(args ...interface{}) {
-	l.base.Log(InfoLevel, "", args, l)
+func snapshotRawBytesToInts16(f *Field) {
+	s := *(*[]int16)(unsafe.Pointer(&f.Bytes))
+	cc := make([]int16, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToInts16
 }
 
-// Fatalln TODO
-func (l *extLogger) Fatalln(args ...interface{}) {
-	l.base.Log(FatalLevel, "", args, l)
-	l.Close()
-	os.Exit(1)
+func snapshotRawBytesToInts8(f *Field) {
+	s := *(*[]int8)(unsafe.Pointer(&f.Bytes))
+	cc := make([]int8, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToInts8
 }
 
-// Panicln TODO
-func (l *extLogger) Panicln(args ...interface{}) {
-	l.base.Log(PanicLevel, "", args, l)
-	l.Close()
-	panic(fmt.Sprint(args...))
+func snapshotRawBytesToUints64(f *Field) {
+	s := *(*[]uint64)(unsafe.Pointer(&f.Bytes))
+	cc := make([]uint64, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToUints64
 }
 
-// // WithField TODO
-// func (l *extLogger) WithField(key string, v interface{}) FieldLogger {
-// 	// return &extLogger{base: l.base, parent: l, fields: []Field{{key, TakeSnapshot(v), nil}}}
-// 	return nil
-// }
+func snapshotRawBytesToUints32(f *Field) {
+	s := *(*[]uint32)(unsafe.Pointer(&f.Bytes))
+	cc := make([]uint32, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToUints32
+}
 
-// func (l *extLogger) WithField2(k1 string, v1 interface{}, k2 string, v2 interface{}) FieldLogger {
-// 	// return &extLogger{base: l.base, parent: l, fields: []Field{
-// 	// 	{k1, TakeSnapshot(v1)}, {k2, TakeSnapshot(v2)}},
-// 	// }
-// 	return nil
-// }
+func snapshotRawBytesToUints16(f *Field) {
+	s := *(*[]uint16)(unsafe.Pointer(&f.Bytes))
+	cc := make([]uint16, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToUints16
+}
 
-// func (l *extLogger) WithField10(k1 string, v1 interface{}, k2 string, v2 interface{}, k3 string, v3 interface{}, k4 string, v4 interface{}, k5 string, v5 interface{}, k6 string, v6 interface{}, k7 string, v7 interface{}, k8 string, v8 interface{}, k9 string, v9 interface{}, k10 string, v10 interface{}) FieldLogger {
-// 	// return &extLogger{base: l.base, parent: l, fields: []Field{
-// 	// 	{k1, TakeSnapshot(v1)}, {k2, TakeSnapshot(v2)}, {k3, TakeSnapshot(v3)}, {k4, TakeSnapshot(v4)},
-// 	// 	{k5, TakeSnapshot(v5)}, {k6, TakeSnapshot(v6)}, {k7, TakeSnapshot(v7)}, {k8, TakeSnapshot(v8)},
-// 	// 	{k9, TakeSnapshot(v9)}, {k10, TakeSnapshot(v10)},
-// 	// }}
-// 	return nil
-// }
+func snapshotRawBytesToUints8(f *Field) {
+	s := *(*[]uint8)(unsafe.Pointer(&f.Bytes))
+	cc := make([]uint8, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToUints8
+}
 
-// func (l *extLogger) WithFields(fields ...Field) FieldLogger {
-// 	if l.base.Level() < InfoLevel {
-// 		return emptyLogger
-// 	}
-// 	// return &extLogger{base: l.base, parent: l, fields: fields}
-// 	return l
-// }
+func snapshotRawBytesToFloats64(f *Field) {
+	s := *(*[]float64)(unsafe.Pointer(&f.Bytes))
+	cc := make([]float64, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToFloats64
+}
 
-// type MyFunc func() []Field
+func snapshotRawBytesToFloats32(f *Field) {
+	s := *(*[]float32)(unsafe.Pointer(&f.Bytes))
+	cc := make([]float32, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToFloats32
+}
 
-// func (l *extLogger) WithFields1(a func() []Field) FieldLogger {
-// 	// return &extLogger{base: l.base, parent: l, fields: nil}
-// 	return nil
-// }
+func snapshotRawBytesToDurations(f *Field) {
+	s := *(*[]time.Duration)(unsafe.Pointer(&f.Bytes))
+	cc := make([]time.Duration, len(s))
+	copy(cc, s)
+	f.Bytes = *(*[]byte)(unsafe.Pointer(&cc))
+	f.Type = FieldTypeBytesToDurations
+}

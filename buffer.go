@@ -18,33 +18,26 @@ func NewBuffer(w io.Writer) *Buffer {
 	return &Buffer{make([]byte, 0, 4096*16), w, nil}
 }
 
+func (b *Buffer) Write(p []byte) (n int, err error) {
+	b.Buf = append(b.Buf, p...)
+
+	return len(p), nil
+}
+
 func (b *Buffer) Error() error {
 	return b.err
 }
 
-func (b *Buffer) EnsureSize(s int) []byte {
-	if !b.ensureSizeInternal(s) {
-		panic(fmt.Sprintf("logf not able to ensure size %d, max is %d", s, cap(b.Buf)))
-	}
-	return b.Buf
-}
-
 func (b *Buffer) AppendString(data string) {
-	if !b.ensureSizeInternal(len(data)) {
-		_, b.err = b.w.Write(([]byte)(data))
-	}
 	b.Buf = append(b.Buf, data...)
 }
 
 func (b *Buffer) AppendBytes(data []byte) {
-	if !b.ensureSizeInternal(len(data)) {
-		_, b.err = b.w.Write(data)
-	}
 	b.Buf = append(b.Buf, data...)
 }
 
 func (b *Buffer) AppendByte(data byte) {
-	b.Buf = append(b.EnsureSize(1), data)
+	b.Buf = append(b.Buf, data)
 }
 
 func (b *Buffer) Flush() {
@@ -54,21 +47,77 @@ func (b *Buffer) Flush() {
 	}
 }
 
+func (b *Buffer) Back() byte {
+	return b.Buf[len(b.Buf)-1]
+}
+
+func (b *Buffer) Len() int {
+	return len(b.Buf)
+}
+
 func (b *Buffer) collapse() {
 	b.Buf = b.Buf[:0]
 }
 
-func (b *Buffer) ensureSizeInternal(s int) bool {
-	if cap(b.Buf)-len(b.Buf) < s {
-		b.Flush()
+func (b *Buffer) AppendUint8(n uint8) {
+	b.Buf = strconv.AppendUint(b.Buf, uint64(n), 10)
+}
+
+func (b *Buffer) AppendUint16(n uint16) {
+	b.Buf = strconv.AppendUint(b.Buf, uint64(n), 10)
+}
+
+func (b *Buffer) AppendUint32(n uint32) {
+	b.Buf = strconv.AppendUint(b.Buf, uint64(n), 10)
+}
+
+func (b *Buffer) AppendUint(n uint) {
+	b.Buf = strconv.AppendUint(b.Buf, uint64(n), 10)
+}
+
+func (b *Buffer) AppendUint64(n uint64) {
+	b.Buf = strconv.AppendUint(b.Buf, n, 10)
+}
+
+func (b *Buffer) AppendInt8(n int8) {
+	b.Buf = strconv.AppendInt(b.Buf, int64(n), 10)
+}
+
+func (b *Buffer) AppendInt16(n int16) {
+	b.Buf = strconv.AppendInt(b.Buf, int64(n), 10)
+}
+
+func (b *Buffer) AppendInt32(n int32) {
+	b.Buf = strconv.AppendInt(b.Buf, int64(n), 10)
+}
+
+func (b *Buffer) AppendInt(n int) {
+	b.Buf = strconv.AppendInt(b.Buf, int64(n), 10)
+}
+
+func (b *Buffer) AppendInt64(n int64) {
+	b.Buf = strconv.AppendInt(b.Buf, n, 10)
+}
+
+func (b *Buffer) AppendFloat32(n float32) {
+	b.Buf = strconv.AppendFloat(b.Buf, float64(n), 'g', -1, 32)
+}
+
+func (b *Buffer) AppendFloat64(n float64) {
+	b.Buf = strconv.AppendFloat(b.Buf, n, 'g', -1, 64)
+}
+
+func (b *Buffer) AppendBool(n bool) {
+	if n {
+		b.Buf = append(b.Buf, "true"...)
+	} else {
+		b.Buf = append(b.Buf, "false"...)
 	}
-	return cap(b.Buf) >= s
 }
 
 const hex = "0123456789abcdef"
 
 func EscapeString(buf *Buffer, s string) error {
-	buf.AppendByte('"')
 	p := 0
 	for i := 0; i < len(s); {
 		c := s[i]
@@ -115,7 +164,43 @@ func EscapeString(buf *Buffer, s string) error {
 		i += wd
 	}
 	buf.AppendString(s[p:])
-	buf.AppendByte('"')
+
+	return nil
+}
+
+func EscapeStringBytes(buf *Buffer, s []byte) error {
+	p := 0
+	for i := 0; i < len(s); {
+		c := s[i]
+		switch {
+		case c >= 0x20 && c != '\\' && c != '"':
+			i++
+			continue
+		default:
+			buf.AppendBytes(s[p:i])
+			switch c {
+			case '\t':
+				buf.AppendString(`\t`)
+			case '\r':
+				buf.AppendString(`\r`)
+			case '\n':
+				buf.AppendString(`\n`)
+			case '\\':
+				buf.AppendString(`\\`)
+			case '"':
+				buf.AppendString(`\"`)
+			default:
+				buf.AppendString(`\u00`)
+				buf.AppendByte(hex[c>>4])
+				buf.AppendByte(hex[c&0xf])
+			}
+			i++
+			p = i
+			continue
+		}
+	}
+	buf.AppendBytes(s[p:])
+
 	return nil
 }
 
@@ -124,104 +209,54 @@ func KnownTypeToBuf(buf *Buffer, v interface{}) bool {
 	case string:
 		EscapeString(buf, rv)
 	case bool:
-		boolToBuf(buf, rv)
+		buf.AppendBool(rv)
 	case int:
-		intToBuf(buf, rv)
+		buf.AppendInt(rv)
 	case int8:
-		int8ToBuf(buf, rv)
+		buf.AppendInt8(rv)
 	case int16:
-		int16ToBuf(buf, rv)
+		buf.AppendInt16(rv)
 	case int32:
-		int32ToBuf(buf, rv)
+		buf.AppendInt32(rv)
 	case int64:
-		int64ToBuf(buf, rv)
+		buf.AppendInt64(rv)
 	case uint:
-		uintToBuf(buf, rv)
+		buf.AppendUint(rv)
 	case uint8:
-		uint8ToBuf(buf, rv)
+		buf.AppendUint8(rv)
 	case uint16:
-		uint16ToBuf(buf, rv)
+		buf.AppendUint16(rv)
 	case uint32:
-		uint32ToBuf(buf, rv)
+		buf.AppendUint32(rv)
 	case uint64:
-		uint64ToBuf(buf, rv)
+		buf.AppendUint64(rv)
 	case float32:
-		float32ToBuf(buf, rv)
+		buf.AppendFloat32(rv)
 	case float64:
-		float64ToBuf(buf, rv)
+		buf.AppendFloat64(rv)
 	case fmt.Stringer:
 		EscapeString(buf, rv.String())
+	case error:
+		EscapeString(buf, rv.Error())
 	default:
+		if rv == nil {
+			return false
+		}
 		switch reflect.TypeOf(rv).Kind() {
 		case reflect.String:
 			EscapeString(buf, reflect.ValueOf(rv).String())
 		case reflect.Bool:
-			boolToBuf(buf, reflect.ValueOf(rv).Bool())
+			buf.AppendBool(reflect.ValueOf(rv).Bool())
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			int64ToBuf(buf, reflect.ValueOf(rv).Int())
+			buf.AppendInt64(reflect.ValueOf(rv).Int())
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			uint64ToBuf(buf, reflect.ValueOf(rv).Uint())
+			buf.AppendUint64(reflect.ValueOf(rv).Uint())
 		case reflect.Float32, reflect.Float64:
-			float64ToBuf(buf, reflect.ValueOf(rv).Float())
+			buf.AppendFloat64(reflect.ValueOf(rv).Float())
 		default:
 			return false
 		}
 	}
+
 	return true
-}
-
-func uint8ToBuf(buf *Buffer, n uint8) {
-	buf.Buf = strconv.AppendUint(buf.EnsureSize(3), uint64(n), 10)
-}
-
-func uint16ToBuf(buf *Buffer, n uint16) {
-	buf.Buf = strconv.AppendUint(buf.EnsureSize(5), uint64(n), 10)
-}
-
-func uint32ToBuf(buf *Buffer, n uint32) {
-	buf.Buf = strconv.AppendUint(buf.EnsureSize(10), uint64(n), 10)
-}
-
-func uintToBuf(buf *Buffer, n uint) {
-	buf.Buf = strconv.AppendUint(buf.EnsureSize(20), uint64(n), 10)
-}
-
-func uint64ToBuf(buf *Buffer, n uint64) {
-	buf.Buf = strconv.AppendUint(buf.EnsureSize(20), n, 10)
-}
-
-func int8ToBuf(buf *Buffer, n int8) {
-	buf.Buf = strconv.AppendInt(buf.EnsureSize(4), int64(n), 10)
-}
-
-func int16ToBuf(buf *Buffer, n int16) {
-	buf.Buf = strconv.AppendInt(buf.EnsureSize(6), int64(n), 10)
-}
-
-func int32ToBuf(buf *Buffer, n int32) {
-	buf.Buf = strconv.AppendInt(buf.EnsureSize(11), int64(n), 10)
-}
-
-func intToBuf(buf *Buffer, n int) {
-	buf.Buf = strconv.AppendInt(buf.EnsureSize(21), int64(n), 10)
-}
-
-func int64ToBuf(buf *Buffer, n int64) {
-	buf.Buf = strconv.AppendInt(buf.EnsureSize(21), n, 10)
-}
-
-func float32ToBuf(buf *Buffer, n float32) {
-	buf.Buf = strconv.AppendFloat(buf.EnsureSize(20), float64(n), 'g', -1, 32)
-}
-
-func float64ToBuf(buf *Buffer, n float64) {
-	buf.Buf = strconv.AppendFloat(buf.EnsureSize(20), n, 'g', -1, 64)
-}
-
-func boolToBuf(buf *Buffer, n bool) {
-	if n {
-		buf.Buf = append(buf.EnsureSize(4), "true"...)
-	} else {
-		buf.Buf = append(buf.EnsureSize(5), "false"...)
-	}
 }
