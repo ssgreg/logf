@@ -13,10 +13,6 @@ type ObjectMarshaller interface {
 	MarshalLogfObject(FieldMarshaller) error
 }
 
-// type CompositeStringMarshaller interface {
-// 	MarshalString(string)
-// }
-
 type TypeMarshaller interface {
 	MarshalAny(interface{})
 

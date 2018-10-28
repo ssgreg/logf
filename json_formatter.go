@@ -3,7 +3,6 @@ package logf
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"time"
 	"unsafe"
 )
@@ -468,8 +467,8 @@ func (f *jsonFormatter) Format(buf *Buffer, e Entry) error {
 	buf.AppendByte('}')
 	buf.AppendByte('\n')
 
-	fmt.Println(string(buf.Buf))
-	panic(string(buf.Buf))
+	// fmt.Println(string(buf.Buf))
+	// panic(string(buf.Buf))
 
 	buf.Flush()
 

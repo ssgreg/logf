@@ -35,55 +35,6 @@ func (l Level) String() string {
 	}
 }
 
-// type StdLogger interface {
-// 	Print(...interface{})
-// 	Printf(string, ...interface{})
-// 	Println(...interface{})
-
-// 	Fatal(...interface{})
-// 	Fatalf(string, ...interface{})
-// 	Fatalln(...interface{})
-
-// 	Panic(...interface{})
-// 	Panicf(string, ...interface{})
-// 	Panicln(...interface{})
-// }
-
-// type FieldGetter interface {
-// 	Fields() ([]Field, FieldGetter)
-// }
-
-// type Logger interface {
-// 	FieldGetter
-
-// 	On(Level) EntryLogger
-
-// 	New() Context
-// }
-
-// type Entry interface {
-// 	FieldGetter
-
-// 	Timestamp() time.Time
-// 	Level() Level
-// 	Format() string
-// 	Args() []interface{}
-// }
-
-// type Context interface {
-// 	Field(k string, v interface{}) Context
-// 	Error(v error) Context
-
-// 	Logger() Logger
-// }
-
-// type EntryLogger interface {
-// 	Field(k string, v interface{}) EntryLogger
-// 	Error(v error) EntryLogger
-
-// 	Log(string, ...interface{})
-// }
-
 type Entry struct {
 	LoggerID      int32
 	DerivedFields []Field
