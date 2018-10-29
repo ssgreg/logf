@@ -15,7 +15,7 @@ type Buffer struct {
 }
 
 func NewBuffer(w io.Writer) *Buffer {
-	return &Buffer{make([]byte, 0, 4096*16), w, nil}
+	return &Buffer{make([]byte, 0, 4096), w, nil}
 }
 
 func (b *Buffer) Write(p []byte) (n int, err error) {
@@ -168,7 +168,7 @@ func EscapeString(buf *Buffer, s string) error {
 	return nil
 }
 
-func EscapeStringBytes(buf *Buffer, s []byte) error {
+func EscapeByteString(buf *Buffer, s []byte) error {
 	p := 0
 	for i := 0; i < len(s); {
 		c := s[i]

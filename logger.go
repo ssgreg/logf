@@ -16,8 +16,8 @@ type Entry struct {
 	Caller        EntryCaller
 }
 
-// Formatter TODO
-type Formatter interface {
+// Encoder TODO
+type Encoder interface {
 	Format(*Buffer, Entry) error
 }
 

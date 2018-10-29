@@ -98,7 +98,7 @@ func (a *DiscardAppender) Close() error {
 // }
 
 type StdoutAppender struct {
-	formatter Formatter
+	formatter Encoder
 	buf       *Buffer
 }
 
@@ -120,6 +120,6 @@ func (a *StdoutAppender) Close() error {
 	return nil
 }
 
-func NewStdoutAppender(formatter Formatter) Appender {
+func NewStdoutAppender(formatter Encoder) Appender {
 	return &StdoutAppender{formatter, NewBuffer(ioutil.Discard)}
 }
