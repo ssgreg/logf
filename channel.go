@@ -60,6 +60,10 @@ func (l *basicChannel) Write(e Entry) {
 	l.channel <- e
 }
 
+func (l *basicChannel) Len() int {
+	return len(l.channel)
+}
+
 func (l *basicChannel) worker() {
 	defer l.wg.Done()
 
