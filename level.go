@@ -5,10 +5,8 @@ type Level uint32
 
 // Severity levels.
 const (
-	// LevelDiscard logs nothing.
-	LevelDiscard Level = iota
 	// LevelError logs errors only.
-	LevelError
+	LevelError Level = iota
 	// LevelWarning logs errors and warnings.
 	LevelWarn
 	// LevelInfo is the default logging level. Logs errors, warnings and infos.
@@ -41,8 +39,6 @@ func (l Level) String() string {
 		return "warning"
 	case LevelError:
 		return "error"
-	case LevelDiscard:
-		return "discard"
 	default:
 		return "unknown"
 	}

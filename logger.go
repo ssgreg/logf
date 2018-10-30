@@ -16,16 +16,13 @@ type Entry struct {
 	Caller        EntryCaller
 }
 
-// Encoder TODO
-type Encoder interface {
-	Format(*Buffer, Entry) error
-}
-
-// Appender TODO
-type Appender interface {
-	Append(Entry) error
-	Close() error
-	Flush() error
+func NewErrorEntry(text string) Entry {
+	return Entry{
+		LoggerID: -1,
+		Level:    LevelError,
+		Time:     time.Now(),
+		Text:     text,
+	}
 }
 
 func NewLogger(level LevelChecker, w ChannelWriter) *Logger {
@@ -62,10 +59,6 @@ type Logger struct {
 func (l CheckedLogger) Write(text string, fs ...Field) {
 	l.logger.write(l.level, text, fs)
 }
-
-// func (l *Logger) Enabled() bool {
-// 	return l.level()
-// }
 
 func (l *Logger) AtLevel(lvl Level, fn func(CheckedLogger)) {
 	if !l.level(lvl) {

@@ -2,100 +2,122 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
-	"runtime"
-	"unsafe"
+	"io"
+	"io/ioutil"
+	"os"
+	"sync"
+
+	"github.com/ssgreg/logf"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-// type Enabler func(logf.Level) bool
+func newLogger(l logf.Level, w io.Writer) (*logf.Logger, logf.Channel) {
+	encoder := logf.NewJSONEncoder(&logf.FormatterConfig{
+		FormatTime: logf.RFC3339TimeFormatter,
+	})
 
-// func (f Enabler) Enabled(lvl logf.Level) bool {
-// 	return f(lvl)
-// }
+	channel := logf.NewBasicChannel(logf.ChannelConfig{
+		Appender:      logf.NewWriteAppender(w, encoder),
+		ErrorAppender: logf.NewWriteAppender(os.Stderr, encoder),
+	})
 
-// type Encoder struct{}
-
-// func (e Encoder) Print(k, v string) {
-// 	fmt.Println(k, v)
-// }
-
-// func To(i interface{}) func(string, string) interface{} {
-// 	return i.(func(string, string) interface{})
-// }
-
-// func Field(k, v string, next func(*Encoder)) func(e *Encoder) {
-// 	return func(e *Encoder) {
-// 		e.Print(k, v)
-// 		if next != nil {
-// 			next(e)
-// 		}
-// 	}
-// }
-
-// func test(logger *logf.MyLogger) {
-// 	for i := 0; i < 1000000; i++ {
-
-// 		rnd := make([]int, 1000)
-// 		for j := 0; j < 1000; j++ {
-// 			rnd[j] = rand.Int()
-// 		}
-
-// 		if i%10000 == 0 {
-// 			runtime.GC()
-// 			fmt.Println("gc", i/10000)
-// 		}
-
-// 		logger.Info("test", logf.ConstInts("k", rnd))
-// 	}
-
-// }
-
-func Get() uintptr {
-	rnd := make([]int, 100000)
-	for j := 0; j < 100000; j++ {
-		rnd[j] = rand.Int()
-	}
-
-	addr := uintptr(unsafe.Pointer(&rnd))
-
-	return addr
-	// fmt.Println(*(*[unsafe.Sizeof(s2)]byte)(addr))
-	// // addr1 := uintptr(addr) + 1
-	// // fmt.Println(*(*byte)(unsafe.Pointer(addr1)))
-	// // (*int16)(unsafe.Pointer(addr))
-
+	return logf.NewLogger(logf.NewMutableLevel(l).Checker(), channel), channel
 }
 
-func GetPointer() []byte {
-	rnd := make([]byte, 1000)
-	rand.Read(rnd)
-	rnd1 := string(rnd)
+var messages = makePseudoMessages(1000)
 
-	return *(*[]byte)(unsafe.Pointer(&rnd1))
+func makePseudoMessages(n int) []string {
+	messages := make([]string, n)
+	for i := range messages {
+		messages[i] = fmt.Sprintf("A text that pretend to be a real message in case of length %d", i)
+	}
+	return messages
+}
 
-	// return addr
-	// fmt.Println(*(*[unsafe.Sizeof(s2)]byte)(addr))
-	// // addr1 := uintptr(addr) + 1
-	// // fmt.Println(*(*byte)(unsafe.Pointer(addr1)))
-	// // (*int16)(unsafe.Pointer(addr))
+func getMessage(n int) string {
+	return messages[n%len(messages)]
+}
 
+func newZapLogger(lvl zapcore.Level) *zap.Logger {
+	c := zap.NewProductionConfig()
+	c.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	c.DisableCaller = true
+	c.OutputPaths = []string{"stdout"}
+	c.Sampling = nil
+
+	logger, _ := c.Build()
+	return logger
+
+	// ec := zap.NewProductionEncoderConfig()
+	// // ec.EncodeDuration = zapcore.NanosDurationEncoder
+	// // ec.EncodeTime = zapcore.EpochNanosTimeEncoder
+	// ec.EncodeTime = zapcore.ISO8601TimeEncoder
+	// enc := zapcore.NewJSONEncoder(ec)
+	// return zap.New(zapcore.NewCore(
+	// 	enc,
+	// 	&Discarder{},
+	// 	lvl,
+	// ))
+}
+
+// A Syncer is a spy for the Sync portion of zapcore.WriteSyncer.
+type Syncer struct {
+	err    error
+	called bool
+}
+
+// SetError sets the error that the Sync method will return.
+func (s *Syncer) SetError(err error) {
+	s.err = err
+}
+
+// Sync records that it was called, then returns the user-supplied error (if
+// any).
+func (s *Syncer) Sync() error {
+	s.called = true
+	return s.err
+}
+
+// Called reports whether the Sync method was called.
+func (s *Syncer) Called() bool {
+	return s.called
+}
+
+// A Discarder sends all writes to ioutil.Discard.
+type Discarder struct{ Syncer }
+
+// Write implements io.Writer.
+func (d *Discarder) Write(b []byte) (int, error) {
+	// return 0, errors.New("ficj")
+	return ioutil.Discard.Write(b)
+	// fmt.Println(string(b))
+	// panic(33)
+	// return 0, nil
 }
 
 func main() {
-	// addr := Get()
-	for i := 0; i < 1000000; i++ {
-		addr := GetPointer()
-		runtime.GC()
-		// fmt.Println(*(*[]int)(unsafe.Pointer(addr)))
-		fmt.Println(*(*string)(unsafe.Pointer(&addr)))
+	// tmp := make([]byte, 0, 1024*1024*200)
+
+	logger, channel := newLogger(logf.LevelDebug, os.Stdout) // bytes.NewBuffer(tmp))
+	defer channel.Close()
+
+	// logger := newZapLogger(zap.DebugLevel)
+	// defer logger.Sync()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1000)
+
+	for g := 0; g < 1000; g++ {
+		go func() {
+			defer wg.Done()
+
+			for i := 0; i < 1000; i++ {
+				logger.Info(getMessage(i), logf.Int("test", 1), logf.Int("test", 1), logf.Int("test", 1))
+				// time.Sleep(time.Millisecond)
+			}
+		}()
 	}
 
-	// channel := logf.NewBufferedChannel(0)
-	// logger := logf.NewLogger(logf.Info, channel)
-	// defer channel.Close()
-	// defer fmt.Println("test exited")
-	// defer runtime.GC()
-
-	// // its := []int{0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}
-	// test(logger)
+	wg.Wait()
 }

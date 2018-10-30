@@ -3,12 +3,34 @@ package logf
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"reflect"
 	"time"
+	"unicode/utf8"
 	"unsafe"
 )
 
 func NewJSONEncoder(c *FormatterConfig) Encoder {
 	f := &jsonEncoder{c, nil, NewCache(100)}
+
+	// Handle default for predefined field names.
+	if f.FieldKeyLevel == "" {
+		f.FieldKeyLevel = DefaultFieldKeyLevel
+	}
+	if f.FieldKeyMsg == "" {
+		f.FieldKeyMsg = DefaultFieldKeyMsg
+	}
+	if f.FieldKeyTime == "" {
+		f.FieldKeyTime = DefaultFieldKeyTime
+	}
+	if f.FieldKeyName == "" {
+		f.FieldKeyName = DefaultFieldKeyName
+	}
+	if f.FieldKeyCaller == "" {
+		f.FieldKeyCaller = DefaultFieldKeyCaller
+	}
+
+	// Handle defaults for type encoders.
 	if f.FormatDuration == nil {
 		f.FormatDuration = StringDurationFormatter
 	}
@@ -418,7 +440,7 @@ func (f *jsonEncoder) addKey(k string) {
 	f.buf.AppendByte(':')
 }
 
-func (f *jsonEncoder) Format(buf *Buffer, e Entry) error {
+func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 	f.buf = buf
 
 	buf.AppendByte('{')
@@ -470,7 +492,153 @@ func (f *jsonEncoder) Format(buf *Buffer, e Entry) error {
 	// fmt.Println(string(buf.Buf))
 	// panic(string(buf.Buf))
 
-	buf.Flush()
+	// buf.Flush()
 
 	return nil
+}
+
+const hex = "0123456789abcdef"
+
+func EscapeString(buf *Buffer, s string) error {
+	p := 0
+	for i := 0; i < len(s); {
+		c := s[i]
+		switch {
+		case c < utf8.RuneSelf && c >= 0x20 && c != '\\' && c != '"':
+			i++
+			continue
+		case c < utf8.RuneSelf:
+			buf.AppendString(s[p:i])
+			switch c {
+			case '\t':
+				buf.AppendString(`\t`)
+			case '\r':
+				buf.AppendString(`\r`)
+			case '\n':
+				buf.AppendString(`\n`)
+			case '\\':
+				buf.AppendString(`\\`)
+			case '"':
+				buf.AppendString(`\"`)
+			default:
+				buf.AppendString(`\u00`)
+				buf.AppendByte(hex[c>>4])
+				buf.AppendByte(hex[c&0xf])
+			}
+			i++
+			p = i
+			continue
+		}
+		v, wd := utf8.DecodeRuneInString(s[i:])
+		switch v {
+		case utf8.RuneError:
+			if wd == 1 {
+				buf.AppendString(s[p:i])
+				buf.AppendString(`\ufffd`)
+				p = i
+			}
+		case '\u2028', '\u2029':
+			buf.AppendString(s[p:i])
+			buf.AppendString(`\u202`)
+			buf.AppendByte(hex[v&0xf])
+			p = i
+		}
+		i += wd
+	}
+	buf.AppendString(s[p:])
+
+	return nil
+}
+
+func EscapeByteString(buf *Buffer, s []byte) error {
+	p := 0
+	for i := 0; i < len(s); {
+		c := s[i]
+		switch {
+		case c >= 0x20 && c != '\\' && c != '"':
+			i++
+			continue
+		default:
+			buf.AppendBytes(s[p:i])
+			switch c {
+			case '\t':
+				buf.AppendString(`\t`)
+			case '\r':
+				buf.AppendString(`\r`)
+			case '\n':
+				buf.AppendString(`\n`)
+			case '\\':
+				buf.AppendString(`\\`)
+			case '"':
+				buf.AppendString(`\"`)
+			default:
+				buf.AppendString(`\u00`)
+				buf.AppendByte(hex[c>>4])
+				buf.AppendByte(hex[c&0xf])
+			}
+			i++
+			p = i
+			continue
+		}
+	}
+	buf.AppendBytes(s[p:])
+
+	return nil
+}
+
+func KnownTypeToBuf(buf *Buffer, v interface{}) bool {
+	switch rv := v.(type) {
+	case string:
+		EscapeString(buf, rv)
+	case bool:
+		buf.AppendBool(rv)
+	case int:
+		buf.AppendInt(rv)
+	case int8:
+		buf.AppendInt8(rv)
+	case int16:
+		buf.AppendInt16(rv)
+	case int32:
+		buf.AppendInt32(rv)
+	case int64:
+		buf.AppendInt64(rv)
+	case uint:
+		buf.AppendUint(rv)
+	case uint8:
+		buf.AppendUint8(rv)
+	case uint16:
+		buf.AppendUint16(rv)
+	case uint32:
+		buf.AppendUint32(rv)
+	case uint64:
+		buf.AppendUint64(rv)
+	case float32:
+		buf.AppendFloat32(rv)
+	case float64:
+		buf.AppendFloat64(rv)
+	case fmt.Stringer:
+		EscapeString(buf, rv.String())
+	case error:
+		EscapeString(buf, rv.Error())
+	default:
+		if rv == nil {
+			return false
+		}
+		switch reflect.TypeOf(rv).Kind() {
+		case reflect.String:
+			EscapeString(buf, reflect.ValueOf(rv).String())
+		case reflect.Bool:
+			buf.AppendBool(reflect.ValueOf(rv).Bool())
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			buf.AppendInt64(reflect.ValueOf(rv).Int())
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			buf.AppendUint64(reflect.ValueOf(rv).Uint())
+		case reflect.Float32, reflect.Float64:
+			buf.AppendFloat64(reflect.ValueOf(rv).Float())
+		default:
+			return false
+		}
+	}
+
+	return true
 }

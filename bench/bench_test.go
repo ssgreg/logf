@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"runtime"
+	"os"
 	"testing"
 	"time"
 
@@ -542,7 +542,20 @@ func newZapLogger(lvl zapcore.Level) *zap.Logger {
 }
 
 func newLogger(l logf.Level) (*logf.Logger, logf.Channel) {
-	channel := logf.NewBufferedChannel(runtime.NumCPU() * 2)
+	encoder := logf.NewJSONEncoder(&logf.FormatterConfig{
+		FieldKeyLevel:  "level",
+		FieldKeyMsg:    "msg",
+		FieldKeyTime:   "ts",
+		FieldKeyName:   "logger",
+		FieldKeyCaller: "caller",
+		FormatTime:     logf.RFC3339TimeFormatter,
+	})
+
+	channel := logf.NewBasicChannel(logf.ChannelConfig{
+		Appender:      logf.NewWriteAppender(ioutil.Discard, encoder),
+		ErrorAppender: logf.NewWriteAppender(os.Stderr, encoder),
+	})
+
 	return logf.NewLogger(logf.NewMutableLevel(l).Checker(), channel), channel
 }
 
