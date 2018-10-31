@@ -14,7 +14,7 @@ import (
 )
 
 func newLogger(l logf.Level, w io.Writer) (*logf.Logger, logf.Channel) {
-	encoder := logf.NewJSONEncoder(logf.SetJSONFormatterConfigDefaults(&logf.FormatterConfig{}))
+	encoder := logf.NewJSONEncoder(logf.SetFormatterConfigDefaults(&logf.FormatterConfig{}))
 	channel := logf.NewBasicChannel(logf.ChannelConfig{
 		Appender:      logf.NewWriteAppender(w, encoder),
 		ErrorAppender: logf.NewWriteAppender(os.Stderr, encoder),

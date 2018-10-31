@@ -89,3 +89,7 @@ type FieldMarshaller interface {
 	MarshalFieldArray(string, ArrayMarshaller)
 	MarshalFieldObject(string, ObjectMarshaller)
 }
+
+type TypeMarshallerFactory interface {
+	TypeMarshaller(*Buffer) TypeMarshaller
+}

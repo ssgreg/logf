@@ -10,50 +10,24 @@ import (
 	"unsafe"
 )
 
-func SetJSONFormatterConfigDefaults(c *FormatterConfig) *FormatterConfig {
-	// Handle default for predefined field names.
-	if c.FieldKeyLevel == "" {
-		c.FieldKeyLevel = DefaultFieldKeyLevel
-	}
-	if c.FieldKeyMsg == "" {
-		c.FieldKeyMsg = DefaultFieldKeyMsg
-	}
-	if c.FieldKeyTime == "" {
-		c.FieldKeyTime = DefaultFieldKeyTime
-	}
-	if c.FieldKeyName == "" {
-		c.FieldKeyName = DefaultFieldKeyName
-	}
-	if c.FieldKeyCaller == "" {
-		c.FieldKeyCaller = DefaultFieldKeyCaller
-	}
-
-	// Handle defaults for type encoder.
-	if c.FormatDuration == nil {
-		c.FormatDuration = StringDurationFormatter
-	}
-	if c.FormatTime == nil {
-		c.FormatTime = RFC3339TimeFormatter
-	}
-	if c.FormatError == nil {
-		c.FormatError = DefaultErrorFormatter
-	}
-	if c.FormatCaller == nil {
-		c.FormatCaller = ShortCallerFormatter
-	}
-
-	return c
+func NewJSONEncoder(c *FormatterConfig) Encoder {
+	return &jsonEncoder{c, NewCache(100), nil}
 }
 
-func NewJSONEncoder(c *FormatterConfig) Encoder {
-	return &jsonEncoder{c, nil, NewCache(100)}
+func NewJSONTypeMarshaller(c *FormatterConfig) TypeMarshallerFactory {
+	return &jsonEncoder{c, nil, nil}
 }
 
 type jsonEncoder struct {
 	*FormatterConfig
-
-	buf   *Buffer
 	cache *Cache
+
+	buf *Buffer
+}
+
+func (f *jsonEncoder) TypeMarshaller(buf *Buffer) TypeMarshaller {
+	f.buf = buf
+	return f
 }
 
 func (f *jsonEncoder) MarshalFieldAny(k string, v interface{}) {
