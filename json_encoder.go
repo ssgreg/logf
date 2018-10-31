@@ -14,7 +14,7 @@ func NewJSONEncoder(c *FormatterConfig) Encoder {
 	return &jsonEncoder{c, NewCache(100), nil}
 }
 
-func NewJSONTypeMarshaller(c *FormatterConfig) TypeMarshallerFactory {
+func NewJSONTypeMarshallerFactory(c *FormatterConfig) TypeMarshallerFactory {
 	return &jsonEncoder{c, nil, nil}
 }
 
