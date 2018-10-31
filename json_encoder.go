@@ -208,7 +208,7 @@ func (f *jsonEncoder) MarshalUnsafeBytes(v unsafe.Pointer) {
 
 func (f *jsonEncoder) MarshalBool(v bool) {
 	f.appendSeparator()
-	f.buf.AppendBool(v)
+	AppendBool(f.buf, v)
 }
 
 func (f *jsonEncoder) MarshalString(v string) {
@@ -220,52 +220,52 @@ func (f *jsonEncoder) MarshalString(v string) {
 
 func (f *jsonEncoder) MarshalInt64(v int64) {
 	f.appendSeparator()
-	f.buf.AppendInt64(v)
+	AppendInt(f.buf, v)
 }
 
 func (f *jsonEncoder) MarshalInt32(v int32) {
 	f.appendSeparator()
-	f.buf.AppendInt32(v)
+	AppendInt(f.buf, int64(v))
 }
 
 func (f *jsonEncoder) MarshalInt16(v int16) {
 	f.appendSeparator()
-	f.buf.AppendInt16(v)
+	AppendInt(f.buf, int64(v))
 }
 
 func (f *jsonEncoder) MarshalInt8(v int8) {
 	f.appendSeparator()
-	f.buf.AppendInt8(v)
+	AppendInt(f.buf, int64(v))
 }
 
 func (f *jsonEncoder) MarshalUint64(v uint64) {
 	f.appendSeparator()
-	f.buf.AppendUint64(v)
+	AppendUint(f.buf, uint64(v))
 }
 
 func (f *jsonEncoder) MarshalUint32(v uint32) {
 	f.appendSeparator()
-	f.buf.AppendUint32(v)
+	AppendUint(f.buf, uint64(v))
 }
 
 func (f *jsonEncoder) MarshalUint16(v uint16) {
 	f.appendSeparator()
-	f.buf.AppendUint16(v)
+	AppendUint(f.buf, uint64(v))
 }
 
 func (f *jsonEncoder) MarshalUint8(v uint8) {
 	f.appendSeparator()
-	f.buf.AppendUint8(v)
+	AppendUint(f.buf, uint64(v))
 }
 
 func (f *jsonEncoder) MarshalFloat64(v float64) {
 	f.appendSeparator()
-	f.buf.AppendFloat64(v)
+	AppendFloat64(f.buf, v)
 }
 
 func (f *jsonEncoder) MarshalFloat32(v float32) {
 	f.appendSeparator()
-	f.buf.AppendFloat32(v)
+	AppendFloat32(f.buf, v)
 }
 
 func (f *jsonEncoder) MarshalDuration(v time.Duration) {
@@ -280,12 +280,7 @@ func (f *jsonEncoder) MarshalTime(v time.Time) {
 
 func (f *jsonEncoder) MarshalBytes(v []byte) {
 	f.buf.AppendByte('"')
-	// f.buf.AppendString(base64.StdEncoding.EncodeToString(v))
-
-	// TODO: add ensure size by enc.EncodedLen(len(src))
-	base64.StdEncoding.Encode(f.buf.Buf, v)
-	// e := base64.NewEncoder(base64.StdEncoding, f.buf)
-	// e.Write(v)
+	base64.StdEncoding.Encode(f.buf.ExtendBytes(base64.StdEncoding.EncodedLen(len(v))), v)
 	f.buf.AppendByte('"')
 }
 
@@ -451,7 +446,7 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 		}
 
 		bf := make([]byte, buf.Len()-le)
-		copy(bf, buf.Buf[le:])
+		copy(bf, buf.Data[le:])
 		f.cache.Set(e.LoggerID, bf)
 	}
 
@@ -555,31 +550,31 @@ func KnownTypeToBuf(buf *Buffer, v interface{}) bool {
 	case string:
 		EscapeString(buf, rv)
 	case bool:
-		buf.AppendBool(rv)
+		AppendBool(buf, rv)
 	case int:
-		buf.AppendInt(rv)
+		AppendInt(buf, int64(rv))
 	case int8:
-		buf.AppendInt8(rv)
+		AppendInt(buf, int64(rv))
 	case int16:
-		buf.AppendInt16(rv)
+		AppendInt(buf, int64(rv))
 	case int32:
-		buf.AppendInt32(rv)
+		AppendInt(buf, int64(rv))
 	case int64:
-		buf.AppendInt64(rv)
+		AppendInt(buf, int64(rv))
 	case uint:
-		buf.AppendUint(rv)
+		AppendUint(buf, uint64(rv))
 	case uint8:
-		buf.AppendUint8(rv)
+		AppendUint(buf, uint64(rv))
 	case uint16:
-		buf.AppendUint16(rv)
+		AppendUint(buf, uint64(rv))
 	case uint32:
-		buf.AppendUint32(rv)
+		AppendUint(buf, uint64(rv))
 	case uint64:
-		buf.AppendUint64(rv)
+		AppendUint(buf, uint64(rv))
 	case float32:
-		buf.AppendFloat32(rv)
+		AppendFloat32(buf, rv)
 	case float64:
-		buf.AppendFloat64(rv)
+		AppendFloat64(buf, rv)
 	case fmt.Stringer:
 		EscapeString(buf, rv.String())
 	case error:
@@ -592,13 +587,13 @@ func KnownTypeToBuf(buf *Buffer, v interface{}) bool {
 		case reflect.String:
 			EscapeString(buf, reflect.ValueOf(rv).String())
 		case reflect.Bool:
-			buf.AppendBool(reflect.ValueOf(rv).Bool())
+			AppendBool(buf, reflect.ValueOf(rv).Bool())
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			buf.AppendInt64(reflect.ValueOf(rv).Int())
+			AppendInt(buf, reflect.ValueOf(rv).Int())
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			buf.AppendUint64(reflect.ValueOf(rv).Uint())
+			AppendUint(buf, reflect.ValueOf(rv).Uint())
 		case reflect.Float32, reflect.Float64:
-			buf.AppendFloat64(reflect.ValueOf(rv).Float())
+			AppendFloat64(buf, reflect.ValueOf(rv).Float())
 		default:
 			return false
 		}

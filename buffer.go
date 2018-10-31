@@ -4,105 +4,127 @@ import (
 	"strconv"
 )
 
+// PageSize is the recommended buffer size.
+const (
+	PageSize = 4 * 1024
+)
+
+// NewBuffer creates the new instance of Buffer with default capacity.
+func NewBuffer() *Buffer {
+	return NewBufferWithCapacity(PageSize)
+}
+
+// NewBufferWithCapacity creates the new instance of Buffer with the given
+// capacity.
+func NewBufferWithCapacity(capacity int) *Buffer {
+	return &Buffer{make([]byte, 0, capacity)}
+}
+
+// Buffer is a helping wrapper for byte slice.
 type Buffer struct {
-	Buf []byte
-	err error
+	Data []byte
 }
 
-func NewBuffer(capacity int) *Buffer {
-	return &Buffer{make([]byte, 0, capacity), nil}
-}
-
+// Write implements io.Writer.
 func (b *Buffer) Write(p []byte) (n int, err error) {
-	b.Buf = append(b.Buf, p...)
+	b.Data = append(b.Data, p...)
 
 	return len(p), nil
 }
 
-func (b *Buffer) Error() error {
-	return b.err
+// String implements fmt.Stringer.
+func (b *Buffer) String() string {
+	return string(b.Data)
 }
 
-func (b *Buffer) AppendString(data string) {
-	b.Buf = append(b.Buf, data...)
-}
-
-func (b *Buffer) AppendBytes(data []byte) {
-	b.Buf = append(b.Buf, data...)
-}
-
-func (b *Buffer) AppendByte(data byte) {
-	b.Buf = append(b.Buf, data)
-}
-
-func (b *Buffer) Reset() {
-	b.collapse()
-}
-
-func (b *Buffer) Back() byte {
-	return b.Buf[len(b.Buf)-1]
-}
-
-func (b *Buffer) Len() int {
-	return len(b.Buf)
-}
-
-func (b *Buffer) collapse() {
-	b.Buf = b.Buf[:0]
-}
-
-func (b *Buffer) AppendUint8(n uint8) {
-	b.Buf = strconv.AppendUint(b.Buf, uint64(n), 10)
-}
-
-func (b *Buffer) AppendUint16(n uint16) {
-	b.Buf = strconv.AppendUint(b.Buf, uint64(n), 10)
-}
-
-func (b *Buffer) AppendUint32(n uint32) {
-	b.Buf = strconv.AppendUint(b.Buf, uint64(n), 10)
-}
-
-func (b *Buffer) AppendUint(n uint) {
-	b.Buf = strconv.AppendUint(b.Buf, uint64(n), 10)
-}
-
-func (b *Buffer) AppendUint64(n uint64) {
-	b.Buf = strconv.AppendUint(b.Buf, n, 10)
-}
-
-func (b *Buffer) AppendInt8(n int8) {
-	b.Buf = strconv.AppendInt(b.Buf, int64(n), 10)
-}
-
-func (b *Buffer) AppendInt16(n int16) {
-	b.Buf = strconv.AppendInt(b.Buf, int64(n), 10)
-}
-
-func (b *Buffer) AppendInt32(n int32) {
-	b.Buf = strconv.AppendInt(b.Buf, int64(n), 10)
-}
-
-func (b *Buffer) AppendInt(n int) {
-	b.Buf = strconv.AppendInt(b.Buf, int64(n), 10)
-}
-
-func (b *Buffer) AppendInt64(n int64) {
-	b.Buf = strconv.AppendInt(b.Buf, n, 10)
-}
-
-func (b *Buffer) AppendFloat32(n float32) {
-	b.Buf = strconv.AppendFloat(b.Buf, float64(n), 'g', -1, 32)
-}
-
-func (b *Buffer) AppendFloat64(n float64) {
-	b.Buf = strconv.AppendFloat(b.Buf, n, 'g', -1, 64)
-}
-
-func (b *Buffer) AppendBool(n bool) {
-	if n {
-		b.Buf = append(b.Buf, "true"...)
-	} else {
-		b.Buf = append(b.Buf, "false"...)
+// EnsureSize ensures that the Buffer is able to append 's' bytes without
+// a futher realloc.
+func (b *Buffer) EnsureSize(s int) []byte {
+	if cap(b.Data)-len(b.Data) < s {
+		tmpLen := len(b.Data)
+		tmp := make([]byte, tmpLen, tmpLen+s+(tmpLen>>1))
+		copy(tmp, b.Data)
+		b.Data = tmp
 	}
+
+	return b.Data
+}
+
+// ExtendBytes extends the Buffer with the given size and returns a slice
+// tp extended part of the Buffer.
+func (b *Buffer) ExtendBytes(s int) []byte {
+	b.Data = append(b.Data, make([]byte, s)...)
+
+	return b.Data[len(b.Data)-s:]
+}
+
+// AppendString appends a string to the Buffer.
+func (b *Buffer) AppendString(data string) {
+	b.Data = append(b.Data, data...)
+}
+
+// AppendBytes appends a byte slice to the Buffer.
+func (b *Buffer) AppendBytes(data []byte) {
+	b.Data = append(b.Data, data...)
+}
+
+// AppendByte appends a single byte to the Buffer.
+func (b *Buffer) AppendByte(data byte) {
+	b.Data = append(b.Data, data)
+}
+
+// Reset resets the underlying byte slice.
+func (b *Buffer) Reset() {
+	b.Data = b.Data[:0]
+}
+
+// Back returns the last byte of the underlying byte slice. A caller is in
+// charge of checking that the Buffer is not empty.
+func (b *Buffer) Back() byte {
+	return b.Data[len(b.Data)-1]
+}
+
+// Bytes returns the underlying byte slice as is.
+func (b *Buffer) Bytes() []byte {
+	return b.Data
+}
+
+// Len returns the length of the underlying byte slice.
+func (b *Buffer) Len() int {
+	return len(b.Data)
+}
+
+// Cap returns the capacity of the underlying byte slice.
+func (b *Buffer) Cap() int {
+	return cap(b.Data)
+}
+
+// AppendUint appends the string form in the base 10 of the given unsigned
+// integer to the given Buffer.
+func AppendUint(b *Buffer, n uint64) {
+	b.Data = strconv.AppendUint(b.Data, n, 10)
+}
+
+// AppendInt appends the string form in the base 10 of the given integer
+// to the given Buffer.
+func AppendInt(b *Buffer, n int64) {
+	b.Data = strconv.AppendInt(b.Data, n, 10)
+}
+
+// AppendFloat32 appends the string form of the given float32 to the given
+// Buffer.
+func AppendFloat32(b *Buffer, n float32) {
+	b.Data = strconv.AppendFloat(b.Data, float64(n), 'g', -1, 32)
+}
+
+// AppendFloat64 appends the string form of the given float32 to the given
+// Buffer.
+func AppendFloat64(b *Buffer, n float64) {
+	b.Data = strconv.AppendFloat(b.Data, n, 'g', -1, 64)
+}
+
+// AppendBool appends "true" or "false", according to the given bool to the
+// given Buffer.
+func AppendBool(b *Buffer, n bool) {
+	b.Data = strconv.AppendBool(b.Data, n)
 }

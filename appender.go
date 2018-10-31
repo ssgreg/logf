@@ -22,7 +22,7 @@ type Appender interface {
 func NewWriteAppender(w io.Writer, enc Encoder) Appender {
 	s, _ := w.(syncer)
 
-	return &writeAppender{w, s, enc, NewBuffer(4096 * 2)}
+	return &writeAppender{w, s, enc, NewBufferWithCapacity(PageSize * 2)}
 }
 
 // syncer provides access the the Sync function of a Writer.
@@ -42,8 +42,7 @@ func (a *writeAppender) Append(entry Entry) error {
 	if err != nil {
 		return err
 	}
-	// TODO: fix hardcode
-	if len(a.buf.Buf) > 4096 {
+	if a.buf.Len() > PageSize {
 		a.Flush()
 	}
 
@@ -64,9 +63,9 @@ func (a *writeAppender) Sync() (err error) {
 }
 
 func (a *writeAppender) Flush() error {
-	if len(a.buf.Buf) != 0 {
+	if a.buf.Len() != 0 {
 		defer a.buf.Reset()
-		_, err := a.w.Write(a.buf.Buf)
+		_, err := a.w.Write(a.buf.Bytes())
 
 		return err
 	}

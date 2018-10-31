@@ -111,7 +111,7 @@ func main() {
 			defer wg.Done()
 
 			for i := 0; i < 1000; i++ {
-				logger.Info(getMessage(i), logf.Int("test", 1), logf.Int("test", 1), logf.Int("test", 1))
+				logger.Info(getMessage(i), logf.Bytes("test", []byte(`1), logf.Int("test", 1), logf.Int("test", 1)`)))
 				time.Sleep(time.Second)
 			}
 		}()
