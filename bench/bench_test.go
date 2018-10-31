@@ -542,14 +542,7 @@ func newZapLogger(lvl zapcore.Level) *zap.Logger {
 }
 
 func newLogger(l logf.Level) (*logf.Logger, logf.Channel) {
-	encoder := logf.NewJSONEncoder(&logf.FormatterConfig{
-		FieldKeyLevel:  "level",
-		FieldKeyMsg:    "msg",
-		FieldKeyTime:   "ts",
-		FieldKeyName:   "logger",
-		FieldKeyCaller: "caller",
-		FormatTime:     logf.RFC3339TimeFormatter,
-	})
+	encoder := logf.NewJSONEncoder(logf.SetJSONFormatterConfigDefaults(&logf.FormatterConfig{}))
 
 	channel := logf.NewBasicChannel(logf.ChannelConfig{
 		Appender:      logf.NewWriteAppender(ioutil.Discard, encoder),

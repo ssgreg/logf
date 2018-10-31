@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/ssgreg/logf"
 	"go.uber.org/zap"
@@ -13,10 +14,7 @@ import (
 )
 
 func newLogger(l logf.Level, w io.Writer) (*logf.Logger, logf.Channel) {
-	encoder := logf.NewJSONEncoder(&logf.FormatterConfig{
-		FormatTime: logf.RFC3339TimeFormatter,
-	})
-
+	encoder := logf.NewJSONEncoder(logf.SetJSONFormatterConfigDefaults(&logf.FormatterConfig{}))
 	channel := logf.NewBasicChannel(logf.ChannelConfig{
 		Appender:      logf.NewWriteAppender(w, encoder),
 		ErrorAppender: logf.NewWriteAppender(os.Stderr, encoder),
@@ -106,15 +104,15 @@ func main() {
 	// defer logger.Sync()
 
 	wg := sync.WaitGroup{}
-	wg.Add(1000)
+	wg.Add(1)
 
-	for g := 0; g < 1000; g++ {
+	for g := 0; g < 1; g++ {
 		go func() {
 			defer wg.Done()
 
 			for i := 0; i < 1000; i++ {
 				logger.Info(getMessage(i), logf.Int("test", 1), logf.Int("test", 1), logf.Int("test", 1))
-				// time.Sleep(time.Millisecond)
+				time.Sleep(time.Second)
 			}
 		}()
 	}

@@ -10,41 +10,43 @@ import (
 	"unsafe"
 )
 
-func NewJSONEncoder(c *FormatterConfig) Encoder {
-	f := &jsonEncoder{c, nil, NewCache(100)}
-
+func SetJSONFormatterConfigDefaults(c *FormatterConfig) *FormatterConfig {
 	// Handle default for predefined field names.
-	if f.FieldKeyLevel == "" {
-		f.FieldKeyLevel = DefaultFieldKeyLevel
+	if c.FieldKeyLevel == "" {
+		c.FieldKeyLevel = DefaultFieldKeyLevel
 	}
-	if f.FieldKeyMsg == "" {
-		f.FieldKeyMsg = DefaultFieldKeyMsg
+	if c.FieldKeyMsg == "" {
+		c.FieldKeyMsg = DefaultFieldKeyMsg
 	}
-	if f.FieldKeyTime == "" {
-		f.FieldKeyTime = DefaultFieldKeyTime
+	if c.FieldKeyTime == "" {
+		c.FieldKeyTime = DefaultFieldKeyTime
 	}
-	if f.FieldKeyName == "" {
-		f.FieldKeyName = DefaultFieldKeyName
+	if c.FieldKeyName == "" {
+		c.FieldKeyName = DefaultFieldKeyName
 	}
-	if f.FieldKeyCaller == "" {
-		f.FieldKeyCaller = DefaultFieldKeyCaller
-	}
-
-	// Handle defaults for type encoders.
-	if f.FormatDuration == nil {
-		f.FormatDuration = StringDurationFormatter
-	}
-	if f.FormatTime == nil {
-		f.FormatTime = RFC3339TimeFormatter
-	}
-	if f.FormatError == nil {
-		f.FormatError = DefaultErrorFormatter
-	}
-	if f.FormatCaller == nil {
-		f.FormatCaller = ShortCallerFormatter
+	if c.FieldKeyCaller == "" {
+		c.FieldKeyCaller = DefaultFieldKeyCaller
 	}
 
-	return f
+	// Handle defaults for type encoder.
+	if c.FormatDuration == nil {
+		c.FormatDuration = StringDurationFormatter
+	}
+	if c.FormatTime == nil {
+		c.FormatTime = RFC3339TimeFormatter
+	}
+	if c.FormatError == nil {
+		c.FormatError = DefaultErrorFormatter
+	}
+	if c.FormatCaller == nil {
+		c.FormatCaller = ShortCallerFormatter
+	}
+
+	return c
+}
+
+func NewJSONEncoder(c *FormatterConfig) Encoder {
+	return &jsonEncoder{c, nil, NewCache(100)}
 }
 
 type jsonEncoder struct {
@@ -466,13 +468,6 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 		field.Accept(f)
 	}
 
-	// for _, field := range e.DerivedFields {
-	// 	buf.AppendString(",")
-	// 	EscapeString(buf, field.Key)
-	// 	buf.AppendString(":")
-	// 	field.Accept(f)
-	// }
-
 	if bytes, ok := f.cache.Get(e.LoggerID); ok {
 		buf.AppendBytes(bytes)
 	} else {
@@ -488,11 +483,6 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 
 	buf.AppendByte('}')
 	buf.AppendByte('\n')
-
-	// fmt.Println(string(buf.Buf))
-	// panic(string(buf.Buf))
-
-	// buf.Flush()
 
 	return nil
 }
