@@ -1,4 +1,4 @@
-package logfjson
+package logf
 
 import (
 	"bytes"
@@ -6,13 +6,12 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ssgreg/logf"
 	"github.com/stretchr/testify/require"
 )
 
 type encoderTestCase struct {
 	Name   string
-	Entry  []logf.Entry
+	Entry  []Entry
 	Golden string
 }
 
@@ -21,10 +20,10 @@ func TestEncoder(t *testing.T) {
 	testCases := []encoderTestCase{
 		{
 			"Simple",
-			[]logf.Entry{
+			[]Entry{
 				{
 					LoggerID: int32(rand.Int()),
-					Level:    logf.LevelInfo,
+					Level:    LevelInfo,
 					Text:     "message",
 				},
 			},
@@ -32,13 +31,13 @@ func TestEncoder(t *testing.T) {
 		},
 		{
 			"SimpleCheck",
-			[]logf.Entry{
+			[]Entry{
 				{
 					LoggerID: int32(rand.Int()),
-					Level:    logf.LevelInfo,
+					Level:    LevelInfo,
 					Text:     "message",
-					Fields: []logf.Field{
-						logf.Any("s", "str"),
+					Fields: []Field{
+						Any("s", "str"),
 					},
 				},
 			},
@@ -50,7 +49,7 @@ func TestEncoder(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			b := logf.NewBuffer()
+			b := NewBuffer()
 			for _, e := range tc.Entry {
 				enc.Encode(b, e)
 			}
@@ -64,6 +63,6 @@ func TestEncoder(t *testing.T) {
 
 }
 
-func newTestEncoder() logf.Encoder {
+func newTestEncoder() Encoder {
 	return NewEncoder(EncoderConfig{})
 }

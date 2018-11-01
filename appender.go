@@ -21,6 +21,31 @@ type Appender interface {
 	Sync() error
 }
 
+// NewDiscardAppender creates the new instance of an appender that does
+// nothing.
+func NewDiscardAppender() Appender {
+	return &discardAppender{}
+}
+
+type discardAppender struct {
+}
+
+func (a *discardAppender) Append(Entry) error {
+	return nil
+}
+
+func (a *discardAppender) Sync() (err error) {
+	return nil
+}
+
+func (a *discardAppender) Flush() error {
+	return nil
+}
+
+func (a *discardAppender) Close() error {
+	return nil
+}
+
 func NewWriteAppender(w io.Writer, enc Encoder) Appender {
 	s, _ := w.(syncer)
 

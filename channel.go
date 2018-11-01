@@ -30,6 +30,10 @@ func NewBasicChannel(cfg ChannelConfig) Channel {
 	if cfg.Capacity < minCap {
 		cfg.Capacity = minCap
 	}
+	if cfg.ErrorAppender == nil {
+		cfg.ErrorAppender = NewDiscardAppender()
+	}
+	// TODO: set default for Appender - text, stdout
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

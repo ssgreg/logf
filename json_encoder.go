@@ -1,4 +1,4 @@
-package logfjson
+package logf
 
 import (
 	"encoding/base64"
@@ -6,34 +6,32 @@ import (
 	"time"
 	"unicode/utf8"
 	"unsafe"
-
-	"github.com/ssgreg/logf"
 )
 
-func NewEncoder(c EncoderConfig) logf.Encoder {
-	return &Encoder{c.WithDefaults(), logf.NewCache(100), nil, 0}
+func NewJSONEncoder(c JSONEncoderConfig) Encoder {
+	return &jsonEncoder{c.WithDefaults(), NewCache(100), nil, 0}
 }
 
-func NewTypeEncoderFactory(c EncoderConfig) logf.TypeEncoderFactory {
-	return &Encoder{c.WithDefaults(), nil, nil, 0}
+func NewJSONTypeEncoderFactory(c JSONEncoderConfig) TypeEncoderFactory {
+	return &jsonEncoder{c.WithDefaults(), nil, nil, 0}
 }
 
-type Encoder struct {
-	EncoderConfig
-	cache *logf.Cache
+type jsonEncoder struct {
+	JSONEncoderConfig
+	cache *Cache
 
-	buf         *logf.Buffer
+	buf         *Buffer
 	startBufLen int
 }
 
-func (f *Encoder) TypeEncoder(buf *logf.Buffer) logf.TypeEncoder {
+func (f *jsonEncoder) TypeEncoder(buf *Buffer) TypeEncoder {
 	f.buf = buf
 	f.startBufLen = f.buf.Len()
 
 	return f
 }
 
-func (f *Encoder) Encode(buf *logf.Buffer, e logf.Entry) error {
+func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 	// TODO: move to clone
 	f.buf = buf
 	f.startBufLen = f.buf.Len()
@@ -81,163 +79,163 @@ func (f *Encoder) Encode(buf *logf.Buffer, e logf.Entry) error {
 	return nil
 }
 
-func (f *Encoder) EncodeFieldAny(k string, v interface{}) {
+func (f *jsonEncoder) EncodeFieldAny(k string, v interface{}) {
 	f.addKey(k)
 	f.EncodeTypeAny(v)
 }
 
-func (f *Encoder) EncodeFieldBool(k string, v bool) {
+func (f *jsonEncoder) EncodeFieldBool(k string, v bool) {
 	f.addKey(k)
 	f.EncodeTypeBool(v)
 }
 
-func (f *Encoder) EncodeFieldInt64(k string, v int64) {
+func (f *jsonEncoder) EncodeFieldInt64(k string, v int64) {
 	f.addKey(k)
 	f.EncodeTypeInt64(v)
 }
 
-func (f *Encoder) EncodeFieldInt32(k string, v int32) {
+func (f *jsonEncoder) EncodeFieldInt32(k string, v int32) {
 	f.addKey(k)
 	f.EncodeTypeInt32(v)
 }
 
-func (f *Encoder) EncodeFieldInt16(k string, v int16) {
+func (f *jsonEncoder) EncodeFieldInt16(k string, v int16) {
 	f.addKey(k)
 	f.EncodeTypeInt16(v)
 }
 
-func (f *Encoder) EncodeFieldInt8(k string, v int8) {
+func (f *jsonEncoder) EncodeFieldInt8(k string, v int8) {
 	f.addKey(k)
 	f.EncodeTypeInt8(v)
 }
 
-func (f *Encoder) EncodeFieldUint64(k string, v uint64) {
+func (f *jsonEncoder) EncodeFieldUint64(k string, v uint64) {
 	f.addKey(k)
 	f.EncodeTypeUint64(v)
 }
 
-func (f *Encoder) EncodeFieldUint32(k string, v uint32) {
+func (f *jsonEncoder) EncodeFieldUint32(k string, v uint32) {
 	f.addKey(k)
 	f.EncodeTypeUint32(v)
 }
 
-func (f *Encoder) EncodeFieldUint16(k string, v uint16) {
+func (f *jsonEncoder) EncodeFieldUint16(k string, v uint16) {
 	f.addKey(k)
 	f.EncodeTypeUint16(v)
 }
 
-func (f *Encoder) EncodeFieldUint8(k string, v uint8) {
+func (f *jsonEncoder) EncodeFieldUint8(k string, v uint8) {
 	f.addKey(k)
 	f.EncodeTypeUint8(v)
 }
 
-func (f *Encoder) EncodeFieldFloat64(k string, v float64) {
+func (f *jsonEncoder) EncodeFieldFloat64(k string, v float64) {
 	f.addKey(k)
 	f.EncodeTypeFloat64(v)
 }
 
-func (f *Encoder) EncodeFieldFloat32(k string, v float32) {
+func (f *jsonEncoder) EncodeFieldFloat32(k string, v float32) {
 	f.addKey(k)
 	f.EncodeTypeFloat32(v)
 }
 
-func (f *Encoder) EncodeFieldString(k string, v string) {
+func (f *jsonEncoder) EncodeFieldString(k string, v string) {
 	f.addKey(k)
 	f.EncodeTypeString(v)
 }
 
-func (f *Encoder) EncodeFieldDuration(k string, v time.Duration) {
+func (f *jsonEncoder) EncodeFieldDuration(k string, v time.Duration) {
 	f.addKey(k)
 	f.EncodeTypeDuration(v)
 }
 
-func (f *Encoder) EncodeFieldError(k string, v error) {
+func (f *jsonEncoder) EncodeFieldError(k string, v error) {
 	// The only exception that has no EncodeX function. EncodeError can add
 	// new fields by itself.
 	f.EncodeError(k, v, f)
 }
 
-func (f *Encoder) EncodeFieldTime(k string, v time.Time) {
+func (f *jsonEncoder) EncodeFieldTime(k string, v time.Time) {
 	f.addKey(k)
 	f.EncodeTypeTime(v)
 }
 
-func (f *Encoder) EncodeFieldArray(k string, v logf.ArrayEncoder) {
+func (f *jsonEncoder) EncodeFieldArray(k string, v ArrayEncoder) {
 	f.addKey(k)
 	f.EncodeTypeArray(v)
 }
 
-func (f *Encoder) EncodeFieldObject(k string, v logf.ObjectEncoder) {
+func (f *jsonEncoder) EncodeFieldObject(k string, v ObjectEncoder) {
 	f.addKey(k)
 	f.EncodeTypeObject(v)
 }
 
-func (f *Encoder) EncodeFieldBytes(k string, v []byte) {
+func (f *jsonEncoder) EncodeFieldBytes(k string, v []byte) {
 	f.addKey(k)
 	f.EncodeTypeBytes(v)
 }
 
-func (f *Encoder) EncodeFieldBools(k string, v []bool) {
+func (f *jsonEncoder) EncodeFieldBools(k string, v []bool) {
 	f.addKey(k)
 	f.EncodeTypeBools(v)
 }
 
-func (f *Encoder) EncodeFieldInts64(k string, v []int64) {
+func (f *jsonEncoder) EncodeFieldInts64(k string, v []int64) {
 	f.addKey(k)
 	f.EncodeTypeInts64(v)
 }
 
-func (f *Encoder) EncodeFieldInts32(k string, v []int32) {
+func (f *jsonEncoder) EncodeFieldInts32(k string, v []int32) {
 	f.addKey(k)
 	f.EncodeTypeInts32(v)
 }
 
-func (f *Encoder) EncodeFieldInts16(k string, v []int16) {
+func (f *jsonEncoder) EncodeFieldInts16(k string, v []int16) {
 	f.addKey(k)
 	f.EncodeTypeInts16(v)
 }
 
-func (f *Encoder) EncodeFieldInts8(k string, v []int8) {
+func (f *jsonEncoder) EncodeFieldInts8(k string, v []int8) {
 	f.addKey(k)
 	f.EncodeTypeInts8(v)
 }
 
-func (f *Encoder) EncodeFieldUints64(k string, v []uint64) {
+func (f *jsonEncoder) EncodeFieldUints64(k string, v []uint64) {
 	f.addKey(k)
 	f.EncodeTypeUints64(v)
 }
 
-func (f *Encoder) EncodeFieldUints32(k string, v []uint32) {
+func (f *jsonEncoder) EncodeFieldUints32(k string, v []uint32) {
 	f.addKey(k)
 	f.EncodeTypeUints32(v)
 }
 
-func (f *Encoder) EncodeFieldUints16(k string, v []uint16) {
+func (f *jsonEncoder) EncodeFieldUints16(k string, v []uint16) {
 	f.addKey(k)
 	f.EncodeTypeUints16(v)
 }
 
-func (f *Encoder) EncodeFieldUints8(k string, v []uint8) {
+func (f *jsonEncoder) EncodeFieldUints8(k string, v []uint8) {
 	f.addKey(k)
 	f.EncodeTypeUints8(v)
 }
 
-func (f *Encoder) EncodeFieldFloats64(k string, v []float64) {
+func (f *jsonEncoder) EncodeFieldFloats64(k string, v []float64) {
 	f.addKey(k)
 	f.EncodeTypeFloats64(v)
 }
 
-func (f *Encoder) EncodeFieldFloats32(k string, v []float32) {
+func (f *jsonEncoder) EncodeFieldFloats32(k string, v []float32) {
 	f.addKey(k)
 	f.EncodeTypeFloats32(v)
 }
 
-func (f *Encoder) EncodeFieldDurations(k string, v []time.Duration) {
+func (f *jsonEncoder) EncodeFieldDurations(k string, v []time.Duration) {
 	f.addKey(k)
 	f.EncodeTypeDurations(v)
 }
 
-func (f *Encoder) EncodeTypeAny(v interface{}) {
+func (f *jsonEncoder) EncodeTypeAny(v interface{}) {
 	e := json.NewEncoder(f.buf)
 	e.Encode(v)
 
@@ -246,99 +244,99 @@ func (f *Encoder) EncodeTypeAny(v interface{}) {
 	}
 }
 
-func (f *Encoder) EncodeTypeByte(v byte) {
+func (f *jsonEncoder) EncodeTypeByte(v byte) {
 	// TODO: fix as  default marhaller do
 	f.appendSeparator()
 	f.buf.AppendByte(v)
 }
 
-func (f *Encoder) EncodeTypeUnsafeBytes(v unsafe.Pointer) {
+func (f *jsonEncoder) EncodeTypeUnsafeBytes(v unsafe.Pointer) {
 	f.appendSeparator()
 	f.buf.AppendByte('"')
 	EscapeByteString(f.buf, *(*[]byte)(v))
 	f.buf.AppendByte('"')
 }
 
-func (f *Encoder) EncodeTypeBool(v bool) {
+func (f *jsonEncoder) EncodeTypeBool(v bool) {
 	f.appendSeparator()
-	logf.AppendBool(f.buf, v)
+	AppendBool(f.buf, v)
 }
 
-func (f *Encoder) EncodeTypeString(v string) {
+func (f *jsonEncoder) EncodeTypeString(v string) {
 	f.appendSeparator()
 	f.buf.AppendByte('"')
 	EscapeString(f.buf, v)
 	f.buf.AppendByte('"')
 }
 
-func (f *Encoder) EncodeTypeInt64(v int64) {
+func (f *jsonEncoder) EncodeTypeInt64(v int64) {
 	f.appendSeparator()
-	logf.AppendInt(f.buf, v)
+	AppendInt(f.buf, v)
 }
 
-func (f *Encoder) EncodeTypeInt32(v int32) {
+func (f *jsonEncoder) EncodeTypeInt32(v int32) {
 	f.appendSeparator()
-	logf.AppendInt(f.buf, int64(v))
+	AppendInt(f.buf, int64(v))
 }
 
-func (f *Encoder) EncodeTypeInt16(v int16) {
+func (f *jsonEncoder) EncodeTypeInt16(v int16) {
 	f.appendSeparator()
-	logf.AppendInt(f.buf, int64(v))
+	AppendInt(f.buf, int64(v))
 }
 
-func (f *Encoder) EncodeTypeInt8(v int8) {
+func (f *jsonEncoder) EncodeTypeInt8(v int8) {
 	f.appendSeparator()
-	logf.AppendInt(f.buf, int64(v))
+	AppendInt(f.buf, int64(v))
 }
 
-func (f *Encoder) EncodeTypeUint64(v uint64) {
+func (f *jsonEncoder) EncodeTypeUint64(v uint64) {
 	f.appendSeparator()
-	logf.AppendUint(f.buf, uint64(v))
+	AppendUint(f.buf, uint64(v))
 }
 
-func (f *Encoder) EncodeTypeUint32(v uint32) {
+func (f *jsonEncoder) EncodeTypeUint32(v uint32) {
 	f.appendSeparator()
-	logf.AppendUint(f.buf, uint64(v))
+	AppendUint(f.buf, uint64(v))
 }
 
-func (f *Encoder) EncodeTypeUint16(v uint16) {
+func (f *jsonEncoder) EncodeTypeUint16(v uint16) {
 	f.appendSeparator()
-	logf.AppendUint(f.buf, uint64(v))
+	AppendUint(f.buf, uint64(v))
 }
 
-func (f *Encoder) EncodeTypeUint8(v uint8) {
+func (f *jsonEncoder) EncodeTypeUint8(v uint8) {
 	f.appendSeparator()
-	logf.AppendUint(f.buf, uint64(v))
+	AppendUint(f.buf, uint64(v))
 }
 
-func (f *Encoder) EncodeTypeFloat64(v float64) {
+func (f *jsonEncoder) EncodeTypeFloat64(v float64) {
 	f.appendSeparator()
-	logf.AppendFloat64(f.buf, v)
+	AppendFloat64(f.buf, v)
 }
 
-func (f *Encoder) EncodeTypeFloat32(v float32) {
+func (f *jsonEncoder) EncodeTypeFloat32(v float32) {
 	f.appendSeparator()
-	logf.AppendFloat32(f.buf, v)
+	AppendFloat32(f.buf, v)
 }
 
-func (f *Encoder) EncodeTypeDuration(v time.Duration) {
+func (f *jsonEncoder) EncodeTypeDuration(v time.Duration) {
 	f.appendSeparator()
 	f.EncodeDuration(v, f)
 }
 
-func (f *Encoder) EncodeTypeTime(v time.Time) {
+func (f *jsonEncoder) EncodeTypeTime(v time.Time) {
 	f.appendSeparator()
 	f.EncodeTime(v, f)
 }
 
-func (f *Encoder) EncodeTypeBytes(v []byte) {
+func (f *jsonEncoder) EncodeTypeBytes(v []byte) {
 	f.appendSeparator()
 	f.buf.AppendByte('"')
 	base64.StdEncoding.Encode(f.buf.ExtendBytes(base64.StdEncoding.EncodedLen(len(v))), v)
 	f.buf.AppendByte('"')
 }
 
-func (f *Encoder) EncodeTypeBools(v []bool) {
+func (f *jsonEncoder) EncodeTypeBools(v []bool) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -347,7 +345,7 @@ func (f *Encoder) EncodeTypeBools(v []bool) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeInts64(v []int64) {
+func (f *jsonEncoder) EncodeTypeInts64(v []int64) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -356,7 +354,7 @@ func (f *Encoder) EncodeTypeInts64(v []int64) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeInts32(v []int32) {
+func (f *jsonEncoder) EncodeTypeInts32(v []int32) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -365,7 +363,7 @@ func (f *Encoder) EncodeTypeInts32(v []int32) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeInts16(v []int16) {
+func (f *jsonEncoder) EncodeTypeInts16(v []int16) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -374,7 +372,7 @@ func (f *Encoder) EncodeTypeInts16(v []int16) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeInts8(v []int8) {
+func (f *jsonEncoder) EncodeTypeInts8(v []int8) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -383,7 +381,7 @@ func (f *Encoder) EncodeTypeInts8(v []int8) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeUints64(v []uint64) {
+func (f *jsonEncoder) EncodeTypeUints64(v []uint64) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -392,7 +390,7 @@ func (f *Encoder) EncodeTypeUints64(v []uint64) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeUints32(v []uint32) {
+func (f *jsonEncoder) EncodeTypeUints32(v []uint32) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -401,7 +399,7 @@ func (f *Encoder) EncodeTypeUints32(v []uint32) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeUints16(v []uint16) {
+func (f *jsonEncoder) EncodeTypeUints16(v []uint16) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -410,7 +408,7 @@ func (f *Encoder) EncodeTypeUints16(v []uint16) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeUints8(v []uint8) {
+func (f *jsonEncoder) EncodeTypeUints8(v []uint8) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -419,7 +417,7 @@ func (f *Encoder) EncodeTypeUints8(v []uint8) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeFloats64(v []float64) {
+func (f *jsonEncoder) EncodeTypeFloats64(v []float64) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -428,7 +426,7 @@ func (f *Encoder) EncodeTypeFloats64(v []float64) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeFloats32(v []float32) {
+func (f *jsonEncoder) EncodeTypeFloats32(v []float32) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -437,7 +435,7 @@ func (f *Encoder) EncodeTypeFloats32(v []float32) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeDurations(v []time.Duration) {
+func (f *jsonEncoder) EncodeTypeDurations(v []time.Duration) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
@@ -446,21 +444,21 @@ func (f *Encoder) EncodeTypeDurations(v []time.Duration) {
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeArray(v logf.ArrayEncoder) {
+func (f *jsonEncoder) EncodeTypeArray(v ArrayEncoder) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	v.EncodeLogfArray(f)
 	f.buf.AppendByte(']')
 }
 
-func (f *Encoder) EncodeTypeObject(v logf.ObjectEncoder) {
+func (f *jsonEncoder) EncodeTypeObject(v ObjectEncoder) {
 	f.appendSeparator()
 	f.buf.AppendByte('{')
 	v.EncodeLogfObject(f)
 	f.buf.AppendByte('}')
 }
 
-func (f *Encoder) appendSeparator() {
+func (f *jsonEncoder) appendSeparator() {
 	if f.empty() {
 		return
 	}
@@ -472,11 +470,11 @@ func (f *Encoder) appendSeparator() {
 	f.buf.AppendByte(',')
 }
 
-func (f *Encoder) empty() bool {
+func (f *jsonEncoder) empty() bool {
 	return f.buf.Len() == f.startBufLen
 }
 
-func (f *Encoder) addKey(k string) {
+func (f *jsonEncoder) addKey(k string) {
 	f.appendSeparator()
 	f.buf.AppendByte('"')
 	EscapeString(f.buf, k)
@@ -486,7 +484,7 @@ func (f *Encoder) addKey(k string) {
 
 const hex = "0123456789abcdef"
 
-func EscapeString(buf *logf.Buffer, s string) error {
+func EscapeString(buf *Buffer, s string) error {
 	p := 0
 	for i := 0; i < len(s); {
 		c := s[i]
@@ -537,7 +535,7 @@ func EscapeString(buf *logf.Buffer, s string) error {
 	return nil
 }
 
-func EscapeByteString(buf *logf.Buffer, s []byte) error {
+func EscapeByteString(buf *Buffer, s []byte) error {
 	p := 0
 	for i := 0; i < len(s); {
 		c := s[i]

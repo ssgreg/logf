@@ -10,7 +10,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/ssgreg/logf"
-	"github.com/ssgreg/logf/logfjson"
 	"github.com/ssgreg/logrus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -543,7 +542,7 @@ func newZapLogger(lvl zapcore.Level) *zap.Logger {
 }
 
 func newLogger(l logf.Level) (*logf.Logger, logf.Channel) {
-	encoder := logfjson.NewEncoder(logfjson.EncoderConfig{})
+	encoder := logf.NewJSONEncoder(logf.JSONEncoderConfig{})
 
 	channel := logf.NewBasicChannel(logf.ChannelConfig{
 		Appender:      logf.NewWriteAppender(ioutil.Discard, encoder),

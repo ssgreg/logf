@@ -1,6 +1,4 @@
-package logfjson
-
-import "github.com/ssgreg/logf"
+package logf
 
 const (
 	DefaultFieldKeyLevel  = "level"
@@ -10,7 +8,7 @@ const (
 	DefaultFieldKeyCaller = "caller"
 )
 
-type EncoderConfig struct {
+type JSONEncoderConfig struct {
 	FieldKeyMsg    string
 	FieldKeyTime   string
 	FieldKeyLevel  string
@@ -23,14 +21,14 @@ type EncoderConfig struct {
 	DisableFieldName   bool
 	DisableFieldCaller bool
 
-	EncodeTime     logf.TimeEncoder
-	EncodeDuration logf.DurationEncoder
-	EncodeError    logf.ErrorEncoder
-	EncodeLevel    logf.LevelEncoder
-	EncodeCaller   logf.CallerEncoder
+	EncodeTime     TimeEncoder
+	EncodeDuration DurationEncoder
+	EncodeError    ErrorEncoder
+	EncodeLevel    LevelEncoder
+	EncodeCaller   CallerEncoder
 }
 
-func (c EncoderConfig) WithDefaults() EncoderConfig {
+func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
 	// Handle default for predefined field names.
 	if c.FieldKeyMsg == "" {
 		c.FieldKeyMsg = DefaultFieldKeyMsg
@@ -50,19 +48,19 @@ func (c EncoderConfig) WithDefaults() EncoderConfig {
 
 	// Handle defaults for type encoder.
 	if c.EncodeDuration == nil {
-		c.EncodeDuration = logf.StringDurationEncoder
+		c.EncodeDuration = StringDurationEncoder
 	}
 	if c.EncodeTime == nil {
-		c.EncodeTime = logf.RFC3339TimeEncoder
+		c.EncodeTime = RFC3339TimeEncoder
 	}
 	if c.EncodeError == nil {
-		c.EncodeError = logf.DefaultErrorEncoder
+		c.EncodeError = DefaultErrorEncoder
 	}
 	if c.EncodeLevel == nil {
-		c.EncodeLevel = logf.DefaultLevelEncoder
+		c.EncodeLevel = DefaultLevelEncoder
 	}
 	if c.EncodeCaller == nil {
-		c.EncodeCaller = logf.ShortCallerEncoder
+		c.EncodeCaller = ShortCallerEncoder
 	}
 
 	return c
