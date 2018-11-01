@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/ssgreg/logf"
+	"github.com/ssgreg/logf/logfjson"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 func newLogger(l logf.Level, w io.Writer) (*logf.Logger, logf.Channel) {
-	encoder := logf.NewJSONEncoder(logf.SetFormatterConfigDefaults(&logf.FormatterConfig{}))
+	encoder := logfjson.NewEncoder(logfjson.EncoderConfig{})
 	channel := logf.NewBasicChannel(logf.ChannelConfig{
 		Appender:      logf.NewWriteAppender(w, encoder),
 		ErrorAppender: logf.NewWriteAppender(os.Stderr, encoder),
@@ -110,7 +111,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			for i := 0; i < 1000; i++ {
+			for i := 0; i < 1; i++ {
 				logger.Info(getMessage(i), logf.Bytes("test", []byte(`1), logf.Int("test", 1), logf.Int("test", 1)`)))
 				time.Sleep(time.Second)
 			}

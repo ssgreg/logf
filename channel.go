@@ -86,6 +86,7 @@ func (l *basicChannel) worker() {
 
 	// Force appender to sync at exit.
 	l.sync()
+	l.close()
 }
 
 func (l *basicChannel) flush() {
@@ -114,8 +115,20 @@ func (l *basicChannel) append(e Entry) {
 	}
 }
 
+func (l *basicChannel) close() {
+	err := l.Appender.Close()
+	if err != nil {
+		l.reportError(fmt.Sprintf("logf: failed to close appender: %+v", err))
+	}
+	if l.ErrorAppender != nil {
+		_ = l.ErrorAppender.Close()
+	}
+}
+
 func (l *basicChannel) reportError(text string) {
-	// TODO: pass error as field value
-	_ = l.ErrorAppender.Append(NewErrorEntry(text))
-	_ = l.ErrorAppender.Sync()
+	if l.ErrorAppender != nil {
+		// TODO: pass error as field value
+		_ = l.ErrorAppender.Append(NewErrorEntry(text))
+		_ = l.ErrorAppender.Sync()
+	}
 }

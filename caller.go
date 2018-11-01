@@ -2,7 +2,9 @@ package logf
 
 import (
 	"runtime"
+	"strconv"
 	"strings"
+	"unsafe"
 )
 
 // EntryCaller holds values returned by runtime.Caller.
@@ -46,4 +48,30 @@ func (c EntryCaller) FileWithPackage() string {
 	}
 
 	return c.File[found+1:]
+}
+
+type CallerEncoder func(EntryCaller, TypeEncoder)
+
+func ShortCallerEncoder(c EntryCaller, m TypeEncoder) {
+	var callerBuf [64]byte
+	var b []byte
+	b = callerBuf[:0]
+	b = append(b, c.FileWithPackage()...)
+	b = append(b, ':')
+	b = strconv.AppendInt(b, int64(c.Line), 10)
+
+	m.EncodeTypeUnsafeBytes(noescape(unsafe.Pointer(&b)))
+	runtime.KeepAlive(&b)
+}
+
+func FullCallerEncoder(c EntryCaller, m TypeEncoder) {
+	var callerBuf [256]byte
+	var b []byte
+	b = callerBuf[:0]
+	b = append(b, c.File...)
+	b = append(b, ':')
+	b = strconv.AppendInt(b, int64(c.Line), 10)
+
+	m.EncodeTypeUnsafeBytes(noescape(unsafe.Pointer(&b)))
+	runtime.KeepAlive(&b)
 }

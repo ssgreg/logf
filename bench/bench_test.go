@@ -10,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/ssgreg/logf"
+	"github.com/ssgreg/logf/logfjson"
 	"github.com/ssgreg/logrus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -370,11 +371,11 @@ type user struct {
 }
 type users []*user
 
-func (u *user) MarshalLogfObject(m logf.FieldMarshaller) error {
-	m.MarshalFieldString("name", u.Name)
-	m.MarshalFieldString("email", u.Email)
-	m.MarshalFieldInt64("createdAt", u.CreatedAt.UnixNano())
-	// m.MarshalFieldTime("createdAt", u.CreatedAt)
+func (u *user) EncodeLogfObject(enc logf.FieldEncoder) error {
+	enc.EncodeFieldString("name", u.Name)
+	enc.EncodeFieldString("email", u.Email)
+	enc.EncodeFieldInt64("createdAt", u.CreatedAt.UnixNano())
+	// enc.EncodeFieldTime("createdAt", u.CreatedAt)
 
 	return nil
 }
@@ -439,7 +440,7 @@ func fakeFields() []logf.Field {
 		logf.Object("user1", oneUser),
 		// // logf.Any("user2", oneUser),
 		// // logf.Any("users", tenUsers),
-		logf.AnError("error", errExample),
+		logf.NamedError("error", errExample),
 	}
 }
 
@@ -542,7 +543,7 @@ func newZapLogger(lvl zapcore.Level) *zap.Logger {
 }
 
 func newLogger(l logf.Level) (*logf.Logger, logf.Channel) {
-	encoder := logf.NewJSONEncoder(logf.SetFormatterConfigDefaults(&logf.FormatterConfig{}))
+	encoder := logfjson.NewEncoder(logfjson.EncoderConfig{})
 
 	channel := logf.NewBasicChannel(logf.ChannelConfig{
 		Appender:      logf.NewWriteAppender(ioutil.Discard, encoder),

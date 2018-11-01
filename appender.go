@@ -7,6 +7,8 @@ import (
 // Appender defines the interface for your own strategies for outputting
 // log entries.
 type Appender interface {
+	io.Closer
+
 	// Append logs the Entry in Appender specific way.
 	Append(Entry) error
 
@@ -75,5 +77,9 @@ func (a *writeAppender) Flush() error {
 		return err
 	}
 
+	return nil
+}
+
+func (a *writeAppender) Close() error {
 	return nil
 }

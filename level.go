@@ -46,3 +46,9 @@ func (l Level) String() string {
 
 // LevelChecker abstracts level checking process.
 type LevelChecker func(Level) bool
+
+type LevelEncoder func(Level, TypeEncoder)
+
+func DefaultLevelEncoder(lvl Level, m TypeEncoder) {
+	m.EncodeTypeString(lvl.String())
+}
