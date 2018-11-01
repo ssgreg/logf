@@ -28,7 +28,7 @@ func (l Level) Enabled(o Level) bool {
 	return l >= o
 }
 
-// String conforms to Stringer interface.
+// String implements fmt.Stringer
 func (l Level) String() string {
 	switch l {
 	case LevelDebug:

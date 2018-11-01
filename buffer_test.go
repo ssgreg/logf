@@ -18,7 +18,6 @@ func TestBufferInitial(t *testing.T) {
 }
 
 func TestBufferAppend(t *testing.T) {
-
 	t.Run("AppendString", func(t *testing.T) {
 		capacity := 10
 		data := "12345678"

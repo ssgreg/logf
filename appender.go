@@ -22,7 +22,12 @@ type Appender interface {
 func NewWriteAppender(w io.Writer, enc Encoder) Appender {
 	s, _ := w.(syncer)
 
-	return &writeAppender{w, s, enc, NewBufferWithCapacity(PageSize * 2)}
+	return &writeAppender{
+		w:   w,
+		s:   s,
+		enc: enc,
+		buf: NewBufferWithCapacity(PageSize * 2),
+	}
 }
 
 // syncer provides access the the Sync function of a Writer.

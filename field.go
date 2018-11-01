@@ -383,23 +383,23 @@ func ConstInts8(k string, v []int8) Field {
 	return Field{Key: k, Type: FieldTypeBytesToInts8, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
 
-func ConstUints(k string, v []int) Field {
+func ConstUints(k string, v []uint) Field {
 	return Field{Key: k, Type: FieldTypeBytesToUints64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
 
-func ConstUints64(k string, v []int64) Field {
+func ConstUints64(k string, v []uint64) Field {
 	return Field{Key: k, Type: FieldTypeBytesToUints64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
 
-func ConstUints32(k string, v []int32) Field {
+func ConstUints32(k string, v []uint32) Field {
 	return Field{Key: k, Type: FieldTypeBytesToUints32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
 
-func ConstUints16(k string, v []int16) Field {
+func ConstUints16(k string, v []uint16) Field {
 	return Field{Key: k, Type: FieldTypeBytesToUints16, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
 
-func ConstUints8(k string, v []int8) Field {
+func ConstUints8(k string, v []uint8) Field {
 	return Field{Key: k, Type: FieldTypeBytesToUints8, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
 

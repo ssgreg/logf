@@ -11,22 +11,25 @@ import (
 )
 
 func NewJSONEncoder(c *FormatterConfig) Encoder {
-	return &jsonEncoder{c, NewCache(100), nil}
+	return &jsonEncoder{c, NewCache(100), nil, 0}
 }
 
 func NewJSONTypeMarshallerFactory(c *FormatterConfig) TypeMarshallerFactory {
-	return &jsonEncoder{c, nil, nil}
+	return &jsonEncoder{c, nil, nil, 0}
 }
 
 type jsonEncoder struct {
 	*FormatterConfig
 	cache *Cache
 
-	buf *Buffer
+	buf         *Buffer
+	startBufLen int
 }
 
 func (f *jsonEncoder) TypeMarshaller(buf *Buffer) TypeMarshaller {
 	f.buf = buf
+	f.startBufLen = f.buf.Len()
+
 	return f
 }
 
@@ -279,12 +282,14 @@ func (f *jsonEncoder) MarshalTime(v time.Time) {
 }
 
 func (f *jsonEncoder) MarshalBytes(v []byte) {
+	f.appendSeparator()
 	f.buf.AppendByte('"')
 	base64.StdEncoding.Encode(f.buf.ExtendBytes(base64.StdEncoding.EncodedLen(len(v))), v)
 	f.buf.AppendByte('"')
 }
 
 func (f *jsonEncoder) MarshalBools(v []bool) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalBool(v[i])
@@ -293,6 +298,7 @@ func (f *jsonEncoder) MarshalBools(v []bool) {
 }
 
 func (f *jsonEncoder) MarshalInts64(v []int64) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalInt64(v[i])
@@ -301,6 +307,7 @@ func (f *jsonEncoder) MarshalInts64(v []int64) {
 }
 
 func (f *jsonEncoder) MarshalInts32(v []int32) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalInt32(v[i])
@@ -309,6 +316,7 @@ func (f *jsonEncoder) MarshalInts32(v []int32) {
 }
 
 func (f *jsonEncoder) MarshalInts16(v []int16) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalInt16(v[i])
@@ -317,6 +325,7 @@ func (f *jsonEncoder) MarshalInts16(v []int16) {
 }
 
 func (f *jsonEncoder) MarshalInts8(v []int8) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalInt8(v[i])
@@ -325,6 +334,7 @@ func (f *jsonEncoder) MarshalInts8(v []int8) {
 }
 
 func (f *jsonEncoder) MarshalUints64(v []uint64) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalUint64(v[i])
@@ -333,6 +343,7 @@ func (f *jsonEncoder) MarshalUints64(v []uint64) {
 }
 
 func (f *jsonEncoder) MarshalUints32(v []uint32) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalUint32(v[i])
@@ -341,6 +352,7 @@ func (f *jsonEncoder) MarshalUints32(v []uint32) {
 }
 
 func (f *jsonEncoder) MarshalUints16(v []uint16) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalUint16(v[i])
@@ -349,6 +361,7 @@ func (f *jsonEncoder) MarshalUints16(v []uint16) {
 }
 
 func (f *jsonEncoder) MarshalUints8(v []uint8) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalUint8(v[i])
@@ -357,6 +370,7 @@ func (f *jsonEncoder) MarshalUints8(v []uint8) {
 }
 
 func (f *jsonEncoder) MarshalFloats64(v []float64) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalFloat64(v[i])
@@ -365,6 +379,7 @@ func (f *jsonEncoder) MarshalFloats64(v []float64) {
 }
 
 func (f *jsonEncoder) MarshalFloats32(v []float32) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalFloat32(v[i])
@@ -373,6 +388,7 @@ func (f *jsonEncoder) MarshalFloats32(v []float32) {
 }
 
 func (f *jsonEncoder) MarshalDurations(v []time.Duration) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.MarshalDuration(v[i])
@@ -381,21 +397,24 @@ func (f *jsonEncoder) MarshalDurations(v []time.Duration) {
 }
 
 func (f *jsonEncoder) MarshalArray(v ArrayMarshaller) {
+	f.appendSeparator()
 	f.buf.AppendByte('[')
 	v.MarshalLogfArray(f)
 	f.buf.AppendByte(']')
 }
 
 func (f *jsonEncoder) MarshalObject(v ObjectMarshaller) {
+	f.appendSeparator()
 	f.buf.AppendByte('{')
 	v.MarshalLogfObject(f)
 	f.buf.AppendByte('}')
 }
 
 func (f *jsonEncoder) appendSeparator() {
-	if f.buf.Len() == 0 {
+	if f.buf.Len() == f.startBufLen {
 		return
 	}
+
 	switch f.buf.Back() {
 	case '{', '[', ':', ',':
 		return
@@ -412,7 +431,9 @@ func (f *jsonEncoder) addKey(k string) {
 }
 
 func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
+	// TODO: move to clone
 	f.buf = buf
+	f.startBufLen = f.buf.Len()
 
 	buf.AppendByte('{')
 
