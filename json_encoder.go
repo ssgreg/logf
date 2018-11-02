@@ -8,12 +8,28 @@ import (
 	"unsafe"
 )
 
-func NewJSONEncoder(c JSONEncoderConfig) Encoder {
-	return &jsonEncoder{c.WithDefaults(), NewCache(100), nil, 0}
+var NewJSONEncoder = jsonEncoderGetter(
+	func(cfg JSONEncoderConfig) Encoder {
+		return &jsonEncoder{cfg.WithDefaults(), NewCache(100), nil, 0}
+	},
+)
+
+var NewJSONTypeEncoderFactory = jsonTypeEncoderFactoryGetter(
+	func(c JSONEncoderConfig) TypeEncoderFactory {
+		return &jsonEncoder{c.WithDefaults(), nil, nil, 0}
+	},
+)
+
+type jsonEncoderGetter func(cfg JSONEncoderConfig) Encoder
+
+func (c jsonEncoderGetter) Default() Encoder {
+	return c(JSONEncoderConfig{})
 }
 
-func NewJSONTypeEncoderFactory(c JSONEncoderConfig) TypeEncoderFactory {
-	return &jsonEncoder{c.WithDefaults(), nil, nil, 0}
+type jsonTypeEncoderFactoryGetter func(cfg JSONEncoderConfig) TypeEncoderFactory
+
+func (c jsonTypeEncoderFactoryGetter) Default() TypeEncoderFactory {
+	return c(JSONEncoderConfig{})
 }
 
 type jsonEncoder struct {

@@ -23,6 +23,11 @@ func (l *MutableLevel) Checker() LevelChecker {
 	}
 }
 
+// LevelChecker implements LevelCheckerGetter.
+func (l *MutableLevel) LevelChecker() LevelChecker {
+	return l.Checker()
+}
+
 // Level returns the current logging level.
 func (l *MutableLevel) Level() Level {
 	return (Level)(atomic.LoadUint32(&l.level))

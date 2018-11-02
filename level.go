@@ -1,5 +1,9 @@
 package logf
 
+import (
+	"strings"
+)
+
 // Level defines severity level of a log message.
 type Level uint32
 
@@ -23,6 +27,11 @@ func (l Level) Checker() LevelChecker {
 	}
 }
 
+// LevelChecker implements LevelCheckerGetter.
+func (l Level) LevelChecker() LevelChecker {
+	return l.Checker()
+}
+
 // Enabled returns true if the given level is allowed within the current level.
 func (l Level) Enabled(o Level) bool {
 	return l >= o
@@ -44,11 +53,43 @@ func (l Level) String() string {
 	}
 }
 
+// NewLevelWithString creates the new Level with the given string.
+func NewLevelWithString(lvl string) (Level, bool) {
+	switch strings.ToLower(lvl) {
+	case "debug":
+		return LevelDebug, true
+	case "info":
+		return LevelInfo, true
+	case "warn", "warning":
+		return LevelWarn, true
+	case "error":
+		return LevelError, true
+	}
+
+	return LevelError, false
+}
+
 // LevelChecker abstracts level checking process.
 type LevelChecker func(Level) bool
 
+// LevelCheckerGetter allows the implementor to act like a common Level
+// checker for the Logger.
+type LevelCheckerGetter interface {
+	LevelChecker() LevelChecker
+}
+
+// LevelCheckerGetterFunc defines a function that returns LevelChecker.
+type LevelCheckerGetterFunc func() LevelChecker
+
+// LevelChecker implements LevelCheckerGetter interface.
+func (fn LevelCheckerGetterFunc) LevelChecker() LevelChecker {
+	return fn()
+}
+
+// LevelEncoder is the function to encode Level.
 type LevelEncoder func(Level, TypeEncoder)
 
+// DefaultLevelEncoder implements LevelEncoder by calling Level itself.
 func DefaultLevelEncoder(lvl Level, m TypeEncoder) {
 	m.EncodeTypeString(lvl.String())
 }

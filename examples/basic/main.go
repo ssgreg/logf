@@ -13,14 +13,10 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func newLogger(l logf.Level, w io.Writer) (*logf.Logger, logf.Channel) {
-	encoder := logf.NewJSONEncoder(logf.JSONEncoderConfig{})
-	channel := logf.NewBasicChannel(logf.ChannelConfig{
-		Appender:      logf.NewWriteAppender(w, encoder),
-		ErrorAppender: logf.NewWriteAppender(os.Stderr, encoder),
-	})
+func newLogger(l logf.Level, w io.Writer) (*logf.Logger, logf.ChannelWriterCloseFunc) {
+	ew, close := logf.NewChannelWriter.Default()
 
-	return logf.NewLogger(logf.NewMutableLevel(l).Checker(), channel), channel
+	return logf.NewLogger(l, ew), close
 }
 
 var messages = makePseudoMessages(1000)
@@ -96,9 +92,8 @@ func (d *Discarder) Write(b []byte) (int, error) {
 
 func main() {
 	// tmp := make([]byte, 0, 1024*1024*200)
-
-	logger, channel := newLogger(logf.LevelDebug, os.Stdout) // bytes.NewBuffer(tmp))
-	defer channel.Close()
+	logger, close := newLogger(logf.LevelDebug, os.Stdout) // bytes.NewBuffer(tmp))
+	defer close()
 
 	// logger := newZapLogger(zap.DebugLevel)
 	// defer logger.Sync()

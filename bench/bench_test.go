@@ -15,28 +15,23 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func BenchmarkDisabled1(b *testing.B) {
-	b.Run("logf", func(b *testing.B) {
-		// logger := logf.NewDisabled()
-		logger, _ := newLogger(logf.LevelError)
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			logger.AtLevel(logf.LevelInfo, func(cl logf.CheckedLogger) {
-				cl.Write(getMessage(0), fakeFields()...)
-			})
-		}
-	})
-}
-
 func BenchmarkDisabledWithoutFields(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
-		// logger := logf.NewDisabled()
 		logger, _ := newLogger(logf.LevelError)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			logger.Info(getMessage(0))
+		}
+	})
+	b.Run("logf.check", func(b *testing.B) {
+		logger, _ := newLogger(logf.LevelError)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.AtLevel(logf.LevelInfo, func(log logf.LogFunc) {
+				log(getMessage(0))
+			})
 		}
 	})
 	b.Run("uber/zap", func(b *testing.B) {
@@ -46,11 +41,29 @@ func BenchmarkDisabledWithoutFields(b *testing.B) {
 			logger.Info(getMessage(0))
 		}
 	})
+	b.Run("uber/zap.check", func(b *testing.B) {
+		logger := newZapLogger(zap.ErrorLevel)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if m := logger.Check(zap.InfoLevel, getMessage(0)); m != nil {
+				logger.Info(getMessage(0))
+			}
+		}
+	})
 	b.Run("rs/zerolog", func(b *testing.B) {
 		logger := newDisabledZerolog()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			logger.Info().Msg(getMessage(0))
+		}
+	})
+	b.Run("rs/zerolog.check", func(b *testing.B) {
+		logger := newDisabledZerolog()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if e := logger.Info(); e.Enabled() {
+				logger.Info().Msg(getMessage(0))
+			}
 		}
 	})
 	b.Run("sirupsen/logrus", func(b *testing.B) {
@@ -63,18 +76,36 @@ func BenchmarkDisabledWithoutFields(b *testing.B) {
 }
 
 func BenchmarkDisabledAccumulatedContext(b *testing.B) {
-	b.Run("Logf", func(b *testing.B) {
-		logger := logf.NewDisabled().With(fakeFields()...)
+	b.Run("logf", func(b *testing.B) {
+		logger := logf.NewDisabledLogger().With(fakeFields()...)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			logger.Info(getMessage(0))
 		}
 	})
-	b.Run("Zap", func(b *testing.B) {
+	b.Run("logf.check", func(b *testing.B) {
+		logger := logf.NewDisabledLogger().With(fakeFields()...)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.AtLevel(logf.LevelInfo, func(log logf.LogFunc) {
+				log(getMessage(0))
+			})
+		}
+	})
+	b.Run("uber/zap", func(b *testing.B) {
 		logger := newZapLogger(zap.ErrorLevel).With(fakeZapFields()...)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			logger.Info(getMessage(0))
+		}
+	})
+	b.Run("uber/zap.check", func(b *testing.B) {
+		logger := newZapLogger(zap.ErrorLevel).With(fakeZapFields()...)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if m := logger.Check(zap.InfoLevel, getMessage(0)); m != nil {
+				logger.Info(getMessage(0))
+			}
 		}
 	})
 	b.Run("rs/zerolog", func(b *testing.B) {
@@ -82,6 +113,15 @@ func BenchmarkDisabledAccumulatedContext(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			logger.Info().Msg(getMessage(0))
+		}
+	})
+	b.Run("rs/zerolog.check", func(b *testing.B) {
+		logger := fakeZerologContext(newDisabledZerolog().With()).Logger()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if e := logger.Info(); e.Enabled() {
+				logger.Info().Msg(getMessage(0))
+			}
 		}
 	})
 	b.Run("sirupsen/logrus", func(b *testing.B) {
@@ -95,7 +135,7 @@ func BenchmarkDisabledAccumulatedContext(b *testing.B) {
 
 func BenchmarkDisabledAddingFields(b *testing.B) {
 	b.Run("Logf", func(b *testing.B) {
-		logger := logf.NewDisabled()
+		logger := logf.NewDisabledLogger()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			logger.Info(getMessage(0), fakeFields()...)
@@ -126,8 +166,8 @@ func BenchmarkDisabledAddingFields(b *testing.B) {
 
 func BenchmarkCreateContextLogger(b *testing.B) {
 	b.Run("Logf", func(b *testing.B) {
-		logger, channel := newLogger(logf.LevelDebug)
-		defer channel.Close()
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -163,8 +203,8 @@ func BenchmarkCreateContextLogger(b *testing.B) {
 
 func BenchmarkWithName(b *testing.B) {
 	b.Run("Logf", func(b *testing.B) {
-		logger, channel := newLogger(logf.LevelDebug)
-		defer channel.Close()
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -184,8 +224,8 @@ func BenchmarkWithName(b *testing.B) {
 
 func BenchmarkWithCaller(b *testing.B) {
 	b.Run("Logf", func(b *testing.B) {
-		logger, channel := newLogger(logf.LevelDebug)
-		defer channel.Close()
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
 		logger = logger.WithCaller()
 
 		b.ResetTimer()
@@ -204,8 +244,8 @@ func BenchmarkWithCaller(b *testing.B) {
 
 func BenchmarkCreateContextWithAccumulatedContextLogger(b *testing.B) {
 	b.Run("Logf", func(b *testing.B) {
-		logger, channel := newLogger(logf.LevelDebug)
-		defer channel.Close()
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
 		logger = logger.With(fakeFields()...)
 
 		b.ResetTimer()
@@ -242,8 +282,8 @@ func BenchmarkCreateContextWithAccumulatedContextLogger(b *testing.B) {
 
 func BenchmarkWithoutFields(b *testing.B) {
 	b.Run("Logf", func(b *testing.B) {
-		logger, channel := newLogger(logf.LevelDebug)
-		defer channel.Close()
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -275,8 +315,8 @@ func BenchmarkWithoutFields(b *testing.B) {
 
 func BenchmarkAccumulatedContext(b *testing.B) {
 	b.Run("Logf", func(b *testing.B) {
-		logger, channel := newLogger(logf.LevelDebug)
-		defer channel.Close()
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
 		logger = logger.With(fakeFields()...)
 
 		b.ResetTimer()
@@ -309,8 +349,8 @@ func BenchmarkAccumulatedContext(b *testing.B) {
 
 func BenchmarkAddingFields(b *testing.B) {
 	b.Run("Logf", func(b *testing.B) {
-		logger, channel := newLogger(logf.LevelDebug)
-		defer channel.Close()
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -342,8 +382,8 @@ func BenchmarkAddingFields(b *testing.B) {
 
 func BenchmarkAddingFieldsParallel(b *testing.B) {
 	b.Run("Logf", func(b *testing.B) {
-		logger, channel := newLogger(logf.LevelDebug)
-		defer channel.Close()
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
 
 		b.ResetTimer()
 		b.RunParallel(func(pb *testing.PB) {
@@ -541,15 +581,15 @@ func newZapLogger(lvl zapcore.Level) *zap.Logger {
 	))
 }
 
-func newLogger(l logf.Level) (*logf.Logger, logf.Channel) {
+func newLogger(l logf.Level) (*logf.Logger, logf.ChannelWriterCloseFunc) {
 	encoder := logf.NewJSONEncoder(logf.JSONEncoderConfig{})
 
-	channel := logf.NewBasicChannel(logf.ChannelConfig{
+	w, close := logf.NewChannelWriter(logf.ChannelWriterConfig{
 		Appender:      logf.NewWriteAppender(ioutil.Discard, encoder),
 		ErrorAppender: logf.NewWriteAppender(os.Stderr, encoder),
 	})
 
-	return logf.NewLogger(logf.NewMutableLevel(l).Checker(), channel), channel
+	return logf.NewLogger(logf.NewMutableLevel(l), w), close
 }
 
 func newDisabledLogrus() *logrus.Logger {

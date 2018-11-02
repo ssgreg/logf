@@ -5,50 +5,33 @@ import (
 	"time"
 )
 
-type Entry struct {
-	LoggerID      int32
-	DerivedFields []Field
-	Fields        []Field
-	Level         Level
-	Time          time.Time
-	Text          string
-	LoggerName    string
-	Caller        EntryCaller
+type EntryWriter interface {
+	WriteEntry(Entry)
 }
 
-func NewErrorEntry(text string) Entry {
-	return Entry{
-		LoggerID: -1,
-		Level:    LevelError,
-		Time:     time.Now(),
-		Text:     text,
-	}
-}
-
-func NewLogger(level LevelChecker, w ChannelWriter) *Logger {
+func NewLogger(level LevelCheckerGetter, w EntryWriter) *Logger {
 	return &Logger{
-		level: level,
+		level: level.LevelChecker(),
 		id:    atomic.AddInt32(&nextID, 1),
-		ch:    w,
+		w:     w,
 	}
 }
 
-func NewDisabled() *Logger {
+func NewDisabledLogger() *Logger {
 	return NewLogger(
-		func(Level) bool {
-			return false
-		}, nil)
+		LevelCheckerGetterFunc(func() LevelChecker {
+			return func(Level) bool {
+				return false
+			}
+		}), nil)
 }
 
-type CheckedLogger struct {
-	logger *Logger
-	level  Level
-}
+type LogFunc func(string, ...Field)
 
 type Logger struct {
 	level LevelChecker
 	id    int32
-	ch    ChannelWriter
+	w     EntryWriter
 
 	fields     []Field
 	name       string
@@ -56,16 +39,14 @@ type Logger struct {
 	callerSkip int
 }
 
-func (l CheckedLogger) Write(text string, fs ...Field) {
-	l.logger.write(l.level, text, fs)
-}
-
-func (l *Logger) AtLevel(lvl Level, fn func(CheckedLogger)) {
+func (l *Logger) AtLevel(lvl Level, fn func(LogFunc)) {
 	if !l.level(lvl) {
 		return
 	}
 
-	fn(CheckedLogger{l, lvl})
+	fn(func(text string, fs ...Field) {
+		l.write(lvl, text, fs)
+	})
 }
 
 func (l *Logger) WithName(n string) *Logger {
@@ -143,20 +124,20 @@ func (l *Logger) Info(text string, fs ...Field) {
 	l.write(LevelInfo, text, fs)
 }
 
-func (l *Logger) Error(text string, fs ...Field) {
-	if !l.level(LevelError) {
-		return
-	}
-
-	l.write(LevelError, text, fs)
-}
-
 func (l *Logger) Warn(text string, fs ...Field) {
 	if !l.level(LevelWarn) {
 		return
 	}
 
 	l.write(LevelWarn, text, fs)
+}
+
+func (l *Logger) Error(text string, fs ...Field) {
+	if !l.level(LevelError) {
+		return
+	}
+
+	l.write(LevelError, text, fs)
 }
 
 func (l *Logger) write(lv Level, text string, fs []Field) {
@@ -169,18 +150,19 @@ func (l *Logger) write(lv Level, text string, fs []Field) {
 		e.Caller = NewEntryCaller(2 + l.callerSkip)
 	}
 
-	l.ch.Write(e)
+	l.w.WriteEntry(e)
 }
 
 func (l *Logger) clone() *Logger {
+	// Field names should be omitted in order not to forget the new fields.
 	return &Logger{
-		level:      l.level,
-		id:         atomic.AddInt32(&nextID, 1),
-		ch:         l.ch,
-		fields:     l.fields,
-		name:       l.name,
-		addCaller:  l.addCaller,
-		callerSkip: l.callerSkip,
+		l.level,
+		atomic.AddInt32(&nextID, 1),
+		l.w,
+		l.fields,
+		l.name,
+		l.addCaller,
+		l.callerSkip,
 	}
 }
 
