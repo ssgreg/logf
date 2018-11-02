@@ -53,8 +53,8 @@ func (l Level) String() string {
 	}
 }
 
-// NewLevelWithString creates the new Level with the given string.
-func NewLevelWithString(lvl string) (Level, bool) {
+// LevelFromString creates the new Level with the given string.
+func LevelFromString(lvl string) (Level, bool) {
 	switch strings.ToLower(lvl) {
 	case "debug":
 		return LevelDebug, true
