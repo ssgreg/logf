@@ -2,13 +2,13 @@ package logf
 
 import (
 	"io"
+	"os"
+	"syscall"
 )
 
 // Appender defines the interface for your own strategies for outputting
 // log entries.
 type Appender interface {
-	io.Closer
-
 	// Append logs the Entry in Appender specific way.
 	Append(Entry) error
 
@@ -48,6 +48,21 @@ func (a *discardAppender) Close() error {
 
 func NewWriteAppender(w io.Writer, enc Encoder) Appender {
 	s, _ := w.(syncer)
+
+	if s != nil {
+		err := s.Sync()
+		// Check for EINVAL - a known error if Writer is bound to a
+		// special File (e.g., a pipe or socket) which does not support
+		// synchronization.
+		if pathErr, ok := err.(*os.PathError); ok {
+			if errno, ok := pathErr.Err.(syscall.Errno); ok {
+				if errno == syscall.EINVAL {
+					// Disable future syncs.
+					s = nil
+				}
+			}
+		}
+	}
 
 	return &writeAppender{
 		w:   w,
@@ -102,9 +117,5 @@ func (a *writeAppender) Flush() error {
 		return err
 	}
 
-	return nil
-}
-
-func (a *writeAppender) Close() error {
 	return nil
 }

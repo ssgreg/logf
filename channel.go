@@ -1,85 +1,102 @@
 package logf
 
 import (
-	"fmt"
+	"os"
 	"runtime"
 	"sync"
 )
 
-type ChannelWriter interface {
-	Write(Entry)
-}
-
-type ChannelCloser interface {
-	Close()
-}
-
-type Channel interface {
-	ChannelWriter
-	ChannelCloser
-}
-
-type ChannelConfig struct {
+type ChannelWriterConfig struct {
 	Capacity      int
 	Appender      Appender
 	ErrorAppender Appender
 }
 
-func NewBasicChannel(cfg ChannelConfig) Channel {
+func (c ChannelWriterConfig) WithDefaults() ChannelWriterConfig {
+	// Chan efficiency depends on the number of CPU installed in the system.
+	// Tests shows that min chan capacity should be twice as big as CPU count.
 	minCap := runtime.NumCPU() * 2
-	if cfg.Capacity < minCap {
-		cfg.Capacity = minCap
+	if c.Capacity < minCap {
+		c.Capacity = minCap
 	}
-	if cfg.ErrorAppender == nil {
-		cfg.ErrorAppender = NewDiscardAppender()
+	// No ErrorAppender by default.
+	if c.ErrorAppender == nil {
+		c.ErrorAppender = NewDiscardAppender()
 	}
-	// TODO: set default for Appender - text, stdout
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	l := &basicChannel{
-		channel:       make(chan Entry, cfg.Capacity),
-		wg:            &wg,
-		ChannelConfig: cfg,
+	// Default appender writes JSON-formatter messages to stdout.
+	if c.Appender == nil {
+		c.Appender = NewWriteAppender(os.Stdout, NewJSONEncoder.Default())
 	}
-	go l.worker()
 
-	return l
+	return c
 }
 
-type basicChannel struct {
-	ChannelConfig
-	channel chan Entry
-	wg      *sync.WaitGroup
+var NewChannelWriter = channelWriterGetter(
+	func(cfg ChannelWriterConfig) (EntryWriter, ChannelWriterCloseFunc) {
+		l := &channelWriter{}
+		l.init(cfg.WithDefaults())
+
+		return l, ChannelWriterCloseFunc(
+			func() {
+				l.Close()
+			})
+	},
+)
+
+type ChannelWriterCloseFunc func()
+
+type channelWriterGetter func(cfg ChannelWriterConfig) (EntryWriter, ChannelWriterCloseFunc)
+
+func (c channelWriterGetter) Default() (EntryWriter, ChannelWriterCloseFunc) {
+	return c(ChannelWriterConfig{})
 }
 
-func (l *basicChannel) Close() {
-	close(l.channel)
+type channelWriter struct {
+	ChannelWriterConfig
+
+	ch chan Entry
+	wg sync.WaitGroup
+}
+
+func (l *channelWriter) Close() error {
+	close(l.ch)
 	l.wg.Wait()
+
+	return nil
 }
 
-// Log TODO
-func (l *basicChannel) Write(e Entry) {
-	l.channel <- e
+func (l *channelWriter) WriteEntry(e Entry) {
+	l.ch <- e
 }
 
-func (l *basicChannel) Len() int {
-	return len(l.channel)
+func (l *channelWriter) Len() int {
+	return len(l.ch)
 }
 
-func (l *basicChannel) worker() {
+func (l *channelWriter) Cap() int {
+	return cap(l.ch)
+}
+
+func (l *channelWriter) init(cfg ChannelWriterConfig) {
+	l.ChannelWriterConfig = cfg
+	l.ch = make(chan Entry, l.Capacity)
+
+	l.wg.Add(1)
+	go l.worker()
+}
+
+func (l *channelWriter) worker() {
 	defer l.wg.Done()
 
 	var e Entry
 	var ok bool
 	for {
 		select {
-		case e, ok = <-l.channel:
+		case e, ok = <-l.ch:
 		default:
 			// Channel is empty. Force appender to Flush.
 			l.flush()
-			e, ok = <-l.channel
+			e, ok = <-l.ch
 		}
 		if !ok {
 			break
@@ -90,49 +107,40 @@ func (l *basicChannel) worker() {
 
 	// Force appender to sync at exit.
 	l.sync()
-	l.close()
 }
 
-func (l *basicChannel) flush() {
+func (l *channelWriter) flush() {
 	err := l.Appender.Flush()
 	if err != nil {
-		l.reportError(fmt.Sprintf("logf: failed to flush appender: %+v", err))
+		l.reportError("logf: failed to flush appender", err)
 	}
 }
 
-func (l *basicChannel) sync() {
+func (l *channelWriter) sync() {
 	err := l.Appender.Sync()
 	if err != nil {
-		l.reportError(fmt.Sprintf("logf: failed to sync appender: %+v", err))
+		l.reportError("logf: failed to sync appender", err)
 	}
 }
 
-func (l *basicChannel) append(e Entry) {
+func (l *channelWriter) append(e Entry) {
 	err := l.Appender.Append(e)
 	if err != nil {
-		l.reportError(fmt.Sprintf("logf: failed to append entry to appender: %+v", err))
+		l.reportError("logf: failed to append entry", err)
 	}
 
+	// Force appender to Sync if entry contains an error message.
+	// This allows to commit buffered messages in case of futher unexpected
+	// panic or crash.
 	if e.Level <= LevelError {
-		// The entry contains error message. Force appender to Sync.
 		l.sync()
 	}
 }
 
-func (l *basicChannel) close() {
-	err := l.Appender.Close()
-	if err != nil {
-		l.reportError(fmt.Sprintf("logf: failed to close appender: %+v", err))
-	}
-	if l.ErrorAppender != nil {
-		_ = l.ErrorAppender.Close()
-	}
+func (l *channelWriter) reportError(text string, err error) {
+	skipError(l.ErrorAppender.Append(newErrorEntry(text, Error(err))))
+	skipError(l.ErrorAppender.Sync())
 }
 
-func (l *basicChannel) reportError(text string) {
-	if l.ErrorAppender != nil {
-		// TODO: pass error as field value
-		_ = l.ErrorAppender.Append(NewErrorEntry(text))
-		_ = l.ErrorAppender.Sync()
-	}
+func skipError(_ error) {
 }
