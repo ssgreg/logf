@@ -6,6 +6,9 @@ import (
 )
 
 // Encoder defines the interface to create your own log format.
+//
+// In case of error, Encoder must remove bytes related to the given Entry
+// from the Buffer.
 type Encoder interface {
 	Encode(*Buffer, Entry) error
 }
