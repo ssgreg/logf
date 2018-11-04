@@ -72,10 +72,6 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 		f.EncodeCaller(e.Caller, f)
 	}
 
-	for _, field := range e.Fields {
-		field.Accept(f)
-	}
-
 	if bytes, ok := f.cache.Get(e.LoggerID); ok {
 		buf.AppendBytes(bytes)
 	} else {
@@ -87,6 +83,10 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 		bf := make([]byte, buf.Len()-le)
 		copy(bf, buf.Data[le:])
 		f.cache.Set(e.LoggerID, bf)
+	}
+
+	for _, field := range e.Fields {
+		field.Accept(f)
 	}
 
 	buf.AppendByte('}')
