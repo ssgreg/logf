@@ -27,6 +27,17 @@ func RFC3339NanoTimeEncoder(t time.Time, m TypeEncoder) {
 	runtime.KeepAlive(&b)
 }
 
+func LayoutTimeEncoder(layout string) TimeEncoder {
+	return func(t time.Time, m TypeEncoder) {
+		var timeBuf [64]byte
+		var b []byte
+		b = timeBuf[:0]
+		b = t.AppendFormat(b, layout)
+		m.EncodeTypeUnsafeBytes(noescape(unsafe.Pointer(&b)))
+		runtime.KeepAlive(&b)
+	}
+}
+
 func UnixNanoTimeEncoder(t time.Time, m TypeEncoder) {
 	m.EncodeTypeInt64(t.UnixNano())
 }
