@@ -42,10 +42,6 @@ func (a *discardAppender) Flush() error {
 	return nil
 }
 
-func (a *discardAppender) Close() error {
-	return nil
-}
-
 func NewWriteAppender(w io.Writer, enc Encoder) Appender {
 	s, _ := w.(syncer)
 
