@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
@@ -14,6 +13,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+var disableOthers = true
 
 func BenchmarkDisabledWithoutFields(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
@@ -34,6 +35,10 @@ func BenchmarkDisabledWithoutFields(b *testing.B) {
 			})
 		}
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("uber/zap", func(b *testing.B) {
 		logger := newZapLogger(zap.ErrorLevel)
 		b.ResetTimer()
@@ -92,6 +97,10 @@ func BenchmarkDisabledAccumulatedContext(b *testing.B) {
 			})
 		}
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("uber/zap", func(b *testing.B) {
 		logger := newZapLogger(zap.ErrorLevel).With(fakeZapFields()...)
 		b.ResetTimer()
@@ -141,6 +150,10 @@ func BenchmarkDisabledAddingFields(b *testing.B) {
 			logger.Info(getMessage(0), fakeFields()...)
 		}
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("Zap", func(b *testing.B) {
 		logger := newZapLogger(zap.ErrorLevel)
 		b.ResetTimer()
@@ -175,6 +188,10 @@ func BenchmarkCreateContextLogger(b *testing.B) {
 			_ = l
 		}
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("Zap", func(b *testing.B) {
 		logger := newZapLogger(zap.ErrorLevel)
 		b.ResetTimer()
@@ -212,6 +229,10 @@ func BenchmarkWithName(b *testing.B) {
 			_ = l
 		}
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("Zap", func(b *testing.B) {
 		logger := newZapLogger(zap.ErrorLevel)
 		b.ResetTimer()
@@ -233,6 +254,10 @@ func BenchmarkWithCaller(b *testing.B) {
 			logger.Info(getMessage(0))
 		}
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("Zap", func(b *testing.B) {
 		logger := newZapLogger(zap.DebugLevel).WithOptions(zap.AddCaller())
 		b.ResetTimer()
@@ -254,6 +279,10 @@ func BenchmarkCreateContextWithAccumulatedContextLogger(b *testing.B) {
 			_ = l
 		}
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("Zap", func(b *testing.B) {
 		logger := newZapLogger(zap.ErrorLevel).With(fakeZapFields()...)
 		b.ResetTimer()
@@ -290,6 +319,10 @@ func BenchmarkWithoutFields(b *testing.B) {
 			logger.Info(getMessage(0))
 		}
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("Zap", func(b *testing.B) {
 		logger := newZapLogger(zap.DebugLevel)
 		b.ResetTimer()
@@ -324,6 +357,10 @@ func BenchmarkAccumulatedContext(b *testing.B) {
 			logger.Info(getMessage(0))
 		}
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("Zap", func(b *testing.B) {
 		logger := newZapLogger(zap.DebugLevel).With(fakeZapFields()...)
 		b.ResetTimer()
@@ -357,6 +394,10 @@ func BenchmarkAddingFields(b *testing.B) {
 			logger.Info(getMessage(0), fakeFields()...)
 		}
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("Zap", func(b *testing.B) {
 		logger := newZapLogger(zap.DebugLevel)
 		b.ResetTimer()
@@ -392,6 +433,10 @@ func BenchmarkAddingFieldsParallel(b *testing.B) {
 			}
 		})
 	})
+	if disableOthers == true {
+		return
+	}
+
 	b.Run("Zap", func(b *testing.B) {
 		logger := newZapLogger(zap.DebugLevel)
 		b.ResetTimer()
@@ -514,6 +559,7 @@ func fakeZerologFields(e *zerolog.Event) *zerolog.Event {
 		Interface("strings", tenStrings).
 		Time("fm", tenTimes[0]).
 		// Interface("times", tenTimes).
+		// TODO: use zero log object marshaller
 		Interface("user1", oneUser).
 		// Interface("user2", oneUser).
 		// Interface("users", tenUsers).
@@ -582,11 +628,16 @@ func newZapLogger(lvl zapcore.Level) *zap.Logger {
 }
 
 func newLogger(l logf.Level) (*logf.Logger, logf.ChannelWriterCloseFunc) {
-	encoder := logf.NewJSONEncoder(logf.JSONEncoderConfig{})
+	encoder := logf.NewJSONEncoder.Default()
+	// encoder := logf.NewJSONEncoder(logf.JSONEncoderConfig{
+	// 	EncodeTime: logf.LayoutTimeEncoder(time.RFC3339),
+	// })
+	// encoder := logf.NewTextEncoder.Default()
+	// encoder := logfjournald.NewEncoder.Default()
 
 	w, close := logf.NewChannelWriter(logf.ChannelWriterConfig{
-		Appender:      logf.NewWriteAppender(ioutil.Discard, encoder),
-		ErrorAppender: logf.NewWriteAppender(os.Stderr, encoder),
+		Appender: logf.NewWriteAppender(ioutil.Discard, encoder),
+		// Appender: logf.NewDiscardAppender(),
 	})
 
 	return logf.NewLogger(logf.NewMutableLevel(l), w), close
