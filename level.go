@@ -37,7 +37,8 @@ func (l Level) Enabled(o Level) bool {
 	return l >= o
 }
 
-// String implements fmt.Stringer
+// String implements fmt.Stringer.
+// String returns a lower-case string representation of the Level.
 func (l Level) String() string {
 	switch l {
 	case LevelDebug:
@@ -45,11 +46,27 @@ func (l Level) String() string {
 	case LevelInfo:
 		return "info"
 	case LevelWarn:
-		return "warning"
+		return "warn"
 	case LevelError:
 		return "error"
 	default:
 		return "unknown"
+	}
+}
+
+// UpperCaseString returns an upper-case string representation of the Level.
+func (l Level) UpperCaseString() string {
+	switch l {
+	case LevelDebug:
+		return "DEBUG"
+	case LevelInfo:
+		return "INFO"
+	case LevelWarn:
+		return "WARN"
+	case LevelError:
+		return "ERROR"
+	default:
+		return "UNKNOWN"
 	}
 }
 
@@ -58,7 +75,7 @@ func LevelFromString(lvl string) (Level, bool) {
 	switch strings.ToLower(lvl) {
 	case "debug":
 		return LevelDebug, true
-	case "info":
+	case "info", "information":
 		return LevelInfo, true
 	case "warn", "warning":
 		return LevelWarn, true
@@ -92,4 +109,9 @@ type LevelEncoder func(Level, TypeEncoder)
 // DefaultLevelEncoder implements LevelEncoder by calling Level itself.
 func DefaultLevelEncoder(lvl Level, m TypeEncoder) {
 	m.EncodeTypeString(lvl.String())
+}
+
+// UpperCaseLevelEncoder implements LevelEncoder by calling Level itself.
+func UpperCaseLevelEncoder(lvl Level, m TypeEncoder) {
+	m.EncodeTypeString(lvl.UpperCaseString())
 }
