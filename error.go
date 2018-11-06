@@ -5,7 +5,12 @@ import "fmt"
 type ErrorEncoder func(string, error, FieldEncoder)
 
 func DefaultErrorEncoder(k string, e error, m FieldEncoder) {
-	msg := e.Error()
+	var msg string
+	if e == nil {
+		msg = "<nil>"
+	} else {
+		msg = e.Error()
+	}
 	m.EncodeFieldString(k, msg)
 
 	switch e.(type) {
