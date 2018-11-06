@@ -103,7 +103,11 @@ func (fd Field) Accept(v FieldEncoder) {
 	case FieldTypeDuration:
 		v.EncodeFieldDuration(fd.Key, time.Duration(fd.Int))
 	case FieldTypeError:
-		v.EncodeFieldError(fd.Key, fd.Any.(error))
+		if fd.Any != nil {
+			v.EncodeFieldError(fd.Key, fd.Any.(error))
+		} else {
+			v.EncodeFieldError(fd.Key, nil)
+		}
 	case FieldTypeTime:
 		if fd.Any != nil {
 			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Int).In(fd.Any.(*time.Location)))
