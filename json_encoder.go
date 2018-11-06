@@ -8,12 +8,16 @@ import (
 	"unsafe"
 )
 
+// NewJSONEncoder creates the new instance of the JSON Encoder with the
+// given JSONEncoderConfig.
 var NewJSONEncoder = jsonEncoderGetter(
 	func(cfg JSONEncoderConfig) Encoder {
 		return &jsonEncoder{cfg.WithDefaults(), NewCache(100), nil, 0}
 	},
 )
 
+// NewJSONTypeEncoderFactory creates the new instance of the JSON
+// TypeEncoderFactory with the given JSONEncoderConfig.
 var NewJSONTypeEncoderFactory = jsonTypeEncoderFactoryGetter(
 	func(c JSONEncoderConfig) TypeEncoderFactory {
 		return &jsonEncoder{c.WithDefaults(), nil, nil, 0}

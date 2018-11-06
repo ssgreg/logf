@@ -1,5 +1,6 @@
 package logf
 
+// Default field keys.
 const (
 	DefaultFieldKeyLevel  = "level"
 	DefaultFieldKeyMsg    = "msg"
@@ -8,6 +9,7 @@ const (
 	DefaultFieldKeyCaller = "caller"
 )
 
+// JSONEncoderConfig allows to configure journal JSON Encoder.
 type JSONEncoderConfig struct {
 	FieldKeyMsg    string
 	FieldKeyTime   string
@@ -28,6 +30,8 @@ type JSONEncoderConfig struct {
 	EncodeCaller   CallerEncoder
 }
 
+// WithDefaults returns the new config in which all uninitialized fields are
+// filled with their default values.
 func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
 	// Handle default for predefined field names.
 	if c.FieldKeyMsg == "" {
