@@ -58,24 +58,34 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 
 	buf.AppendByte('{')
 
-	if f.FieldKeyLevel != "" {
+	// Level.
+	if !f.DisableFieldLevel {
 		f.addKey(f.FieldKeyLevel)
 		f.EncodeLevel(e.Level, f)
 	}
-	if f.FieldKeyTime != "" {
+
+	// Time.
+	if !f.DisableFieldTime {
 		f.EncodeFieldTime(f.FieldKeyTime, e.Time)
 	}
-	if f.FieldKeyName != "" && e.LoggerName != "" {
+
+	// Logger name.
+	if !f.DisableFieldName && e.LoggerName != "" {
 		f.EncodeFieldString(f.FieldKeyName, e.LoggerName)
 	}
-	if f.FieldKeyMsg != "" {
+
+	// Message.
+	if !f.DisableFieldMsg {
 		f.EncodeFieldString(f.FieldKeyMsg, e.Text)
 	}
-	if f.FieldKeyCaller != "" && e.Caller.Specified {
+
+	// Caller.
+	if !f.DisableFieldCaller && e.Caller.Specified {
 		f.addKey(f.FieldKeyCaller)
 		f.EncodeCaller(e.Caller, f)
 	}
 
+	// Logger's fields.
 	if bytes, ok := f.cache.Get(e.LoggerID); ok {
 		buf.AppendBytes(bytes)
 	} else {
@@ -89,6 +99,7 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 		f.cache.Set(e.LoggerID, bf)
 	}
 
+	// Entry's fields.
 	for _, field := range e.Fields {
 		field.Accept(f)
 	}

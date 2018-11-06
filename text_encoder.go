@@ -69,7 +69,7 @@ func (f *textEncoder) Encode(buf *Buffer, e Entry) error {
 		f.buf.AppendString(e.Text)
 	})
 
-	// Logger fields.
+	// Logger's fields.
 	if bytes, ok := f.cache.Get(e.LoggerID); ok {
 		buf.AppendBytes(bytes)
 	} else {

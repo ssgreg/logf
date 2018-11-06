@@ -16,7 +16,6 @@ type encoderTestCase struct {
 }
 
 func TestEncoder(t *testing.T) {
-
 	testCases := []encoderTestCase{
 		{
 			"Simple",
