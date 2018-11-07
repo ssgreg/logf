@@ -5,10 +5,7 @@ import (
 	"time"
 )
 
-type EntryWriter interface {
-	WriteEntry(Entry)
-}
-
+// NewLogger returns a new Logger with a given Level and EntryWriter.
 func NewLogger(level LevelCheckerGetter, w EntryWriter) *Logger {
 	return &Logger{
 		level: level.LevelChecker(),
@@ -17,6 +14,8 @@ func NewLogger(level LevelCheckerGetter, w EntryWriter) *Logger {
 	}
 }
 
+// NewDisabledLogger return a new Logger that logs nothing as fast as
+// possible.
 func NewDisabledLogger() *Logger {
 	return NewLogger(
 		LevelCheckerGetterFunc(func() LevelChecker {
@@ -26,8 +25,10 @@ func NewDisabledLogger() *Logger {
 		}), nil)
 }
 
-type LogFunc func(string, ...Field)
-
+// Logger is the fast, asynchronous, structured logger.
+//
+// The Logger wraps EntryWriter to check logging level and provide a bit of
+// syntactic sugar.
 type Logger struct {
 	level LevelChecker
 	id    int32
@@ -39,6 +40,11 @@ type Logger struct {
 	callerSkip int
 }
 
+// LogFunc allows to log a message with a bound level.
+type LogFunc func(string, ...Field)
+
+// AtLevel calls the given fn if logging a message at the specified level
+// is enabled, passing a LogFunc with the bound level.
 func (l *Logger) AtLevel(lvl Level, fn func(LogFunc)) {
 	if !l.level(lvl) {
 		return
@@ -49,6 +55,10 @@ func (l *Logger) AtLevel(lvl Level, fn func(LogFunc)) {
 	})
 }
 
+// WithName returns a new Logger adding the given name to the calling one.
+// Name separator is a period.
+//
+// Loggers has no name by default.
 func (l *Logger) WithName(n string) *Logger {
 	if n == "" {
 		return l
@@ -64,6 +74,8 @@ func (l *Logger) WithName(n string) *Logger {
 	return cc
 }
 
+// WithCaller returns a new Logger that adds a special annotation parameters
+// to each logging message, such as the filename and line number of a caller.
 func (l *Logger) WithCaller() *Logger {
 	cc := l.clone()
 	cc.addCaller = true
@@ -71,6 +83,8 @@ func (l *Logger) WithCaller() *Logger {
 	return cc
 }
 
+// WithCallerSkip returns a new Logger with increased number of skipped
+// frames. It's usable to build a custom wrapper for the Logger.
 func (l *Logger) WithCallerSkip(skip int) *Logger {
 	cc := l.clone()
 	cc.callerSkip = skip
@@ -78,6 +92,7 @@ func (l *Logger) WithCallerSkip(skip int) *Logger {
 	return cc
 }
 
+// With returns a new Logger with the given additional fields.
 func (l *Logger) With(fs ...Field) *Logger {
 	// This code attempts to archive optimum performance with minimum
 	// allocations count. Do not change it unless the folowing benchmarks
@@ -108,6 +123,8 @@ func (l *Logger) With(fs ...Field) *Logger {
 	return cc
 }
 
+// Debug logs a debug message with the given text, optional fields and
+// fields passed to the Logger using With function.
 func (l *Logger) Debug(text string, fs ...Field) {
 	if !l.level(LevelDebug) {
 		return
@@ -116,6 +133,8 @@ func (l *Logger) Debug(text string, fs ...Field) {
 	l.write(LevelDebug, text, fs)
 }
 
+// Info logs an info message with the given text, optional fields and
+// fields passed to the Logger using With function.
 func (l *Logger) Info(text string, fs ...Field) {
 	if !l.level(LevelInfo) {
 		return
@@ -124,6 +143,8 @@ func (l *Logger) Info(text string, fs ...Field) {
 	l.write(LevelInfo, text, fs)
 }
 
+// Warn logs a warning message with the given text, optional fields and
+// fields passed to the Logger using With function.
 func (l *Logger) Warn(text string, fs ...Field) {
 	if !l.level(LevelWarn) {
 		return
@@ -132,6 +153,8 @@ func (l *Logger) Warn(text string, fs ...Field) {
 	l.write(LevelWarn, text, fs)
 }
 
+// Error logs an error message with the given text, optional fields and
+// fields passed to the Logger using With function.
 func (l *Logger) Error(text string, fs ...Field) {
 	if !l.level(LevelError) {
 		return
@@ -141,6 +164,7 @@ func (l *Logger) Error(text string, fs ...Field) {
 }
 
 func (l *Logger) write(lv Level, text string, fs []Field) {
+	// Snapshot non-const fields.
 	for i := range fs {
 		snapshotField(&fs[i])
 	}
