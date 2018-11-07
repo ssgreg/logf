@@ -1,244 +1,12 @@
 package logf
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"time"
 	"unsafe"
 )
-
-// TODO: special case that calls String() for the passed object
-
-type FieldType byte
-
-const (
-	FieldTypeUnknown FieldType = iota
-	FieldTypeAny
-	FieldTypeBool
-	FieldTypeInt64
-	FieldTypeInt32
-	FieldTypeInt16
-	FieldTypeInt8
-	FieldTypeUint64
-	FieldTypeUint32
-	FieldTypeUint16
-	FieldTypeUint8
-	FieldTypeFloat64
-	FieldTypeFloat32
-	FieldTypeDuration
-	FieldTypeError
-	FieldTypeTime
-
-	FieldTypeBytes
-	FieldTypeBytesToString
-	FieldTypeBytesToBools
-	FieldTypeBytesToInts64
-	FieldTypeBytesToInts32
-	FieldTypeBytesToInts16
-	FieldTypeBytesToInts8
-	FieldTypeBytesToUints64
-	FieldTypeBytesToUints32
-	FieldTypeBytesToUints16
-	FieldTypeBytesToUints8
-	FieldTypeBytesToFloats64
-	FieldTypeBytesToFloats32
-	FieldTypeBytesToDurations
-
-	FieldTypeArray
-	FieldTypeObject
-)
-
-// Special cases that are processed during snapshoting phase.
-const (
-	FieldTypeRawMask FieldType = 1<<7 + iota
-	FieldTypeRawBytes
-	FieldTypeRawBytesToBools
-	FieldTypeRawBytesToInts64
-	FieldTypeRawBytesToInts32
-	FieldTypeRawBytesToInts16
-	FieldTypeRawBytesToInts8
-	FieldTypeRawBytesToUints64
-	FieldTypeRawBytesToUints32
-	FieldTypeRawBytesToUints16
-	FieldTypeRawBytesToUints8
-	FieldTypeRawBytesToFloats64
-	FieldTypeRawBytesToFloats32
-	FieldTypeRawBytesToDurations
-)
-
-type Field struct {
-	Key   string
-	Type  FieldType
-	Any   interface{}
-	Int   int64
-	Bytes []byte
-}
-
-func (fd Field) Accept(v FieldEncoder) {
-	switch fd.Type {
-	case FieldTypeAny:
-		v.EncodeFieldAny(fd.Key, fd.Any)
-	case FieldTypeBool:
-		v.EncodeFieldBool(fd.Key, fd.Int != 0)
-	case FieldTypeInt64:
-		v.EncodeFieldInt64(fd.Key, fd.Int)
-	case FieldTypeInt32:
-		v.EncodeFieldInt32(fd.Key, int32(fd.Int))
-	case FieldTypeInt16:
-		v.EncodeFieldInt16(fd.Key, int16(fd.Int))
-	case FieldTypeInt8:
-		v.EncodeFieldInt8(fd.Key, int8(fd.Int))
-	case FieldTypeUint64:
-		v.EncodeFieldUint64(fd.Key, uint64(fd.Int))
-	case FieldTypeUint32:
-		v.EncodeFieldUint32(fd.Key, uint32(fd.Int))
-	case FieldTypeUint16:
-		v.EncodeFieldUint16(fd.Key, uint16(fd.Int))
-	case FieldTypeUint8:
-		v.EncodeFieldUint8(fd.Key, uint8(fd.Int))
-	case FieldTypeFloat32:
-		v.EncodeFieldFloat32(fd.Key, math.Float32frombits(uint32(fd.Int)))
-	case FieldTypeFloat64:
-		v.EncodeFieldFloat64(fd.Key, math.Float64frombits(uint64(fd.Int)))
-	case FieldTypeDuration:
-		v.EncodeFieldDuration(fd.Key, time.Duration(fd.Int))
-	case FieldTypeError:
-		if fd.Any != nil {
-			v.EncodeFieldError(fd.Key, fd.Any.(error))
-		} else {
-			v.EncodeFieldError(fd.Key, nil)
-		}
-	case FieldTypeTime:
-		if fd.Any != nil {
-			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Int).In(fd.Any.(*time.Location)))
-		} else {
-			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Int))
-		}
-	case FieldTypeArray:
-		v.EncodeFieldArray(fd.Key, fd.Any.(ArrayEncoder))
-	case FieldTypeObject:
-		v.EncodeFieldObject(fd.Key, fd.Any.(ObjectEncoder))
-	case FieldTypeBytes:
-		v.EncodeFieldBytes(fd.Key, fd.Bytes)
-	case FieldTypeBytesToString:
-		v.EncodeFieldString(fd.Key, *(*string)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToBools:
-		v.EncodeFieldBools(fd.Key, *(*[]bool)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts64:
-		v.EncodeFieldInts64(fd.Key, *(*[]int64)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts32:
-		v.EncodeFieldInts32(fd.Key, *(*[]int32)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts16:
-		v.EncodeFieldInts16(fd.Key, *(*[]int16)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts8:
-		v.EncodeFieldInts8(fd.Key, *(*[]int8)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints64:
-		v.EncodeFieldUints64(fd.Key, *(*[]uint64)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints32:
-		v.EncodeFieldUints32(fd.Key, *(*[]uint32)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints16:
-		v.EncodeFieldUints16(fd.Key, *(*[]uint16)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints8:
-		v.EncodeFieldUints8(fd.Key, *(*[]uint8)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToFloats64:
-		v.EncodeFieldFloats64(fd.Key, *(*[]float64)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToFloats32:
-		v.EncodeFieldFloats32(fd.Key, *(*[]float32)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToDurations:
-		v.EncodeFieldDurations(fd.Key, *(*[]time.Duration)(unsafe.Pointer(&fd.Bytes)))
-	}
-}
-
-func Any(k string, v interface{}) Field {
-	switch rv := v.(type) {
-	case bool:
-		return Bool(k, rv)
-	case int:
-		return Int(k, rv)
-	case int64:
-		return Int64(k, rv)
-	case int32:
-		return Int32(k, rv)
-	case int16:
-		return Int16(k, rv)
-	case int8:
-		return Int8(k, rv)
-	case uint:
-		return Uint(k, rv)
-	case uint64:
-		return Uint64(k, rv)
-	case uint32:
-		return Uint32(k, rv)
-	case uint16:
-		return Uint16(k, rv)
-	case uint8:
-		return Uint8(k, rv)
-	case float64:
-		return Float64(k, rv)
-	case float32:
-		return Float32(k, rv)
-	case time.Time:
-		return Time(k, rv)
-	case time.Duration:
-		return Duration(k, rv)
-	case error:
-		return NamedError(k, rv)
-	case ArrayEncoder:
-		return Array(k, rv)
-	case ObjectEncoder:
-		return Object(k, rv)
-	case []byte:
-		return Bytes(k, rv)
-	case []string:
-		return Strings(k, rv)
-	case []bool:
-		return Bools(k, rv)
-	case []int:
-		return Ints(k, rv)
-	case []int64:
-		return Ints64(k, rv)
-	case []int32:
-		return Ints32(k, rv)
-	case []int16:
-		return Ints16(k, rv)
-	case []int8:
-		return Ints8(k, rv)
-	case []uint:
-		return Uints(k, rv)
-	case []uint64:
-		return Uints64(k, rv)
-	case []uint32:
-		return Uints32(k, rv)
-	case []uint16:
-		return Uints16(k, rv)
-	case []float64:
-		return Floats64(k, rv)
-	case []float32:
-		return Floats32(k, rv)
-	case []time.Duration:
-		return Durations(k, rv)
-
-	default:
-		switch reflect.TypeOf(rv).Kind() {
-		case reflect.String:
-			return String(k, reflect.ValueOf(rv).String())
-		case reflect.Bool:
-			return Bool(k, reflect.ValueOf(rv).Bool())
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			return Int64(k, reflect.ValueOf(rv).Int())
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			return Uint64(k, reflect.ValueOf(rv).Uint())
-		case reflect.Float32, reflect.Float64:
-			return Float64(k, reflect.ValueOf(rv).Float())
-		}
-	}
-
-	return Field{Key: k, Type: FieldTypeAny, Any: v}
-}
-
-// func Any(k string, v interface{}) Field {
-// 	return Field{Key: k, Type: FieldTypeAny, Any: v}
-// }
 
 func Bool(k string, v bool) Field {
 	var tmp int64
@@ -449,6 +217,45 @@ func Object(k string, v ObjectEncoder) Field {
 	return Field{Key: k, Type: FieldTypeObject, Any: v}
 }
 
+// ConstStringer returns a new Field with the given key and Stringer.
+// Call ConstStringer if your object is const. It has significantly less
+// impact on the calling goroutine.
+func ConstStringer(k string, v fmt.Stringer) Field {
+	return Field{Key: k, Type: FieldTypeStringer, Any: v}
+}
+
+// Stringer returns a new Field with the given key and Stringer.
+func Stringer(k string, v fmt.Stringer) Field {
+	return String(k, v.String())
+}
+
+// ConstFormatter returns a new Field with the given key, verb and interface
+// to format. Call ConstFormatter if your object is const. It has significantly
+// less impact on the calling goroutine.
+func ConstFormatter(k string, verb string, v interface{}) Field {
+	return Field{Key: k, Type: FieldTypeFormatter, Bytes: *(*[]byte)(unsafe.Pointer(&verb)), Any: v}
+}
+
+// ConstFormatterV returns a new Field with the given key and interface to
+// format. It uses the predefined verb "%#v" (a Go-syntax representation of
+// the value). Call ConstFormatterV if your object is const. It has
+// significantly less impact on the calling goroutine.
+func ConstFormatterV(k string, verb string, v interface{}) Field {
+	return ConstFormatterV(k, "%#v", v)
+}
+
+// Formatter returns a new Field with the given key, verb and interface to
+// format.
+func Formatter(k string, verb string, v interface{}) Field {
+	return String(k, fmt.Sprintf(verb, v))
+}
+
+// FormatterV returns a new Field with the given key and interface to format.
+// It uses the predefined verb "%#v" (a Go-syntax representation of the value).
+func FormatterV(k string, v interface{}) Field {
+	return Formatter(k, "%#v", v)
+}
+
 type stringArray []string
 
 func (o stringArray) EncodeLogfArray(e TypeEncoder) error {
@@ -457,4 +264,237 @@ func (o stringArray) EncodeLogfArray(e TypeEncoder) error {
 	}
 
 	return nil
+}
+
+func Any(k string, v interface{}) Field {
+	switch rv := v.(type) {
+	case bool:
+		return Bool(k, rv)
+	case int:
+		return Int(k, rv)
+	case int64:
+		return Int64(k, rv)
+	case int32:
+		return Int32(k, rv)
+	case int16:
+		return Int16(k, rv)
+	case int8:
+		return Int8(k, rv)
+	case uint:
+		return Uint(k, rv)
+	case uint64:
+		return Uint64(k, rv)
+	case uint32:
+		return Uint32(k, rv)
+	case uint16:
+		return Uint16(k, rv)
+	case uint8:
+		return Uint8(k, rv)
+	case float64:
+		return Float64(k, rv)
+	case float32:
+		return Float32(k, rv)
+	case time.Time:
+		return Time(k, rv)
+	case time.Duration:
+		return Duration(k, rv)
+	case error:
+		return NamedError(k, rv)
+	case ArrayEncoder:
+		return Array(k, rv)
+	case ObjectEncoder:
+		return Object(k, rv)
+	case []byte:
+		return Bytes(k, rv)
+	case []string:
+		return Strings(k, rv)
+	case []bool:
+		return Bools(k, rv)
+	case []int:
+		return Ints(k, rv)
+	case []int64:
+		return Ints64(k, rv)
+	case []int32:
+		return Ints32(k, rv)
+	case []int16:
+		return Ints16(k, rv)
+	case []int8:
+		return Ints8(k, rv)
+	case []uint:
+		return Uints(k, rv)
+	case []uint64:
+		return Uints64(k, rv)
+	case []uint32:
+		return Uints32(k, rv)
+	case []uint16:
+		return Uints16(k, rv)
+	case []float64:
+		return Floats64(k, rv)
+	case []float32:
+		return Floats32(k, rv)
+	case []time.Duration:
+		return Durations(k, rv)
+
+	default:
+		switch reflect.TypeOf(rv).Kind() {
+		case reflect.String:
+			return String(k, reflect.ValueOf(rv).String())
+		case reflect.Bool:
+			return Bool(k, reflect.ValueOf(rv).Bool())
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			return Int64(k, reflect.ValueOf(rv).Int())
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			return Uint64(k, reflect.ValueOf(rv).Uint())
+		case reflect.Float32, reflect.Float64:
+			return Float64(k, reflect.ValueOf(rv).Float())
+		}
+	}
+
+	return Field{Key: k, Type: FieldTypeAny, Any: v}
+}
+
+type FieldType byte
+
+const (
+	FieldTypeUnknown FieldType = iota
+	FieldTypeAny
+	FieldTypeBool
+	FieldTypeInt64
+	FieldTypeInt32
+	FieldTypeInt16
+	FieldTypeInt8
+	FieldTypeUint64
+	FieldTypeUint32
+	FieldTypeUint16
+	FieldTypeUint8
+	FieldTypeFloat64
+	FieldTypeFloat32
+	FieldTypeDuration
+	FieldTypeError
+	FieldTypeTime
+
+	FieldTypeBytes
+	FieldTypeBytesToString
+	FieldTypeBytesToBools
+	FieldTypeBytesToInts64
+	FieldTypeBytesToInts32
+	FieldTypeBytesToInts16
+	FieldTypeBytesToInts8
+	FieldTypeBytesToUints64
+	FieldTypeBytesToUints32
+	FieldTypeBytesToUints16
+	FieldTypeBytesToUints8
+	FieldTypeBytesToFloats64
+	FieldTypeBytesToFloats32
+	FieldTypeBytesToDurations
+
+	FieldTypeArray
+	FieldTypeObject
+	FieldTypeStringer
+	FieldTypeFormatter
+)
+
+// Special cases that are processed during snapshoting phase.
+const (
+	FieldTypeRawMask FieldType = 1<<7 + iota
+	FieldTypeRawBytes
+	FieldTypeRawBytesToBools
+	FieldTypeRawBytesToInts64
+	FieldTypeRawBytesToInts32
+	FieldTypeRawBytesToInts16
+	FieldTypeRawBytesToInts8
+	FieldTypeRawBytesToUints64
+	FieldTypeRawBytesToUints32
+	FieldTypeRawBytesToUints16
+	FieldTypeRawBytesToUints8
+	FieldTypeRawBytesToFloats64
+	FieldTypeRawBytesToFloats32
+	FieldTypeRawBytesToDurations
+)
+
+type Field struct {
+	Key   string
+	Type  FieldType
+	Any   interface{}
+	Int   int64
+	Bytes []byte
+}
+
+func (fd Field) Accept(v FieldEncoder) {
+	switch fd.Type {
+	case FieldTypeAny:
+		v.EncodeFieldAny(fd.Key, fd.Any)
+	case FieldTypeBool:
+		v.EncodeFieldBool(fd.Key, fd.Int != 0)
+	case FieldTypeInt64:
+		v.EncodeFieldInt64(fd.Key, fd.Int)
+	case FieldTypeInt32:
+		v.EncodeFieldInt32(fd.Key, int32(fd.Int))
+	case FieldTypeInt16:
+		v.EncodeFieldInt16(fd.Key, int16(fd.Int))
+	case FieldTypeInt8:
+		v.EncodeFieldInt8(fd.Key, int8(fd.Int))
+	case FieldTypeUint64:
+		v.EncodeFieldUint64(fd.Key, uint64(fd.Int))
+	case FieldTypeUint32:
+		v.EncodeFieldUint32(fd.Key, uint32(fd.Int))
+	case FieldTypeUint16:
+		v.EncodeFieldUint16(fd.Key, uint16(fd.Int))
+	case FieldTypeUint8:
+		v.EncodeFieldUint8(fd.Key, uint8(fd.Int))
+	case FieldTypeFloat32:
+		v.EncodeFieldFloat32(fd.Key, math.Float32frombits(uint32(fd.Int)))
+	case FieldTypeFloat64:
+		v.EncodeFieldFloat64(fd.Key, math.Float64frombits(uint64(fd.Int)))
+	case FieldTypeDuration:
+		v.EncodeFieldDuration(fd.Key, time.Duration(fd.Int))
+	case FieldTypeError:
+		if fd.Any != nil {
+			v.EncodeFieldError(fd.Key, fd.Any.(error))
+		} else {
+			v.EncodeFieldError(fd.Key, nil)
+		}
+	case FieldTypeTime:
+		if fd.Any != nil {
+			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Int).In(fd.Any.(*time.Location)))
+		} else {
+			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Int))
+		}
+	case FieldTypeArray:
+		v.EncodeFieldArray(fd.Key, fd.Any.(ArrayEncoder))
+	case FieldTypeObject:
+		v.EncodeFieldObject(fd.Key, fd.Any.(ObjectEncoder))
+	case FieldTypeStringer:
+		v.EncodeFieldString(fd.Key, (fd.Any.(fmt.Stringer)).String())
+	case FieldTypeFormatter:
+		v.EncodeFieldString(fd.Key, fmt.Sprintf(*(*string)(unsafe.Pointer(&fd.Bytes)), fd.Any))
+	case FieldTypeBytes:
+		v.EncodeFieldBytes(fd.Key, fd.Bytes)
+	case FieldTypeBytesToString:
+		v.EncodeFieldString(fd.Key, *(*string)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToBools:
+		v.EncodeFieldBools(fd.Key, *(*[]bool)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToInts64:
+		v.EncodeFieldInts64(fd.Key, *(*[]int64)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToInts32:
+		v.EncodeFieldInts32(fd.Key, *(*[]int32)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToInts16:
+		v.EncodeFieldInts16(fd.Key, *(*[]int16)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToInts8:
+		v.EncodeFieldInts8(fd.Key, *(*[]int8)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToUints64:
+		v.EncodeFieldUints64(fd.Key, *(*[]uint64)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToUints32:
+		v.EncodeFieldUints32(fd.Key, *(*[]uint32)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToUints16:
+		v.EncodeFieldUints16(fd.Key, *(*[]uint16)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToUints8:
+		v.EncodeFieldUints8(fd.Key, *(*[]uint8)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToFloats64:
+		v.EncodeFieldFloats64(fd.Key, *(*[]float64)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToFloats32:
+		v.EncodeFieldFloats32(fd.Key, *(*[]float32)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToDurations:
+		v.EncodeFieldDurations(fd.Key, *(*[]time.Duration)(unsafe.Pointer(&fd.Bytes)))
+	}
 }
