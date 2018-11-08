@@ -19,7 +19,7 @@ const (
 	LevelDebug
 )
 
-// Checker is common way to get LevelChecker. Use it with every custom
+// Checker is the common way to get LevelChecker. Use it with every custom
 // implementation of Level.
 func (l Level) Checker() LevelChecker {
 	return func(o Level) bool {
