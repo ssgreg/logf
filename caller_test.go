@@ -182,5 +182,5 @@ func (e *testingTypeEncoder) EncodeTypeObject(v ObjectEncoder) {
 }
 
 func (e *testingTypeEncoder) EncodeTypeUnsafeBytes(v unsafe.Pointer) {
-	e.result = *(*string)(v)
+	e.result = string(*(*[]byte)(v))
 }
