@@ -50,8 +50,11 @@ func (c EntryCaller) FileWithPackage() string {
 	return c.File[found+1:]
 }
 
+// CallerEncoder is the function type that encodes the given EntryCaller.
 type CallerEncoder func(EntryCaller, TypeEncoder)
 
+// ShortCallerEncoder encodes the given EntryCaller using it's FileWithPackage
+// function.
 func ShortCallerEncoder(c EntryCaller, m TypeEncoder) {
 	var callerBuf [64]byte
 	var b []byte
@@ -64,6 +67,7 @@ func ShortCallerEncoder(c EntryCaller, m TypeEncoder) {
 	runtime.KeepAlive(&b)
 }
 
+// FullCallerEncoder encodes the given EntryCaller using a full file path.
 func FullCallerEncoder(c EntryCaller, m TypeEncoder) {
 	var callerBuf [256]byte
 	var b []byte
