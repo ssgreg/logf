@@ -6,8 +6,8 @@ import (
 	"syscall"
 )
 
-// Appender defines the interface for your own strategies for outputting
-// log entries.
+// Appender is the interface for your own strategies for outputting log
+// entries.
 type Appender interface {
 	// Append logs the Entry in Appender specific way.
 	Append(Entry) error
@@ -21,8 +21,7 @@ type Appender interface {
 	Sync() error
 }
 
-// NewDiscardAppender creates the new instance of an appender that does
-// nothing.
+// NewDiscardAppender returns a new Appender that does nothing.
 func NewDiscardAppender() Appender {
 	return &discardAppender{}
 }
@@ -42,6 +41,7 @@ func (a *discardAppender) Flush() error {
 	return nil
 }
 
+// NewWriteAppender returns a new Appender with the given Writer and Encoder.
 func NewWriteAppender(w io.Writer, enc Encoder) Appender {
 	s, _ := w.(syncer)
 
