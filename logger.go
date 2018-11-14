@@ -169,7 +169,7 @@ func (l *Logger) write(lv Level, text string, fs []Field) {
 		snapshotField(&fs[i])
 	}
 
-	e := Entry{l.id, l.fields, fs, lv, time.Now(), text, l.name, EntryCaller{}}
+	e := Entry{l.id, l.name, l.fields, fs, lv, time.Now(), text, EntryCaller{}}
 	if l.addCaller {
 		e.Caller = NewEntryCaller(2 + l.callerSkip)
 	}
