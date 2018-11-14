@@ -38,7 +38,7 @@ func (b *Buffer) String() string {
 }
 
 // EnsureSize ensures that the Buffer is able to append 's' bytes without
-// a futher realloc.
+// a further realloc.
 func (b *Buffer) EnsureSize(s int) []byte {
 	if cap(b.Data)-len(b.Data) < s {
 		tmpLen := len(b.Data)

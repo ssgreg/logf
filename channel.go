@@ -151,7 +151,7 @@ func (l *channelWriter) append(e Entry) {
 	}
 
 	// Force appender to Sync if entry contains an error message.
-	// This allows to commit buffered messages in case of futher unexpected
+	// This allows to commit buffered messages in case of further unexpected
 	// panic or crash.
 	if e.Level <= LevelError {
 		if l.EnableSyncOnError {

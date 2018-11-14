@@ -95,7 +95,7 @@ func (l *Logger) WithCallerSkip(skip int) *Logger {
 // With returns a new Logger with the given additional fields.
 func (l *Logger) With(fs ...Field) *Logger {
 	// This code attempts to archive optimum performance with minimum
-	// allocations count. Do not change it unless the folowing benchmarks
+	// allocations count. Do not change it unless the following benchmarks
 	// will show a better performance:
 	// - BenchmarkCreateContextLogger
 	// - BenchmarkCreateContextWithAccumulatedContextLogger
