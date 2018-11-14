@@ -9,13 +9,13 @@ type Level uint32
 
 // Severity levels.
 const (
-	// LevelError logs errors only.
+	// LevelError allows to log errors only.
 	LevelError Level = iota
-	// LevelWarning logs errors and warnings.
+	// LevelWarning allows to log errors and warnings.
 	LevelWarn
-	// LevelInfo is the default logging level. Logs errors, warnings and infos.
+	// LevelInfo is the default logging level. Allows to log errors, warnings and infos.
 	LevelInfo
-	// LevelDebug logs everything.
+	// LevelDebug allows to log messages with all severity levels.
 	LevelDebug
 )
 
