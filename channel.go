@@ -4,6 +4,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"time"
 )
 
 // ChannelWriterConfig allows to configure ChannelWriter.
@@ -167,4 +168,14 @@ func (l *channelWriter) reportError(text string, err error) {
 }
 
 func skipError(_ error) {
+}
+
+func newErrorEntry(text string, fs ...Field) Entry {
+	return Entry{
+		LoggerID: -1,
+		Level:    LevelError,
+		Time:     time.Now(),
+		Text:     text,
+		Fields:   fs,
+	}
 }
