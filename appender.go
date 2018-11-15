@@ -47,12 +47,12 @@ func NewWriteAppender(w io.Writer, enc Encoder) Appender {
 
 	if s != nil {
 		err := s.Sync()
-		// Check for EINVAL - a known error if Writer is bound to a
-		// special File (e.g., a pipe or socket) which does not support
+		// Check for EINVAL and ENOTSUP - known errors if Writer is bound to
+		// a special File (e.g., a pipe or socket) which does not support
 		// synchronization.
 		if pathErr, ok := err.(*os.PathError); ok {
 			if errno, ok := pathErr.Err.(syscall.Errno); ok {
-				if errno == syscall.EINVAL {
+				if errno == syscall.EINVAL || errno == syscall.ENOTSUP {
 					// Disable future syncs.
 					s = nil
 				}
