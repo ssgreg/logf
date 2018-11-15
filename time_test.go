@@ -8,31 +8,31 @@ import (
 )
 
 func TestRFC3339TimeEncoder(t *testing.T) {
-	tm := time.Unix(1542266559, 305941000)
+	tm := time.Unix(1542266559, 305941000).UTC()
 	enc := testingTypeEncoder{}
 	RFC3339TimeEncoder(tm, &enc)
 
-	assert.EqualValues(t, "2018-11-15T10:22:39+03:00", enc.result)
+	assert.EqualValues(t, "2018-11-15T07:22:39Z", enc.result)
 }
 
 func TestRFC3339NanoTimeEncoder(t *testing.T) {
-	tm := time.Unix(1542266559, 305941000)
+	tm := time.Unix(1542266559, 305941000).UTC()
 	enc := testingTypeEncoder{}
 	RFC3339NanoTimeEncoder(tm, &enc)
 
-	assert.EqualValues(t, "2018-11-15T10:22:39.305941+03:00", enc.result)
+	assert.EqualValues(t, "2018-11-15T07:22:39.305941Z", enc.result)
 }
 
 func TestLayoutTimeEncoder(t *testing.T) {
-	tm := time.Unix(1542266559, 305941000)
+	tm := time.Unix(1542266559, 305941000).UTC()
 	enc := testingTypeEncoder{}
 	LayoutTimeEncoder(time.StampNano)(tm, &enc)
 
-	assert.EqualValues(t, "Nov 15 10:22:39.305941000", enc.result)
+	assert.EqualValues(t, "Nov 15 07:22:39.305941000", enc.result)
 }
 
 func TestUnixNanoTimeEncoder(t *testing.T) {
-	tm := time.Unix(1542266559, 305941000)
+	tm := time.Unix(1542266559, 305941000).UTC()
 	enc := testingTypeEncoder{}
 	UnixNanoTimeEncoder(tm, &enc)
 
