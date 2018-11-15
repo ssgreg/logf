@@ -97,3 +97,46 @@ func TestUpperCaseLevelEncoder(t *testing.T) {
 
 	assert.EqualValues(t, "ERROR", enc.result)
 }
+
+func TestMutableLevelChecker(t *testing.T) {
+	type LevelCheck struct {
+		level   Level
+		enabled bool
+	}
+
+	cases := []struct {
+		checker LevelChecker
+		goldens []LevelCheck
+	}{
+		{
+			NewMutableLevel(LevelError).LevelChecker(),
+			[]LevelCheck{{LevelError, true}, {LevelWarn, false}, {LevelInfo, false}, {LevelDebug, false}},
+		},
+		{
+			NewMutableLevel(LevelWarn).LevelChecker(),
+			[]LevelCheck{{LevelError, true}, {LevelWarn, true}, {LevelInfo, false}, {LevelDebug, false}},
+		},
+		{
+			NewMutableLevel(LevelInfo).LevelChecker(),
+			[]LevelCheck{{LevelError, true}, {LevelWarn, true}, {LevelInfo, true}, {LevelDebug, false}},
+		},
+		{
+			NewMutableLevel(LevelDebug).LevelChecker(),
+			[]LevelCheck{{LevelError, true}, {LevelWarn, true}, {LevelInfo, true}, {LevelDebug, true}},
+		},
+	}
+
+	for i, cs := range cases {
+		for _, golden := range cs.goldens {
+			assert.Equal(t, golden.enabled, cs.checker(golden.level), "%d checks with %q", i, golden.level)
+		}
+	}
+}
+
+func TestMutableLevel(t *testing.T) {
+	level := NewMutableLevel(LevelError)
+	assert.Equal(t, LevelError, level.Level())
+
+	level.Set(LevelDebug)
+	assert.Equal(t, LevelDebug, level.Level())
+}
