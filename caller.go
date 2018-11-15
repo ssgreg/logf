@@ -50,7 +50,7 @@ func (c EntryCaller) FileWithPackage() string {
 	return c.File[found+1:]
 }
 
-// CallerEncoder is the function type that encodes the given EntryCaller.
+// CallerEncoder is the function type to encode the given EntryCaller.
 type CallerEncoder func(EntryCaller, TypeEncoder)
 
 // ShortCallerEncoder encodes the given EntryCaller using it's FileWithPackage

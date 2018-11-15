@@ -103,7 +103,7 @@ func (fn LevelCheckerGetterFunc) LevelChecker() LevelChecker {
 	return fn()
 }
 
-// LevelEncoder is the function to encode Level.
+// LevelEncoder is the function type to encode Level.
 type LevelEncoder func(Level, TypeEncoder)
 
 // DefaultLevelEncoder implements LevelEncoder by calling Level itself.
