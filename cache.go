@@ -25,9 +25,6 @@ func NewCache(limit int) *Cache {
 // Set adds the given buffer with the given key to the cache or replaces
 // the existing one with the same key.
 func (c *Cache) Set(k int32, bytes []byte) {
-	// if e, ok := c.m[k]; ok {
-	// 	c.l.Remove(e)
-	// }
 	e := c.l.PushFront(&element{k, bytes})
 	c.m[k] = e
 
