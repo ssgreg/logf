@@ -16,6 +16,11 @@ import (
 
 var disableOthers = true
 
+// TODO: benchmarks descriptions
+// TODO: non-parallel execution explanation
+// TODO: scenario decomposition
+// TODO: use zerolog object and array marshaller
+
 func BenchmarkDisabledPlainText(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger, _ := newLogger(logf.LevelError)
