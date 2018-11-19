@@ -5,7 +5,7 @@ import (
 )
 
 // Level defines severity level of a log message.
-type Level uint32
+type Level int8
 
 // Severity levels.
 const (
