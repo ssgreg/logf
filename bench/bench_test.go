@@ -156,7 +156,7 @@ func BenchmarkDisabledTextWithFields(b *testing.B) {
 		}
 	})
 	b.Run("logf.check", func(b *testing.B) {
-		logger := logf.NewDisabledLogger().With(fakeFields()...)
+		logger := logf.NewDisabledLogger()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			logger.AtLevel(logf.LevelInfo, func(log logf.LogFunc) {
@@ -176,7 +176,7 @@ func BenchmarkDisabledTextWithFields(b *testing.B) {
 		}
 	})
 	b.Run("uber/zap.check", func(b *testing.B) {
-		logger := newZapLogger(zap.ErrorLevel).With(fakeZapFields()...)
+		logger := newZapLogger(zap.ErrorLevel)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			if m := logger.Check(zap.InfoLevel, getMessage(0)); m != nil {
@@ -192,7 +192,7 @@ func BenchmarkDisabledTextWithFields(b *testing.B) {
 		}
 	})
 	b.Run("rs/zerolog.check", func(b *testing.B) {
-		logger := fakeZerologContext(newDisabledZerolog().With()).Logger()
+		logger := newDisabledZerolog()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			if e := logger.Info(); e.Enabled() {
