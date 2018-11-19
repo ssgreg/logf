@@ -97,8 +97,8 @@ func (l *Logger) With(fs ...Field) *Logger {
 	// This code attempts to archive optimum performance with minimum
 	// allocations count. Do not change it unless the following benchmarks
 	// will show a better performance:
-	// - BenchmarkCreateContextLogger
-	// - BenchmarkCreateContextWithAccumulatedContextLogger
+	// - BenchmarkAccumulateFields
+	// - BenchmarkAccumulateFieldsWithAccumulatedFields
 
 	var cc *Logger
 	if len(l.fields) == 0 {
