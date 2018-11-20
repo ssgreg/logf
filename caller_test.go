@@ -2,8 +2,6 @@ package logf
 
 import (
 	"testing"
-	"time"
-	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -42,7 +40,7 @@ func TestEntryCaller(t *testing.T) {
 }
 
 func TestShortCallerEncoder(t *testing.T) {
-	enc := testingTypeEncoder{}
+	enc := testTypeEncoder{}
 	caller := EntryCaller{0, "/a/b/c/d.go", 66, true}
 	ShortCallerEncoder(caller, &enc)
 
@@ -50,137 +48,9 @@ func TestShortCallerEncoder(t *testing.T) {
 }
 
 func TestFullCallerEncoder(t *testing.T) {
-	enc := testingTypeEncoder{}
+	enc := testTypeEncoder{}
 	caller := EntryCaller{0, "/a/b/c/d.go", 66, true}
 	FullCallerEncoder(caller, &enc)
 
 	assert.EqualValues(t, "/a/b/c/d.go:66", enc.result)
-}
-
-type testingTypeEncoder struct {
-	result interface{}
-}
-
-func (e *testingTypeEncoder) EncodeTypeAny(v interface{}) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeBool(v bool) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeInt64(v int64) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeInt32(v int32) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeInt16(v int16) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeInt8(v int8) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeUint64(v uint64) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeUint32(v uint32) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeUint16(v uint16) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeUint8(v uint8) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeFloat64(v float64) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeFloat32(v float32) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeDuration(v time.Duration) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeTime(v time.Time) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeString(v string) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeBytes(v []byte) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeBools(v []bool) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeInts64(v []int64) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeInts32(v []int32) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeInts16(v []int16) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeInts8(v []int8) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeUints64(v []uint64) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeUints32(v []uint32) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeUints16(v []uint16) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeUints8(v []uint8) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeFloats64(v []float64) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeFloats32(v []float32) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeDurations(v []time.Duration) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeArray(v ArrayEncoder) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeObject(v ObjectEncoder) {
-	e.result = v
-}
-
-func (e *testingTypeEncoder) EncodeTypeUnsafeBytes(v unsafe.Pointer) {
-	e.result = string(*(*[]byte)(v))
 }

@@ -85,14 +85,14 @@ func TestLevelFromString(t *testing.T) {
 }
 
 func TestDefaultLevelEncoder(t *testing.T) {
-	enc := testingTypeEncoder{}
+	enc := testTypeEncoder{}
 	DefaultLevelEncoder(LevelError, &enc)
 
 	assert.EqualValues(t, "error", enc.result)
 }
 
 func TestUpperCaseLevelEncoder(t *testing.T) {
-	enc := testingTypeEncoder{}
+	enc := testTypeEncoder{}
 	UpperCaseLevelEncoder(LevelError, &enc)
 
 	assert.EqualValues(t, "ERROR", enc.result)
