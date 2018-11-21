@@ -3,6 +3,7 @@ package logf
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,10 +30,22 @@ func TestBufferAppend(t *testing.T) {
 		require.EqualValues(t, capacity, buf.Cap())
 		require.EqualValues(t, data, string(buf.Data))
 
-		buf.AppendString(data)
+		buf.AppendBytes([]byte(data))
 		require.EqualValues(t, dataLen*2, buf.Len())
 		require.True(t, buf.Cap() >= dataLen*2)
 		require.EqualValues(t, data+data, buf.String())
+
+		n, err := buf.Write([]byte(data))
+		assert.Equal(t, len(data), n)
+		assert.NoError(t, err)
+		require.EqualValues(t, dataLen*3, buf.Len())
+		require.True(t, buf.Cap() >= dataLen*3)
+		require.EqualValues(t, data+data+data, buf.String())
+
+		buf.AppendByte('\n')
+		require.EqualValues(t, dataLen*3+1, buf.Len())
+		require.True(t, buf.Cap() >= dataLen*3+1)
+		require.EqualValues(t, data+data+data+"\n", buf.String())
 	})
 }
 
@@ -78,4 +91,36 @@ func TestBufferExtendBytes(t *testing.T) {
 		require.EqualValues(t, capacity*2, buf.Len())
 		require.True(t, buf.Cap() >= capacity*2)
 	})
+}
+
+func TestBufferBack(t *testing.T) {
+	capacity := 10
+	buf := NewBufferWithCapacity(capacity)
+	buf.AppendByte('\n')
+	assert.EqualValues(t, '\n', buf.Back())
+}
+
+func TestBufferAppendFunctions(t *testing.T) {
+	capacity := 10
+	buf := NewBufferWithCapacity(capacity)
+
+	AppendUint(buf, 123456789012345678)
+	assert.Equal(t, []byte("123456789012345678"), buf.Bytes())
+	buf.Reset()
+
+	AppendInt(buf, -123456789012345678)
+	assert.Equal(t, []byte("-123456789012345678"), buf.Bytes())
+	buf.Reset()
+
+	AppendFloat32(buf, 123456.16)
+	assert.Equal(t, []byte("123456.16"), buf.Bytes())
+	buf.Reset()
+
+	AppendFloat64(buf, 123456.16)
+	assert.Equal(t, []byte("123456.16"), buf.Bytes())
+	buf.Reset()
+
+	AppendBool(buf, true)
+	assert.Equal(t, []byte("true"), buf.Bytes())
+	buf.Reset()
 }

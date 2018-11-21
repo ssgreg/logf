@@ -34,7 +34,7 @@ func (b *Buffer) Write(p []byte) (n int, err error) {
 
 // String implements fmt.Stringer.
 func (b *Buffer) String() string {
-	return string(b.Data)
+	return string(b.Bytes())
 }
 
 // EnsureSize ensures that the Buffer is able to append 's' bytes without
