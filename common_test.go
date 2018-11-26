@@ -15,14 +15,16 @@ func (w *testEntryWriter) WriteEntry(e Entry) {
 }
 
 // testSnapshotter implements Snapshotter allowing to check whether
-// TakeSnapshot was called or not.
+// TakeSnapshot was called or not. TakeSnapshot returns new object of
+// this type.
 type testSnapshotter struct {
 	Called bool
 }
 
 func (s *testSnapshotter) TakeSnapshot() interface{} {
 	s.Called = true
-	return s
+
+	return &testSnapshotter{}
 }
 
 // testLevelCheckerReturningFalse implements LevelCheckerGetter that always
