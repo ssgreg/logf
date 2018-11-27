@@ -59,55 +59,53 @@ var NewChannelWriter = channelWriterGetter(
 
 		return l, ChannelWriterCloseFunc(
 			func() {
-				l.Close()
+				l.close()
 			})
 	},
 )
 
+// ChannelWriterCloseFunc allows to close channel writer.
 type ChannelWriterCloseFunc func()
-
-type channelWriterGetter func(cfg ChannelWriterConfig) (EntryWriter, ChannelWriterCloseFunc)
-
-func (c channelWriterGetter) Default() (EntryWriter, ChannelWriterCloseFunc) {
-	return c(ChannelWriterConfig{})
-}
 
 type channelWriter struct {
 	ChannelWriterConfig
+	sync.Mutex
+	sync.WaitGroup
 
-	ch chan Entry
-	wg sync.WaitGroup
-}
-
-func (l *channelWriter) Close() error {
-	close(l.ch)
-	l.wg.Wait()
-
-	return nil
+	ch     chan Entry
+	closed bool
 }
 
 func (l *channelWriter) WriteEntry(e Entry) {
 	l.ch <- e
 }
 
-func (l *channelWriter) Len() int {
-	return len(l.ch)
-}
-
-func (l *channelWriter) Cap() int {
-	return cap(l.ch)
-}
-
 func (l *channelWriter) init(cfg ChannelWriterConfig) {
 	l.ChannelWriterConfig = cfg
 	l.ch = make(chan Entry, l.Capacity)
 
-	l.wg.Add(1)
+	l.Add(1)
 	go l.worker()
 }
 
+func (l *channelWriter) close() {
+	l.Lock()
+	defer l.Unlock()
+
+	// Double close is allowed.
+	if !l.closed {
+		close(l.ch)
+		l.Wait()
+
+		// Mark channel as closed and drained. Channel is not reset to nil,
+		// that allows build-it panic in case of calling WriterEntry after
+		// Close.
+		l.closed = true
+	}
+}
+
 func (l *channelWriter) worker() {
-	defer l.wg.Done()
+	defer l.Done()
 
 	var e Entry
 	var ok bool
@@ -178,4 +176,10 @@ func newErrorEntry(text string, fs ...Field) Entry {
 		Text:     text,
 		Fields:   fs,
 	}
+}
+
+type channelWriterGetter func(cfg ChannelWriterConfig) (EntryWriter, ChannelWriterCloseFunc)
+
+func (c channelWriterGetter) Default() (EntryWriter, ChannelWriterCloseFunc) {
+	return c(ChannelWriterConfig{})
 }
