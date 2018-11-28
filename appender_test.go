@@ -166,6 +166,7 @@ func TestWriteAppender(t *testing.T) {
 	// expected and no sync calls.
 	checkWriterData(t, &w, "", 0)
 
+	assert.NoError(t, a.Flush())
 	assert.NoError(t, a.Sync())
 	// Sync forced Appender to commit it's buffer. Expected specified
 	// buffer and one sync call.

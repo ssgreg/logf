@@ -92,17 +92,12 @@ func (a *writeAppender) Append(entry Entry) error {
 	return nil
 }
 
-func (a *writeAppender) Sync() (err error) {
-	defer func() {
-		if a.s != nil {
-			syncErr := a.s.Sync()
-			if syncErr != nil && err == nil {
-				err = syncErr
-			}
-		}
-	}()
+func (a *writeAppender) Sync() error {
+	if a.s == nil {
+		return nil
+	}
 
-	return a.Flush()
+	return a.s.Sync()
 }
 
 func (a *writeAppender) Flush() error {

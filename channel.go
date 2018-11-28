@@ -113,7 +113,7 @@ func (l *channelWriter) worker() {
 		select {
 		case e, ok = <-l.ch:
 		default:
-			// Channel is empty. Force appender to Flush.
+			// Channel is empty. Force appender to flush.
 			l.flush()
 			e, ok = <-l.ch
 		}
@@ -124,7 +124,8 @@ func (l *channelWriter) worker() {
 		l.append(e)
 	}
 
-	// Force appender to sync at exit.
+	// Force appender to flush & sync at exit.
+	l.flush()
 	l.sync()
 }
 
@@ -152,16 +153,16 @@ func (l *channelWriter) append(e Entry) {
 	// This allows to commit buffered messages in case of further unexpected
 	// panic or crash.
 	if e.Level <= LevelError {
+		l.flush()
 		if l.EnableSyncOnError {
 			l.sync()
-		} else {
-			l.flush()
 		}
 	}
 }
 
 func (l *channelWriter) reportError(text string, err error) {
 	skipError(l.ErrorAppender.Append(newErrorEntry(text, Error(err))))
+	skipError(l.ErrorAppender.Flush())
 	skipError(l.ErrorAppender.Sync())
 }
 
