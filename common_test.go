@@ -205,6 +205,10 @@ func (e *testTypeEncoder) EncodeTypeUnsafeBytes(v unsafe.Pointer) {
 	e.result = string(*(*[]byte)(v))
 }
 
+func newTestFieldEncoder() *testFieldEncoder {
+	return &testFieldEncoder{make(map[string]interface{})}
+}
+
 // testFieldEncoder implements FieldEncoder storing all fields to be encoded.
 type testFieldEncoder struct {
 	result map[string]interface{}

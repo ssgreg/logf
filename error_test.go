@@ -47,7 +47,3 @@ func TestDefaultErrorEncoderWithNil(t *testing.T) {
 	assert.EqualValues(t, 1, len(enc.result))
 	assert.EqualValues(t, "<nil>", enc.result["error"])
 }
-
-func newTestFieldEncoder() *testFieldEncoder {
-	return &testFieldEncoder{make(map[string]interface{})}
-}
