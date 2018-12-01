@@ -57,6 +57,17 @@ func TestSnapshotBools(t *testing.T) {
 	assert.Equal(t, f.Bytes, rawArray)
 }
 
+func TestSnapshotInts(t *testing.T) {
+	f := Ints("", []int{0})
+	assert.True(t, f.Type&FieldTypeRawMask != 0)
+	rawArray := f.Bytes
+
+	snapshotField(&f)
+	assert.True(t, f.Type&FieldTypeRawMask == 0)
+	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
+	assert.Equal(t, f.Bytes, rawArray)
+}
+
 func TestSnapshotInts64(t *testing.T) {
 	f := Ints64("", []int64{0})
 	assert.True(t, f.Type&FieldTypeRawMask != 0)
@@ -92,6 +103,17 @@ func TestSnapshotInts16(t *testing.T) {
 
 func TestSnapshotInts8(t *testing.T) {
 	f := Ints8("", []int8{0})
+	assert.True(t, f.Type&FieldTypeRawMask != 0)
+	rawArray := f.Bytes
+
+	snapshotField(&f)
+	assert.True(t, f.Type&FieldTypeRawMask == 0)
+	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
+	assert.Equal(t, f.Bytes, rawArray)
+}
+
+func TestSnapshotUints(t *testing.T) {
+	f := Uints("", []uint{0})
 	assert.True(t, f.Type&FieldTypeRawMask != 0)
 	rawArray := f.Bytes
 
