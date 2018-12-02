@@ -37,6 +37,7 @@ func (c *Cache) Set(k int32, bytes []byte) {
 func (c *Cache) Get(k int32) ([]byte, bool) {
 	if e, ok := c.m[k]; ok {
 		c.l.MoveToFront(e)
+
 		return e.Value.(*element).bytes, true
 	}
 
