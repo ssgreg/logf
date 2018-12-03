@@ -59,7 +59,7 @@ func TestChannelWriterWrite(t *testing.T) {
 	defer func() {
 		assert.NotEmpty(t, appender.Entries)
 		assert.EqualValues(t, 42, appender.Entries[0].LoggerID)
-		assert.Equal(t, 1, appender.FlushCallCounter, "expected one flush at exit")
+		assert.True(t, appender.FlushCallCounter > 0 && appender.FlushCallCounter < 3, "expected one flush at exit (and sometimes additional flush on empty channel)")
 		assert.Equal(t, 1, appender.SyncCallCounter, "expected one sync at exit")
 	}()
 	defer close()
