@@ -180,3 +180,47 @@ func TestField(t *testing.T) {
 		})
 	}
 }
+
+func TestFieldStrings(t *testing.T) {
+	e := newTestFieldEncoder()
+	f := Strings("k", []string{"42"})
+	f.Accept(e)
+
+	ae := e.result["k"].(ArrayEncoder)
+	te := testTypeEncoder{}
+	ae.EncodeLogfArray(&te)
+
+	assert.Equal(t, "42", te.result)
+}
+
+type testArrayEncoder struct{}
+
+func (o testArrayEncoder) EncodeLogfArray(TypeEncoder) error {
+	return nil
+}
+
+func TestFieldArray(t *testing.T) {
+	golden := &testArrayEncoder{}
+
+	e := newTestFieldEncoder()
+	f := Array("k", &testArrayEncoder{})
+	f.Accept(e)
+
+	assert.Equal(t, golden, e.result["k"])
+}
+
+type testObjectEncoder struct{}
+
+func (o testObjectEncoder) EncodeLogfObject(FieldEncoder) error {
+	return nil
+}
+
+func TestFieldObject(t *testing.T) {
+	golden := &testObjectEncoder{}
+
+	e := newTestFieldEncoder()
+	f := Object("k", &testObjectEncoder{})
+	f.Accept(e)
+
+	assert.Equal(t, golden, e.result["k"])
+}
