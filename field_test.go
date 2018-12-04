@@ -209,12 +209,6 @@ func TestFieldArray(t *testing.T) {
 	assert.Equal(t, golden, e.result["k"])
 }
 
-type testObjectEncoder struct{}
-
-func (o testObjectEncoder) EncodeLogfObject(FieldEncoder) error {
-	return nil
-}
-
 func TestFieldObject(t *testing.T) {
 	golden := &testObjectEncoder{}
 
@@ -222,5 +216,41 @@ func TestFieldObject(t *testing.T) {
 	f := Object("k", &testObjectEncoder{})
 	f.Accept(e)
 
+	assert.Equal(t, golden, e.result["k"])
+}
+
+func TestFieldTime(t *testing.T) {
+	golden := time.Now()
+
+	e := newTestFieldEncoder()
+	f := Time("k", golden)
+	f.Accept(e)
+
+	assert.Equal(t, golden.Format(time.RFC3339Nano), (e.result["k"].(time.Time)).Format(time.RFC3339Nano))
+}
+
+func TestFieldStringer(t *testing.T) {
+	golden := "before"
+	str := &testStringer{golden}
+
+	e := newTestFieldEncoder()
+	f := Stringer("k", str)
+
+	// Change result returning by str. Stinger must call String() during a
+	// call of Stringer().
+	str.result = "after"
+
+	f.Accept(e)
+	assert.Equal(t, golden, e.result["k"])
+}
+
+func TestFieldConstStringer(t *testing.T) {
+	golden := "before"
+	str := &testStringer{golden}
+
+	e := newTestFieldEncoder()
+	f := ConstStringer("k", str)
+
+	f.Accept(e)
 	assert.Equal(t, golden, e.result["k"])
 }

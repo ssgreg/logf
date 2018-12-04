@@ -337,3 +337,17 @@ func (e *testFieldEncoder) EncodeFieldArray(k string, v ArrayEncoder) {
 func (e *testFieldEncoder) EncodeFieldObject(k string, v ObjectEncoder) {
 	e.result[k] = v
 }
+
+type testObjectEncoder struct{}
+
+func (o testObjectEncoder) EncodeLogfObject(FieldEncoder) error {
+	return nil
+}
+
+type testStringer struct {
+	result string
+}
+
+func (s testStringer) String() string {
+	return s.result
+}
