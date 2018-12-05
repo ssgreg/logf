@@ -229,6 +229,16 @@ func TestFieldTime(t *testing.T) {
 	assert.Equal(t, golden.Format(time.RFC3339Nano), (e.result["k"].(time.Time)).Format(time.RFC3339Nano))
 }
 
+func TestFieldTimeWithoutLocation(t *testing.T) {
+	golden := time.Unix(320836234, 0)
+
+	e := newTestFieldEncoder()
+	f := Field{Key: "k", Type: FieldTypeTime, Int: golden.UnixNano()}
+	f.Accept(e)
+
+	assert.Equal(t, golden.Format(time.RFC3339Nano), (e.result["k"].(time.Time)).Format(time.RFC3339Nano))
+}
+
 func TestFieldStringer(t *testing.T) {
 	golden := "before"
 	str := &testStringer{golden}
