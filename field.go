@@ -367,8 +367,8 @@ func ConstFormatter(k string, verb string, v interface{}) Field {
 // Call ConstFormatterV if your object is const. It has significantly less
 // impact on the calling goroutine.
 //
-func ConstFormatterV(k string, verb string, v interface{}) Field {
-	return ConstFormatterV(k, "%#v", v)
+func ConstFormatterV(k string, v interface{}) Field {
+	return ConstFormatter(k, "%#v", v)
 }
 
 // Formatter returns a new Field with the given key, verb and interface to
