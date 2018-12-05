@@ -254,3 +254,58 @@ func TestFieldConstStringer(t *testing.T) {
 	f.Accept(e)
 	assert.Equal(t, golden, e.result["k"])
 }
+
+func TestFieldConstFormatter(t *testing.T) {
+	golden := "42"
+	e := newTestFieldEncoder()
+	f := ConstFormatter("k", "%d", 42)
+
+	f.Accept(e)
+	assert.Equal(t, golden, e.result["k"])
+}
+
+func TestFieldConstFormatterV(t *testing.T) {
+	type testFormatterV struct {
+		str string
+	}
+
+	e := newTestFieldEncoder()
+	f := ConstFormatterV("k", testFormatterV{"42"})
+
+	f.Accept(e)
+	assert.Equal(t, `logf.testFormatterV{str:"42"}`, e.result["k"])
+}
+
+func TestFieldFormatter(t *testing.T) {
+	type testFormatterV struct {
+		str string
+	}
+	testing := testFormatterV{"42"}
+
+	e := newTestFieldEncoder()
+	f := Formatter("k", "%s", &testing)
+
+	// Change testing value to check that ConstFormatter formats string
+	// during it's call.
+	testing.str = "66"
+
+	f.Accept(e)
+	assert.Equal(t, "&{42}", e.result["k"])
+}
+
+func TestFieldFormatterV(t *testing.T) {
+	type testFormatterV struct {
+		str string
+	}
+	testing := testFormatterV{"42"}
+
+	e := newTestFieldEncoder()
+	f := FormatterV("k", &testing)
+
+	// Change testing value to check that ConstFormatter formats string
+	// during it's call.
+	testing.str = "66"
+
+	f.Accept(e)
+	assert.Equal(t, `&logf.testFormatterV{str:"42"}`, e.result["k"])
+}
