@@ -210,6 +210,14 @@ func TestFieldArray(t *testing.T) {
 	assert.Equal(t, golden, e.result["k"])
 }
 
+func TestFieldNilArray(t *testing.T) {
+	e := newTestFieldEncoder()
+	f := Array("k", nil)
+	f.Accept(e)
+
+	assert.Equal(t, "nil", e.result["k"])
+}
+
 func TestFieldObject(t *testing.T) {
 	golden := &testObjectEncoder{}
 
@@ -218,6 +226,14 @@ func TestFieldObject(t *testing.T) {
 	f.Accept(e)
 
 	assert.Equal(t, golden, e.result["k"])
+}
+
+func TestFieldNilObject(t *testing.T) {
+	e := newTestFieldEncoder()
+	f := Object("k", nil)
+	f.Accept(e)
+
+	assert.Equal(t, "nil", e.result["k"])
 }
 
 func TestFieldTime(t *testing.T) {

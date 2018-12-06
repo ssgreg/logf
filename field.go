@@ -592,9 +592,17 @@ func (fd Field) Accept(v FieldEncoder) {
 			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Int))
 		}
 	case FieldTypeArray:
-		v.EncodeFieldArray(fd.Key, fd.Any.(ArrayEncoder))
+		if fd.Any != nil {
+			v.EncodeFieldArray(fd.Key, fd.Any.(ArrayEncoder))
+		} else {
+			v.EncodeFieldString(fd.Key, "nil")
+		}
 	case FieldTypeObject:
-		v.EncodeFieldObject(fd.Key, fd.Any.(ObjectEncoder))
+		if fd.Any != nil {
+			v.EncodeFieldObject(fd.Key, fd.Any.(ObjectEncoder))
+		} else {
+			v.EncodeFieldString(fd.Key, "nil")
+		}
 	case FieldTypeStringer:
 		if fd.Any != nil {
 			v.EncodeFieldString(fd.Key, (fd.Any.(fmt.Stringer)).String())
