@@ -10,174 +10,213 @@ import (
 
 func TestField(t *testing.T) {
 	cases := []struct {
-		name   string
-		fn     func(interface{}) Field
-		golden interface{}
+		name     string
+		fn       func(interface{}) Field
+		original interface{}
+		expected interface{}
 	}{
 		{
-			name:   "Bool",
-			fn:     func(v interface{}) Field { return Bool("k", v.(bool)) },
-			golden: true,
+			name:     "Bool",
+			fn:       func(v interface{}) Field { return Bool("k", v.(bool)) },
+			original: true,
+			expected: true,
 		},
 		{
-			name:   "Int",
-			fn:     func(v interface{}) Field { return Int("k", int(v.(int64))) },
-			golden: int64(42),
+			name:     "Int",
+			fn:       func(v interface{}) Field { return Int("k", v.(int)) },
+			original: 42,
+			expected: int64(42),
 		},
 		{
-			name:   "Int64",
-			fn:     func(v interface{}) Field { return Int64("k", v.(int64)) },
-			golden: int64(42),
+			name:     "Int64",
+			fn:       func(v interface{}) Field { return Int64("k", v.(int64)) },
+			original: int64(42),
+			expected: int64(42),
 		},
 		{
-			name:   "Int32",
-			fn:     func(v interface{}) Field { return Int32("k", v.(int32)) },
-			golden: int32(42),
+			name:     "Int32",
+			fn:       func(v interface{}) Field { return Int32("k", v.(int32)) },
+			original: int32(42),
+			expected: int32(42),
 		},
 		{
-			name:   "Int16",
-			fn:     func(v interface{}) Field { return Int16("k", v.(int16)) },
-			golden: int16(42),
+			name:     "Int16",
+			fn:       func(v interface{}) Field { return Int16("k", v.(int16)) },
+			original: int16(42),
+			expected: int16(42),
 		},
 		{
-			name:   "Int8",
-			fn:     func(v interface{}) Field { return Int8("k", v.(int8)) },
-			golden: int8(42),
+			name:     "Int8",
+			fn:       func(v interface{}) Field { return Int8("k", v.(int8)) },
+			original: int8(42),
+			expected: int8(42),
 		},
 		{
-			name:   "Uint",
-			fn:     func(v interface{}) Field { return Uint("k", uint(v.(uint64))) },
-			golden: uint64(42),
+			name:     "Uint",
+			fn:       func(v interface{}) Field { return Uint("k", v.(uint)) },
+			original: uint(42),
+			expected: uint64(42),
 		},
 		{
-			name:   "Uint64",
-			fn:     func(v interface{}) Field { return Uint64("k", v.(uint64)) },
-			golden: uint64(42),
+			name:     "Uint64",
+			fn:       func(v interface{}) Field { return Uint64("k", v.(uint64)) },
+			original: uint64(42),
+			expected: uint64(42),
 		},
 		{
-			name:   "Uint32",
-			fn:     func(v interface{}) Field { return Uint32("k", v.(uint32)) },
-			golden: uint32(42),
+			name:     "Uint32",
+			fn:       func(v interface{}) Field { return Uint32("k", v.(uint32)) },
+			original: uint32(42),
+			expected: uint32(42),
 		},
 		{
-			name:   "Uint16",
-			fn:     func(v interface{}) Field { return Uint16("k", v.(uint16)) },
-			golden: uint16(42),
+			name:     "Uint16",
+			fn:       func(v interface{}) Field { return Uint16("k", v.(uint16)) },
+			original: uint16(42),
+			expected: uint16(42),
 		},
 		{
-			name:   "Uint8",
-			fn:     func(v interface{}) Field { return Uint8("k", v.(uint8)) },
-			golden: uint8(42),
+			name:     "Uint8",
+			fn:       func(v interface{}) Field { return Uint8("k", v.(uint8)) },
+			original: uint8(42),
+			expected: uint8(42),
 		},
 		{
-			name:   "Float64",
-			fn:     func(v interface{}) Field { return Float64("k", v.(float64)) },
-			golden: float64(42),
+			name:     "Float64",
+			fn:       func(v interface{}) Field { return Float64("k", v.(float64)) },
+			original: float64(42),
+			expected: float64(42),
 		},
 		{
-			name:   "Float32",
-			fn:     func(v interface{}) Field { return Float32("k", v.(float32)) },
-			golden: float32(42),
+			name:     "Float32",
+			fn:       func(v interface{}) Field { return Float32("k", v.(float32)) },
+			original: float32(42),
+			expected: float32(42),
 		},
 		{
-			name:   "Duration",
-			fn:     func(v interface{}) Field { return Duration("k", v.(time.Duration)) },
-			golden: time.Second,
+			name:     "Duration",
+			fn:       func(v interface{}) Field { return Duration("k", v.(time.Duration)) },
+			original: time.Second,
+			expected: time.Second,
 		},
 		{
-			name:   "Duration",
-			fn:     func(v interface{}) Field { return Duration("k", v.(time.Duration)) },
-			golden: time.Second,
+			name:     "String",
+			fn:       func(v interface{}) Field { return String("k", v.(string)) },
+			original: "42",
+			expected: "42",
 		},
 		{
-			name:   "String",
-			fn:     func(v interface{}) Field { return String("k", v.(string)) },
-			golden: "42",
+			name:     "ConstBytes",
+			fn:       func(v interface{}) Field { return ConstBytes("k", v.([]byte)) },
+			original: []byte{42},
+			expected: []byte{42},
 		},
 		{
-			name:   "ConstBytes",
-			fn:     func(v interface{}) Field { return ConstBytes("k", v.([]byte)) },
-			golden: []byte{42},
+			name:     "ConstBools",
+			fn:       func(v interface{}) Field { return ConstBools("k", v.([]bool)) },
+			original: []bool{true},
+			expected: []bool{true},
 		},
 		{
-			name:   "ConstBools",
-			fn:     func(v interface{}) Field { return ConstBools("k", v.([]bool)) },
-			golden: []bool{true},
+			name:     "ConstInts",
+			fn:       func(v interface{}) Field { return ConstInts("k", v.([]int)) },
+			original: []int{42},
+			expected: []int64{42},
 		},
 		{
-			name:   "ConstInts",
-			fn:     func(v interface{}) Field { return ConstInts("k", []int{int((v.([]int64))[0])}) },
-			golden: []int64{42},
+			name:     "ConstInts64",
+			fn:       func(v interface{}) Field { return ConstInts64("k", v.([]int64)) },
+			original: []int64{42},
+			expected: []int64{42},
 		},
 		{
-			name:   "ConstInts64",
-			fn:     func(v interface{}) Field { return ConstInts64("k", v.([]int64)) },
-			golden: []int64{42},
+			name:     "ConstInts32",
+			fn:       func(v interface{}) Field { return ConstInts32("k", v.([]int32)) },
+			original: []int32{42},
+			expected: []int32{42},
 		},
 		{
-			name:   "ConstInts32",
-			fn:     func(v interface{}) Field { return ConstInts32("k", v.([]int32)) },
-			golden: []int32{42},
+			name:     "ConstInts16",
+			fn:       func(v interface{}) Field { return ConstInts16("k", v.([]int16)) },
+			original: []int16{42},
+			expected: []int16{42},
 		},
 		{
-			name:   "ConstInts16",
-			fn:     func(v interface{}) Field { return ConstInts16("k", v.([]int16)) },
-			golden: []int16{42},
+			name:     "ConstInts8",
+			fn:       func(v interface{}) Field { return ConstInts8("k", v.([]int8)) },
+			original: []int8{42},
+			expected: []int8{42},
 		},
 		{
-			name:   "ConstInts8",
-			fn:     func(v interface{}) Field { return ConstInts8("k", v.([]int8)) },
-			golden: []int8{42},
+			name:     "ConstUints",
+			fn:       func(v interface{}) Field { return ConstUints("k", v.([]uint)) },
+			original: []uint{42},
+			expected: []uint64{42},
 		},
 		{
-			name:   "ConstUints",
-			fn:     func(v interface{}) Field { return ConstUints("k", []uint{uint((v.([]uint64))[0])}) },
-			golden: []uint64{42},
+			name:     "ConstUints64",
+			fn:       func(v interface{}) Field { return ConstUints64("k", v.([]uint64)) },
+			original: []uint64{42},
+			expected: []uint64{42},
 		},
 		{
-			name:   "ConstUints64",
-			fn:     func(v interface{}) Field { return ConstUints64("k", v.([]uint64)) },
-			golden: []uint64{42},
+			name:     "ConstUints32",
+			fn:       func(v interface{}) Field { return ConstUints32("k", v.([]uint32)) },
+			original: []uint32{42},
+			expected: []uint32{42},
 		},
 		{
-			name:   "ConstUints32",
-			fn:     func(v interface{}) Field { return ConstUints32("k", v.([]uint32)) },
-			golden: []uint32{42},
+			name:     "ConstUints16",
+			fn:       func(v interface{}) Field { return ConstUints16("k", v.([]uint16)) },
+			original: []uint16{42},
+			expected: []uint16{42},
 		},
 		{
-			name:   "ConstUints16",
-			fn:     func(v interface{}) Field { return ConstUints16("k", v.([]uint16)) },
-			golden: []uint16{42},
+			name:     "ConstUints8",
+			fn:       func(v interface{}) Field { return ConstUints8("k", v.([]uint8)) },
+			original: []uint8{42},
+			expected: []uint8{42},
 		},
 		{
-			name:   "ConstUints8",
-			fn:     func(v interface{}) Field { return ConstUints8("k", v.([]uint8)) },
-			golden: []uint8{42},
+			name:     "ConstFloats64",
+			fn:       func(v interface{}) Field { return ConstFloats64("k", v.([]float64)) },
+			original: []float64{42},
+			expected: []float64{42},
 		},
 		{
-			name:   "ConstFloats64",
-			fn:     func(v interface{}) Field { return ConstFloats64("k", v.([]float64)) },
-			golden: []float64{42},
+			name:     "ConstFloats32",
+			fn:       func(v interface{}) Field { return ConstFloats32("k", v.([]float32)) },
+			original: []float32{42},
+			expected: []float32{42},
 		},
 		{
-			name:   "ConstFloats32",
-			fn:     func(v interface{}) Field { return ConstFloats32("k", v.([]float32)) },
-			golden: []float32{42},
-		},
-		{
-			name:   "ConstDurations",
-			fn:     func(v interface{}) Field { return ConstDurations("k", v.([]time.Duration)) },
-			golden: []time.Duration{time.Second},
+			name:     "ConstDurations",
+			fn:       func(v interface{}) Field { return ConstDurations("k", v.([]time.Duration)) },
+			original: []time.Duration{time.Second},
+			expected: []time.Duration{time.Second},
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			e := newTestFieldEncoder()
-			f := c.fn(c.golden)
-			f.Accept(e)
+			t.Run("", func(t *testing.T) {
+				e := newTestFieldEncoder()
+				f := c.fn(c.original)
+				f.Accept(e)
 
-			assert.Equal(t, c.golden, e.result["k"])
+				assert.Equal(t, c.expected, e.result["k"])
+			})
+			t.Run("Any", func(t *testing.T) {
+				e := newTestFieldEncoder()
+				f := Any("k", c.original)
+
+				// Need to snapshot fields because Any could return raw byte
+				// types that need to be copied.
+				snapshotField(&f)
+				f.Accept(e)
+
+				assert.Equal(t, c.expected, e.result["k"])
+			})
 		})
 	}
 }
@@ -378,4 +417,175 @@ func TestFieldNilError(t *testing.T) {
 
 	f.Accept(e)
 	assert.Equal(t, nil, e.result["error"])
+}
+
+func TestFieldAny(t *testing.T) {
+	cases := []struct {
+		name   string
+		fn     func(interface{}) Field
+		golden interface{}
+	}{
+		{
+			name:   "Bool",
+			golden: true,
+		},
+		{
+			name:   "Int",
+			golden: int64(42),
+		},
+		{
+			name:   "Int64",
+			golden: int64(42),
+		},
+		// {
+		// 	name:   "Int32",
+		// 	fn:     func(v interface{}) Field { return Int32("k", v.(int32)) },
+		// 	golden: int32(42),
+		// },
+		// {
+		// 	name:   "Int16",
+		// 	fn:     func(v interface{}) Field { return Int16("k", v.(int16)) },
+		// 	golden: int16(42),
+		// },
+		// {
+		// 	name:   "Int8",
+		// 	fn:     func(v interface{}) Field { return Int8("k", v.(int8)) },
+		// 	golden: int8(42),
+		// },
+		// {
+		// 	name:   "Uint",
+		// 	fn:     func(v interface{}) Field { return Uint("k", uint(v.(uint64))) },
+		// 	golden: uint64(42),
+		// },
+		// {
+		// 	name:   "Uint64",
+		// 	fn:     func(v interface{}) Field { return Uint64("k", v.(uint64)) },
+		// 	golden: uint64(42),
+		// },
+		// {
+		// 	name:   "Uint32",
+		// 	fn:     func(v interface{}) Field { return Uint32("k", v.(uint32)) },
+		// 	golden: uint32(42),
+		// },
+		// {
+		// 	name:   "Uint16",
+		// 	fn:     func(v interface{}) Field { return Uint16("k", v.(uint16)) },
+		// 	golden: uint16(42),
+		// },
+		// {
+		// 	name:   "Uint8",
+		// 	fn:     func(v interface{}) Field { return Uint8("k", v.(uint8)) },
+		// 	golden: uint8(42),
+		// },
+		// {
+		// 	name:   "Float64",
+		// 	fn:     func(v interface{}) Field { return Float64("k", v.(float64)) },
+		// 	golden: float64(42),
+		// },
+		// {
+		// 	name:   "Float32",
+		// 	fn:     func(v interface{}) Field { return Float32("k", v.(float32)) },
+		// 	golden: float32(42),
+		// },
+		// {
+		// 	name:   "Duration",
+		// 	fn:     func(v interface{}) Field { return Duration("k", v.(time.Duration)) },
+		// 	golden: time.Second,
+		// },
+		// {
+		// 	name:   "Duration",
+		// 	fn:     func(v interface{}) Field { return Duration("k", v.(time.Duration)) },
+		// 	golden: time.Second,
+		// },
+		// {
+		// 	name:   "String",
+		// 	fn:     func(v interface{}) Field { return String("k", v.(string)) },
+		// 	golden: "42",
+		// },
+		// {
+		// 	name:   "ConstBytes",
+		// 	fn:     func(v interface{}) Field { return ConstBytes("k", v.([]byte)) },
+		// 	golden: []byte{42},
+		// },
+		// {
+		// 	name:   "ConstBools",
+		// 	fn:     func(v interface{}) Field { return ConstBools("k", v.([]bool)) },
+		// 	golden: []bool{true},
+		// },
+		// {
+		// 	name:   "ConstInts",
+		// 	fn:     func(v interface{}) Field { return ConstInts("k", []int{int((v.([]int64))[0])}) },
+		// 	golden: []int64{42},
+		// },
+		// {
+		// 	name:   "ConstInts64",
+		// 	fn:     func(v interface{}) Field { return ConstInts64("k", v.([]int64)) },
+		// 	golden: []int64{42},
+		// },
+		// {
+		// 	name:   "ConstInts32",
+		// 	fn:     func(v interface{}) Field { return ConstInts32("k", v.([]int32)) },
+		// 	golden: []int32{42},
+		// },
+		// {
+		// 	name:   "ConstInts16",
+		// 	fn:     func(v interface{}) Field { return ConstInts16("k", v.([]int16)) },
+		// 	golden: []int16{42},
+		// },
+		// {
+		// 	name:   "ConstInts8",
+		// 	fn:     func(v interface{}) Field { return ConstInts8("k", v.([]int8)) },
+		// 	golden: []int8{42},
+		// },
+		// {
+		// 	name:   "ConstUints",
+		// 	fn:     func(v interface{}) Field { return ConstUints("k", []uint{uint((v.([]uint64))[0])}) },
+		// 	golden: []uint64{42},
+		// },
+		// {
+		// 	name:   "ConstUints64",
+		// 	fn:     func(v interface{}) Field { return ConstUints64("k", v.([]uint64)) },
+		// 	golden: []uint64{42},
+		// },
+		// {
+		// 	name:   "ConstUints32",
+		// 	fn:     func(v interface{}) Field { return ConstUints32("k", v.([]uint32)) },
+		// 	golden: []uint32{42},
+		// },
+		// {
+		// 	name:   "ConstUints16",
+		// 	fn:     func(v interface{}) Field { return ConstUints16("k", v.([]uint16)) },
+		// 	golden: []uint16{42},
+		// },
+		// {
+		// 	name:   "ConstUints8",
+		// 	fn:     func(v interface{}) Field { return ConstUints8("k", v.([]uint8)) },
+		// 	golden: []uint8{42},
+		// },
+		// {
+		// 	name:   "ConstFloats64",
+		// 	fn:     func(v interface{}) Field { return ConstFloats64("k", v.([]float64)) },
+		// 	golden: []float64{42},
+		// },
+		// {
+		// 	name:   "ConstFloats32",
+		// 	fn:     func(v interface{}) Field { return ConstFloats32("k", v.([]float32)) },
+		// 	golden: []float32{42},
+		// },
+		// {
+		// 	name:   "ConstDurations",
+		// 	fn:     func(v interface{}) Field { return ConstDurations("k", v.([]time.Duration)) },
+		// 	golden: []time.Duration{time.Second},
+		// },
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e := newTestFieldEncoder()
+			f := Any("k", c.golden)
+			f.Accept(e)
+
+			assert.Equal(t, c.golden, e.result["k"])
+		})
+	}
 }
