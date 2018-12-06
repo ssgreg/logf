@@ -347,6 +347,10 @@ func ConstStringer(k string, v fmt.Stringer) Field {
 
 // Stringer returns a new Field with the given key and Stringer.
 func Stringer(k string, v fmt.Stringer) Field {
+	if v == nil {
+		return String(k, "nil")
+	}
+
 	return String(k, v.String())
 }
 
@@ -592,7 +596,11 @@ func (fd Field) Accept(v FieldEncoder) {
 	case FieldTypeObject:
 		v.EncodeFieldObject(fd.Key, fd.Any.(ObjectEncoder))
 	case FieldTypeStringer:
-		v.EncodeFieldString(fd.Key, (fd.Any.(fmt.Stringer)).String())
+		if fd.Any != nil {
+			v.EncodeFieldString(fd.Key, (fd.Any.(fmt.Stringer)).String())
+		} else {
+			v.EncodeFieldString(fd.Key, "nil")
+		}
 	case FieldTypeFormatter:
 		v.EncodeFieldString(fd.Key, fmt.Sprintf(*(*string)(unsafe.Pointer(&fd.Bytes)), fd.Any))
 	case FieldTypeBytes:

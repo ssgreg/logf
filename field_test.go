@@ -255,6 +255,14 @@ func TestFieldStringer(t *testing.T) {
 	assert.Equal(t, golden, e.result["k"])
 }
 
+func TestFieldNilStringer(t *testing.T) {
+	e := newTestFieldEncoder()
+	f := Stringer("k", nil)
+
+	f.Accept(e)
+	assert.Equal(t, "nil", e.result["k"])
+}
+
 func TestFieldConstStringer(t *testing.T) {
 	golden := "before"
 	str := &testStringer{golden}
@@ -266,6 +274,13 @@ func TestFieldConstStringer(t *testing.T) {
 	assert.Equal(t, golden, e.result["k"])
 }
 
+func TestFieldNilConstStringer(t *testing.T) {
+	e := newTestFieldEncoder()
+	f := ConstStringer("k", nil)
+
+	f.Accept(e)
+	assert.Equal(t, "nil", e.result["k"])
+}
 func TestFieldConstFormatter(t *testing.T) {
 	golden := "42"
 	e := newTestFieldEncoder()
@@ -339,4 +354,12 @@ func TestFieldError(t *testing.T) {
 
 	f.Accept(e)
 	assert.Equal(t, golden, e.result["error"])
+}
+
+func TestFieldNilError(t *testing.T) {
+	e := newTestFieldEncoder()
+	f := Error(nil)
+
+	f.Accept(e)
+	assert.Equal(t, nil, e.result["error"])
 }
