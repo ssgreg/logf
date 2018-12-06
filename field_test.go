@@ -1,6 +1,7 @@
 package logf
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -318,4 +319,24 @@ func TestFieldFormatterV(t *testing.T) {
 
 	f.Accept(e)
 	assert.Equal(t, `&logf.testFormatterV{str:"42"}`, e.result["k"])
+}
+
+func TestFieldNamedError(t *testing.T) {
+	golden := errors.New("named error")
+
+	e := newTestFieldEncoder()
+	f := NamedError("k", golden)
+
+	f.Accept(e)
+	assert.Equal(t, golden, e.result["k"])
+}
+
+func TestFieldError(t *testing.T) {
+	golden := errors.New("common error")
+
+	e := newTestFieldEncoder()
+	f := Error(golden)
+
+	f.Accept(e)
+	assert.Equal(t, golden, e.result["error"])
 }
