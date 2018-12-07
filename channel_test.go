@@ -174,7 +174,7 @@ func TestChannelWriterSyncOnErrorWhenEnabled(t *testing.T) {
 	defer func() {
 		assert.NotEmpty(t, appender.Entries)
 		assert.EqualValues(t, 42, appender.Entries[0].LoggerID)
-		assert.Equal(t, 2, appender.FlushCallCounter, "expected one flush at exit and one flush on message add")
+		assert.True(t, appender.FlushCallCounter > 1 && appender.FlushCallCounter < 4, "expected one flush at exit, one on message add (and sometimes additional flush on empty channel)")
 		assert.Equal(t, 2, appender.SyncCallCounter, "expected one sync at exit and one sync on message add")
 	}()
 	defer close()
