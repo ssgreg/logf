@@ -36,3 +36,7 @@ The output is the following:
 ```json
 {"level":"info","ts":"2018-11-03T09:49:56+03:00","msg":"got cpu info","count":8}
 ```
+
+## Benchmarks
+
+TODO
