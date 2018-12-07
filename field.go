@@ -460,6 +460,8 @@ func Any(k string, v interface{}) Field {
 		return Floats32(k, rv)
 	case []time.Duration:
 		return Durations(k, rv)
+	case string:
+		return String(k, rv)
 
 	default:
 		switch reflect.TypeOf(rv).Kind() {
