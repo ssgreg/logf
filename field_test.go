@@ -199,38 +199,45 @@ func TestField(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			t.Run("", func(t *testing.T) {
-				e := newTestFieldEncoder()
-				f := c.fn(c.original)
-				f.Accept(e)
+			f := c.fn(c.original)
+			e := newTestFieldEncoder()
+			f.Accept(e)
+			assert.Equal(t, c.expected, e.result["k"])
+		})
+		t.Run(c.name+"->Any", func(t *testing.T) {
+			f := Any("k", c.original)
 
-				assert.Equal(t, c.expected, e.result["k"])
-			})
-			t.Run("Any", func(t *testing.T) {
-				e := newTestFieldEncoder()
-				f := Any("k", c.original)
+			// Need to snapshot fields because Any could return raw byte
+			// types that need to be copied.
+			snapshotField(&f)
+			e := newTestFieldEncoder()
+			f.Accept(e)
 
-				// Need to snapshot fields because Any could return raw byte
-				// types that need to be copied.
-				snapshotField(&f)
-				f.Accept(e)
-
-				assert.Equal(t, c.expected, e.result["k"])
-			})
+			assert.Equal(t, c.expected, e.result["k"])
 		})
 	}
 }
 
 func TestFieldStrings(t *testing.T) {
-	e := newTestFieldEncoder()
-	f := Strings("k", []string{"42"})
-	f.Accept(e)
+	check := func(t *testing.T, f *Field) {
+		e := newTestFieldEncoder()
+		f.Accept(e)
 
-	ae := e.result["k"].(ArrayEncoder)
-	te := testTypeEncoder{}
-	ae.EncodeLogfArray(&te)
+		ae := e.result["k"].(ArrayEncoder)
+		te := testTypeEncoder{}
+		ae.EncodeLogfArray(&te)
 
-	assert.Equal(t, "42", te.result)
+		assert.Equal(t, "42", te.result)
+	}
+
+	t.Run("Time", func(t *testing.T) {
+		f := Strings("k", []string{"42"})
+		check(t, &f)
+	})
+	t.Run("Time->Any", func(t *testing.T) {
+		f := Any("k", []string{"42"})
+		check(t, &f)
+	})
 }
 
 type testArrayEncoder struct{}
@@ -242,47 +249,73 @@ func (o testArrayEncoder) EncodeLogfArray(TypeEncoder) error {
 func TestFieldArray(t *testing.T) {
 	golden := &testArrayEncoder{}
 
-	e := newTestFieldEncoder()
-	f := Array("k", &testArrayEncoder{})
-	f.Accept(e)
+	check := func(t *testing.T, f *Field) {
+		e := newTestFieldEncoder()
+		f.Accept(e)
+		assert.Equal(t, golden, e.result["k"])
+	}
 
-	assert.Equal(t, golden, e.result["k"])
+	t.Run("Array", func(t *testing.T) {
+		f := Array("k", &testArrayEncoder{})
+		check(t, &f)
+	})
+	t.Run("Array->Any", func(t *testing.T) {
+		f := Any("k", &testArrayEncoder{})
+		check(t, &f)
+	})
 }
 
 func TestFieldNilArray(t *testing.T) {
 	e := newTestFieldEncoder()
 	f := Array("k", nil)
 	f.Accept(e)
-
 	assert.Equal(t, "nil", e.result["k"])
 }
 
 func TestFieldObject(t *testing.T) {
 	golden := &testObjectEncoder{}
 
-	e := newTestFieldEncoder()
-	f := Object("k", &testObjectEncoder{})
-	f.Accept(e)
+	check := func(t *testing.T, f *Field) {
+		e := newTestFieldEncoder()
+		f.Accept(e)
+		assert.Equal(t, golden, e.result["k"])
+	}
 
-	assert.Equal(t, golden, e.result["k"])
+	t.Run("Array", func(t *testing.T) {
+		f := Object("k", &testObjectEncoder{})
+		check(t, &f)
+	})
+	t.Run("Array->Any", func(t *testing.T) {
+		f := Any("k", &testObjectEncoder{})
+		check(t, &f)
+	})
 }
 
 func TestFieldNilObject(t *testing.T) {
 	e := newTestFieldEncoder()
 	f := Object("k", nil)
 	f.Accept(e)
-
 	assert.Equal(t, "nil", e.result["k"])
 }
 
 func TestFieldTime(t *testing.T) {
 	golden := time.Now()
 
-	e := newTestFieldEncoder()
-	f := Time("k", golden)
-	f.Accept(e)
+	check := func(t *testing.T, f *Field) {
+		e := newTestFieldEncoder()
+		f.Accept(e)
 
-	assert.Equal(t, golden.Format(time.RFC3339Nano), (e.result["k"].(time.Time)).Format(time.RFC3339Nano))
+		assert.Equal(t, golden.Format(time.RFC3339Nano), (e.result["k"].(time.Time)).Format(time.RFC3339Nano))
+	}
+
+	t.Run("Time", func(t *testing.T) {
+		f := Time("k", golden)
+		check(t, &f)
+	})
+	t.Run("Any->Time", func(t *testing.T) {
+		f := Any("k", golden)
+		check(t, &f)
+	})
 }
 
 func TestFieldTimeWithoutLocation(t *testing.T) {
@@ -394,11 +427,20 @@ func TestFieldFormatterV(t *testing.T) {
 func TestFieldNamedError(t *testing.T) {
 	golden := errors.New("named error")
 
-	e := newTestFieldEncoder()
-	f := NamedError("k", golden)
+	check := func(t *testing.T, f *Field) {
+		e := newTestFieldEncoder()
+		f.Accept(e)
+		assert.Equal(t, golden, e.result["k"])
+	}
 
-	f.Accept(e)
-	assert.Equal(t, golden, e.result["k"])
+	t.Run("NamedError", func(t *testing.T) {
+		f := NamedError("k", golden)
+		check(t, &f)
+	})
+	t.Run("NamedError->Any", func(t *testing.T) {
+		f := Any("k", golden)
+		check(t, &f)
+	})
 }
 
 func TestFieldError(t *testing.T) {
@@ -412,180 +454,122 @@ func TestFieldError(t *testing.T) {
 }
 
 func TestFieldNilError(t *testing.T) {
-	e := newTestFieldEncoder()
 	f := Error(nil)
-
+	e := newTestFieldEncoder()
 	f.Accept(e)
 	assert.Equal(t, nil, e.result["error"])
 }
 
-func TestFieldAny(t *testing.T) {
+func TestFieldAnyWithCustomType(t *testing.T) {
+	type customType struct{}
+	customTypeValue := customType{}
+
+	f := Any("k", &customTypeValue)
+	e := newTestFieldEncoder()
+	f.Accept(e)
+	assert.Equal(t, &customTypeValue, e.result["k"])
+}
+
+func TestFieldAnyReflect(t *testing.T) {
+	type customStringType string
+	type customBoolType bool
+	type customIntType int
+	type customInt64Type int64
+	type customInt32Type int32
+	type customInt16Type int16
+	type customInt8Type int8
+	type customUintType uint
+	type customUint64Type uint64
+	type customUint32Type uint32
+	type customUint16Type uint16
+	type customUint8Type uint8
+	type customFloat64Type float64
+	type customFloat32Type float32
+
 	cases := []struct {
-		name   string
-		fn     func(interface{}) Field
-		golden interface{}
+		name     string
+		original interface{}
+		expected interface{}
 	}{
 		{
-			name:   "Bool",
-			golden: true,
+			name:     "String",
+			original: customStringType("42"),
+			expected: "42",
 		},
 		{
-			name:   "Int",
-			golden: int64(42),
+			name:     "Bool",
+			original: customBoolType(true),
+			expected: true,
 		},
 		{
-			name:   "Int64",
-			golden: int64(42),
+			name:     "Int",
+			original: customIntType(42),
+			expected: int64(42),
 		},
-		// {
-		// 	name:   "Int32",
-		// 	fn:     func(v interface{}) Field { return Int32("k", v.(int32)) },
-		// 	golden: int32(42),
-		// },
-		// {
-		// 	name:   "Int16",
-		// 	fn:     func(v interface{}) Field { return Int16("k", v.(int16)) },
-		// 	golden: int16(42),
-		// },
-		// {
-		// 	name:   "Int8",
-		// 	fn:     func(v interface{}) Field { return Int8("k", v.(int8)) },
-		// 	golden: int8(42),
-		// },
-		// {
-		// 	name:   "Uint",
-		// 	fn:     func(v interface{}) Field { return Uint("k", uint(v.(uint64))) },
-		// 	golden: uint64(42),
-		// },
-		// {
-		// 	name:   "Uint64",
-		// 	fn:     func(v interface{}) Field { return Uint64("k", v.(uint64)) },
-		// 	golden: uint64(42),
-		// },
-		// {
-		// 	name:   "Uint32",
-		// 	fn:     func(v interface{}) Field { return Uint32("k", v.(uint32)) },
-		// 	golden: uint32(42),
-		// },
-		// {
-		// 	name:   "Uint16",
-		// 	fn:     func(v interface{}) Field { return Uint16("k", v.(uint16)) },
-		// 	golden: uint16(42),
-		// },
-		// {
-		// 	name:   "Uint8",
-		// 	fn:     func(v interface{}) Field { return Uint8("k", v.(uint8)) },
-		// 	golden: uint8(42),
-		// },
-		// {
-		// 	name:   "Float64",
-		// 	fn:     func(v interface{}) Field { return Float64("k", v.(float64)) },
-		// 	golden: float64(42),
-		// },
-		// {
-		// 	name:   "Float32",
-		// 	fn:     func(v interface{}) Field { return Float32("k", v.(float32)) },
-		// 	golden: float32(42),
-		// },
-		// {
-		// 	name:   "Duration",
-		// 	fn:     func(v interface{}) Field { return Duration("k", v.(time.Duration)) },
-		// 	golden: time.Second,
-		// },
-		// {
-		// 	name:   "Duration",
-		// 	fn:     func(v interface{}) Field { return Duration("k", v.(time.Duration)) },
-		// 	golden: time.Second,
-		// },
-		// {
-		// 	name:   "String",
-		// 	fn:     func(v interface{}) Field { return String("k", v.(string)) },
-		// 	golden: "42",
-		// },
-		// {
-		// 	name:   "ConstBytes",
-		// 	fn:     func(v interface{}) Field { return ConstBytes("k", v.([]byte)) },
-		// 	golden: []byte{42},
-		// },
-		// {
-		// 	name:   "ConstBools",
-		// 	fn:     func(v interface{}) Field { return ConstBools("k", v.([]bool)) },
-		// 	golden: []bool{true},
-		// },
-		// {
-		// 	name:   "ConstInts",
-		// 	fn:     func(v interface{}) Field { return ConstInts("k", []int{int((v.([]int64))[0])}) },
-		// 	golden: []int64{42},
-		// },
-		// {
-		// 	name:   "ConstInts64",
-		// 	fn:     func(v interface{}) Field { return ConstInts64("k", v.([]int64)) },
-		// 	golden: []int64{42},
-		// },
-		// {
-		// 	name:   "ConstInts32",
-		// 	fn:     func(v interface{}) Field { return ConstInts32("k", v.([]int32)) },
-		// 	golden: []int32{42},
-		// },
-		// {
-		// 	name:   "ConstInts16",
-		// 	fn:     func(v interface{}) Field { return ConstInts16("k", v.([]int16)) },
-		// 	golden: []int16{42},
-		// },
-		// {
-		// 	name:   "ConstInts8",
-		// 	fn:     func(v interface{}) Field { return ConstInts8("k", v.([]int8)) },
-		// 	golden: []int8{42},
-		// },
-		// {
-		// 	name:   "ConstUints",
-		// 	fn:     func(v interface{}) Field { return ConstUints("k", []uint{uint((v.([]uint64))[0])}) },
-		// 	golden: []uint64{42},
-		// },
-		// {
-		// 	name:   "ConstUints64",
-		// 	fn:     func(v interface{}) Field { return ConstUints64("k", v.([]uint64)) },
-		// 	golden: []uint64{42},
-		// },
-		// {
-		// 	name:   "ConstUints32",
-		// 	fn:     func(v interface{}) Field { return ConstUints32("k", v.([]uint32)) },
-		// 	golden: []uint32{42},
-		// },
-		// {
-		// 	name:   "ConstUints16",
-		// 	fn:     func(v interface{}) Field { return ConstUints16("k", v.([]uint16)) },
-		// 	golden: []uint16{42},
-		// },
-		// {
-		// 	name:   "ConstUints8",
-		// 	fn:     func(v interface{}) Field { return ConstUints8("k", v.([]uint8)) },
-		// 	golden: []uint8{42},
-		// },
-		// {
-		// 	name:   "ConstFloats64",
-		// 	fn:     func(v interface{}) Field { return ConstFloats64("k", v.([]float64)) },
-		// 	golden: []float64{42},
-		// },
-		// {
-		// 	name:   "ConstFloats32",
-		// 	fn:     func(v interface{}) Field { return ConstFloats32("k", v.([]float32)) },
-		// 	golden: []float32{42},
-		// },
-		// {
-		// 	name:   "ConstDurations",
-		// 	fn:     func(v interface{}) Field { return ConstDurations("k", v.([]time.Duration)) },
-		// 	golden: []time.Duration{time.Second},
-		// },
+		{
+			name:     "Int64",
+			original: customInt64Type(42),
+			expected: int64(42),
+		},
+		{
+			name:     "Int32",
+			original: customInt32Type(42),
+			expected: int64(42),
+		},
+		{
+			name:     "Int16",
+			original: customInt16Type(42),
+			expected: int64(42),
+		},
+		{
+			name:     "Int8",
+			original: customInt8Type(42),
+			expected: int64(42),
+		},
+		{
+			name:     "Uint",
+			original: customUintType(42),
+			expected: uint64(42),
+		},
+		{
+			name:     "Uint64",
+			original: customUint64Type(42),
+			expected: uint64(42),
+		},
+		{
+			name:     "Uint32",
+			original: customUint32Type(42),
+			expected: uint64(42),
+		},
+		{
+			name:     "Uint16",
+			original: customUint16Type(42),
+			expected: uint64(42),
+		},
+		{
+			name:     "Uint8",
+			original: customUint8Type(42),
+			expected: uint64(42),
+		},
+		{
+			name:     "Float64",
+			original: customFloat64Type(42),
+			expected: float64(42),
+		},
+		{
+			name:     "Float32",
+			original: customFloat32Type(42),
+			expected: float64(42),
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			f := Any("k", c.original)
 			e := newTestFieldEncoder()
-			f := Any("k", c.golden)
 			f.Accept(e)
-
-			assert.Equal(t, c.golden, e.result["k"])
+			assert.Equal(t, c.expected, e.result["k"])
 		})
 	}
+
 }
