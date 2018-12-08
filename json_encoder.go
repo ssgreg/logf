@@ -522,7 +522,9 @@ func EscapeString(buf *Buffer, s string) error {
 		switch {
 		case c < utf8.RuneSelf && c >= 0x20 && c != '\\' && c != '"':
 			i++
+
 			continue
+
 		case c < utf8.RuneSelf:
 			buf.AppendString(s[p:i])
 			switch c {
@@ -543,6 +545,7 @@ func EscapeString(buf *Buffer, s string) error {
 			}
 			i++
 			p = i
+
 			continue
 		}
 		v, wd := utf8.DecodeRuneInString(s[i:])
@@ -573,7 +576,9 @@ func EscapeByteString(buf *Buffer, s []byte) error {
 		switch {
 		case c >= 0x20 && c != '\\' && c != '"':
 			i++
+
 			continue
+
 		default:
 			buf.AppendBytes(s[p:i])
 			switch c {
@@ -594,6 +599,7 @@ func EscapeByteString(buf *Buffer, s []byte) error {
 			}
 			i++
 			p = i
+
 			continue
 		}
 	}
