@@ -515,6 +515,7 @@ func (f *jsonEncoder) addKey(k string) {
 
 const hex = "0123456789abcdef"
 
+// EscapeString processes a single escape sequence to the given Buffer.
 func EscapeString(buf *Buffer, s string) error {
 	p := 0
 	for i := 0; i < len(s); {
@@ -569,6 +570,8 @@ func EscapeString(buf *Buffer, s string) error {
 	return nil
 }
 
+// EscapeByteString processes a single escape sequence to the given Buffer.
+// TODO: use EscapeString instead
 func EscapeByteString(buf *Buffer, s []byte) error {
 	p := 0
 	for i := 0; i < len(s); {
