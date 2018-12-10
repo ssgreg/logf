@@ -3,6 +3,7 @@ package logf
 import (
 	"bytes"
 	"encoding/json"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,7 @@ type encoderTestCase struct {
 var loggerID = int32(0)
 
 func newLoggerID() int32 {
-	loggerID++
+	atomic.AddInt32(&loggerID, 1)
 
 	return loggerID
 }
