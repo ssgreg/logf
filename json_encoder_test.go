@@ -150,6 +150,15 @@ func TestEncoder(t *testing.T) {
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","error":"short","error.verbose":"verbose"}` + "\n",
 		},
 		{
+			"FieldsBytes",
+			Entry{
+				Fields: []Field{
+					ConstBytes("bytes", []byte{0x42}),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bytes":"Qg=="}` + "\n",
+		},
+		{
 			"FieldsDerivedFields",
 			Entry{
 				DerivedFields: []Field{
