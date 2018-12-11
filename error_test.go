@@ -2,24 +2,10 @@ package logf
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-type verboseError struct {
-	short string
-	full  string
-}
-
-func (e *verboseError) Error() string {
-	return e.short
-}
-
-func (e *verboseError) Format(f fmt.State, c rune) {
-	f.Write([]byte(e.full))
-}
 
 func TestDefaultErrorEncoderWithPlainError(t *testing.T) {
 	e := errors.New("simple error")

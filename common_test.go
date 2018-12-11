@@ -1,6 +1,7 @@
 package logf
 
 import (
+	"fmt"
 	"time"
 	"unsafe"
 )
@@ -340,7 +341,18 @@ func (e *testFieldEncoder) EncodeFieldObject(k string, v ObjectEncoder) {
 
 type testObjectEncoder struct{}
 
-func (o testObjectEncoder) EncodeLogfObject(FieldEncoder) error {
+func (o testObjectEncoder) EncodeLogfObject(e FieldEncoder) error {
+	e.EncodeFieldString("username", "username")
+	e.EncodeFieldInt64("code", 42)
+
+	return nil
+}
+
+type testArrayEncoder struct{}
+
+func (o testArrayEncoder) EncodeLogfArray(e TypeEncoder) error {
+	e.EncodeTypeInt64(42)
+
 	return nil
 }
 
@@ -350,4 +362,17 @@ type testStringer struct {
 
 func (s testStringer) String() string {
 	return s.result
+}
+
+type verboseError struct {
+	short string
+	full  string
+}
+
+func (e *verboseError) Error() string {
+	return e.short
+}
+
+func (e *verboseError) Format(f fmt.State, c rune) {
+	f.Write([]byte(e.full))
 }

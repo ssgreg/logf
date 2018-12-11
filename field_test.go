@@ -240,12 +240,6 @@ func TestFieldStrings(t *testing.T) {
 	})
 }
 
-type testArrayEncoder struct{}
-
-func (o testArrayEncoder) EncodeLogfArray(TypeEncoder) error {
-	return nil
-}
-
 func TestFieldArray(t *testing.T) {
 	golden := &testArrayEncoder{}
 

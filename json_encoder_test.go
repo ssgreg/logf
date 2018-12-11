@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -101,6 +102,52 @@ func TestEncoder(t *testing.T) {
 				},
 			},
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bools":[true],"ints":[42],"ints64":[42],"ints32":[42],"ints16":[42],"ints8":[42],"uints":[42],"uints64":[42],"uints32":[42],"uints16":[42],"uints8":[42],"floats64":[4.2],"floats32":[4.2]}` + "\n",
+		},
+		{
+			"FieldsDuration",
+			Entry{
+				Fields: []Field{
+					Duration("duration", time.Second),
+					ConstDurations("durations", []time.Duration{time.Second}),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","duration":"1s","durations":["1s"]}` + "\n",
+		},
+		{
+			"FieldsTime",
+			Entry{
+				Fields: []Field{
+					Time("time", time.Unix(320836234, 0)),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","time":"1980-03-02T12:10:34+03:00"}` + "\n",
+		},
+		{
+			"FieldsArray",
+			Entry{
+				Fields: []Field{
+					Array("array", &testArrayEncoder{}),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","array":[42]}` + "\n",
+		},
+		{
+			"FieldsObject",
+			Entry{
+				Fields: []Field{
+					Object("object", &testObjectEncoder{}),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","object":{"username":"username","code":42}}` + "\n",
+		},
+		{
+			"FieldsError",
+			Entry{
+				Fields: []Field{
+					Error(&verboseError{"short", "verbose"}),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","error":"short","error.verbose":"verbose"}` + "\n",
 		},
 		{
 			"FieldsDerivedFields",
