@@ -159,6 +159,15 @@ func TestEncoder(t *testing.T) {
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bytes":"Qg=="}` + "\n",
 		},
 		{
+			"FieldsAny",
+			Entry{
+				Fields: []Field{
+					Any("any", &struct{ Field string }{Field: "42"}),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","any":{"Field":"42"}}` + "\n",
+		},
+		{
 			"FieldsDerivedFields",
 			Entry{
 				DerivedFields: []Field{
