@@ -117,10 +117,10 @@ func TestEncoder(t *testing.T) {
 			"FieldsTime",
 			Entry{
 				Fields: []Field{
-					Time("time", time.Unix(320836234, 0)),
+					Time("time", time.Unix(320836234, 0).UTC()),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","time":"1980-03-02T12:10:34+03:00"}` + "\n",
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","time":"1980-03-02T09:10:34Z"}` + "\n",
 		},
 		{
 			"FieldsArray",
