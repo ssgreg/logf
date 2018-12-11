@@ -275,12 +275,6 @@ func (f *jsonEncoder) EncodeTypeAny(v interface{}) {
 	}
 }
 
-func (f *jsonEncoder) EncodeTypeByte(v byte) {
-	// TODO: fix as  default marhaller do
-	f.appendSeparator()
-	f.buf.AppendByte(v)
-}
-
 func (f *jsonEncoder) EncodeTypeUnsafeBytes(v unsafe.Pointer) {
 	f.appendSeparator()
 	f.buf.AppendByte('"')
