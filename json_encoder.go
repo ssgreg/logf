@@ -544,20 +544,16 @@ func EscapeString(buf *Buffer, s string) error {
 			continue
 		}
 		v, wd := utf8.DecodeRuneInString(s[i:])
-		switch v {
-		case utf8.RuneError:
-			if wd == 1 {
-				buf.AppendString(s[p:i])
-				buf.AppendString(`\ufffd`)
-				p = i
-			}
-		case '\u2028', '\u2029':
+		if v == utf8.RuneError && wd == 1 {
 			buf.AppendString(s[p:i])
-			buf.AppendString(`\u202`)
-			buf.AppendByte(hex[v&0xf])
+			buf.AppendString(`\ufffd`)
+			i++
 			p = i
+
+			continue
+		} else {
+			i += wd
 		}
-		i += wd
 	}
 	buf.AppendString(s[p:])
 
