@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -205,5 +206,44 @@ func TestEncoder(t *testing.T) {
 			var a map[string]interface{}
 			require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&a), "generated json expected to be parsed by native golang json encoder")
 		})
+	}
+}
+
+func TestEscapeString(t *testing.T) {
+	testCases := []struct {
+		golden string
+		source string
+	}{
+		{`кириллица`, "кириллица"},
+		{`not<escape>html`, `not<escape>html`},
+		{`badtext\ufffd`, "badtext\xc5"},
+		{`ошибка\ufffdошибка`, "ошибка\xc5ошибка"},
+		{`测试`, "测试"},
+		{`测\ufffd试`, "测\xc5试"},
+		{`\u0008\\\r\n\t\"`, "\b\\\r\n\t\""},
+	}
+
+	for _, tc := range testCases {
+		b := NewBuffer()
+		assert.NoError(t, EscapeString(b, tc.source))
+		assert.Equal(t, tc.golden, b.String())
+	}
+}
+
+func TestEscapeByteString(t *testing.T) {
+	testCases := []struct {
+		golden string
+		source string
+	}{
+		{`кириллица`, "кириллица"},
+		{`not<escape>html`, `not<escape>html`},
+		{`测试`, "测试"},
+		{`\u0008\\\r\n\t\"`, "\b\\\r\n\t\""},
+	}
+
+	for _, tc := range testCases {
+		b := NewBuffer()
+		assert.NoError(t, EscapeByteString(b, []byte(tc.source)))
+		assert.Equal(t, tc.golden, b.String())
 	}
 }
