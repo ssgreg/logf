@@ -247,3 +247,12 @@ func TestEscapeByteString(t *testing.T) {
 		assert.Equal(t, tc.golden, b.String())
 	}
 }
+
+func TestEncoderFactory(t *testing.T) {
+	b := NewBuffer()
+	ef := NewJSONTypeEncoderFactory.Default()
+	te := ef.TypeEncoder(b)
+
+	te.EncodeTypeString("42")
+	assert.Equal(t, `"42"`, b.String())
+}
