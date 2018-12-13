@@ -9,7 +9,7 @@ Faster-than-light, asynchronous, structured logger in Go with zero allocation co
 
 ## Example
 
-The following example creates the new `logf` logger and logs a message.
+The following example creates a new `logf` logger and logs a message.
 
 ```go
 package main
