@@ -615,9 +615,6 @@ type Discarder struct{ Syncer }
 // Write implements io.Writer.
 func (d *Discarder) Write(b []byte) (int, error) {
 	return ioutil.Discard.Write(b)
-	// fmt.Println(string(b))
-	// panic(33)
-	// return 0, nil
 }
 
 func newZapLogger(lvl zapcore.Level) *zap.Logger {
