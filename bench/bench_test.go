@@ -20,6 +20,7 @@ var disableOthers = true
 // TODO: non-parallel execution explanation
 // TODO: scenario decomposition
 // TODO: use zerolog object and array marshaller
+// TODO: add checked logging for normal (not disabled) cases
 
 func BenchmarkDisabledPlainText(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
