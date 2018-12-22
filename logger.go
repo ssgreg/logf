@@ -108,7 +108,6 @@ func (l *Logger) With(fs ...Field) *Logger {
 	} else {
 		// The less efficient path forces us to copy parent's fields.
 		c := make([]Field, 0, len(l.fields)+len(fs))
-		// TODO: change order
 		c = append(c, l.fields...)
 		c = append(c, fs...)
 
