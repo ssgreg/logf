@@ -611,7 +611,7 @@ func (d *Discarder) Write(b []byte) (int, error) {
 }
 
 func newZapLogger(lvl zapcore.Level) *zap.Logger {
-``	ec := zap.NewProductionEncoderConfig()
+	ec := zap.NewProductionEncoderConfig()
 	ec.EncodeDuration = zapcore.NanosDurationEncoder
 	// ec.EncodeTime = zapcore.EpochNanosTimeEncoder
 	ec.EncodeTime = zapcore.ISO8601TimeEncoder
