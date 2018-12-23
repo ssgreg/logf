@@ -40,3 +40,18 @@ The output is the following:
 ## Benchmarks
 
 TODO
+
+## TODOs
+
+Benchmarks:
+
+* benchmarks descriptions
+* non-parallel execution explanation
+* scenario decomposition
+* use zerolog object and array marshaller
+* add checked logging for normal (not disabled) cases
+
+Encoder:
+
+* move to clone
+* use EscapeString instead

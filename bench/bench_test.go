@@ -16,12 +16,6 @@ import (
 
 var disableOthers = true
 
-// TODO: benchmarks descriptions
-// TODO: non-parallel execution explanation
-// TODO: scenario decomposition
-// TODO: use zerolog object and array marshaller
-// TODO: add checked logging for normal (not disabled) cases
-
 func BenchmarkDisabledPlainText(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger, _ := newLogger(logf.LevelError)
@@ -565,7 +559,6 @@ func fakeZerologFields(e *zerolog.Event) *zerolog.Event {
 		Interface("strings", tenStrings).
 		Time("fm", tenTimes[0]).
 		// Interface("times", tenTimes).
-		// TODO: use zero log object marshaller
 		Interface("user1", oneUser).
 		// Interface("user2", oneUser).
 		// Interface("users", tenUsers).
@@ -618,7 +611,7 @@ func (d *Discarder) Write(b []byte) (int, error) {
 }
 
 func newZapLogger(lvl zapcore.Level) *zap.Logger {
-	ec := zap.NewProductionEncoderConfig()
+``	ec := zap.NewProductionEncoderConfig()
 	ec.EncodeDuration = zapcore.NanosDurationEncoder
 	// ec.EncodeTime = zapcore.EpochNanosTimeEncoder
 	ec.EncodeTime = zapcore.ISO8601TimeEncoder

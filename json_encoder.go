@@ -52,7 +52,6 @@ func (f *jsonEncoder) TypeEncoder(buf *Buffer) TypeEncoder {
 }
 
 func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
-	// TODO: move to clone
 	f.buf = buf
 	f.startBufLen = f.buf.Len()
 
@@ -561,7 +560,6 @@ func EscapeString(buf *Buffer, s string) error {
 }
 
 // EscapeByteString processes a single escape sequence to the given Buffer.
-// TODO: use EscapeString instead
 func EscapeByteString(buf *Buffer, s []byte) error {
 	p := 0
 	for i := 0; i < len(s); {
