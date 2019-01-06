@@ -459,7 +459,6 @@ func (u *user) EncodeLogfObject(enc logf.FieldEncoder) error {
 	enc.EncodeFieldString("name", u.Name)
 	enc.EncodeFieldString("email", u.Email)
 	enc.EncodeFieldInt64("createdAt", u.CreatedAt.UnixNano())
-	// enc.EncodeFieldTime("createdAt", u.CreatedAt)
 
 	return nil
 }
@@ -625,15 +624,8 @@ func newZapLogger(lvl zapcore.Level) *zap.Logger {
 
 func newLogger(l logf.Level) (*logf.Logger, logf.ChannelWriterCloseFunc) {
 	encoder := logf.NewJSONEncoder.Default()
-	// encoder := logf.NewJSONEncoder(logf.JSONEncoderConfig{
-	// 	EncodeTime: logf.LayoutTimeEncoder(time.RFC3339),
-	// })
-	// encoder := logf.NewTextEncoder.Default()
-	// encoder := logfjournald.NewEncoder.Default()
-
 	w, close := logf.NewChannelWriter(logf.ChannelWriterConfig{
 		Appender: logf.NewWriteAppender(ioutil.Discard, encoder),
-		// Appender: logf.NewDiscardAppender(),
 	})
 
 	return logf.NewLogger(logf.NewMutableLevel(l), w), close
