@@ -1,4 +1,4 @@
-package bench
+package benchmarks
 
 import (
 	"io/ioutil"
