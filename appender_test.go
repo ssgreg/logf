@@ -173,6 +173,28 @@ func TestWriteAppender(t *testing.T) {
 	checkWriterData(t, &w, `{"level":"error","ts":"0001-01-01T00:00:00Z","msg":""}`+"\n", 1)
 }
 
+func TestCompositeAppenderErrors(t *testing.T) {
+	goldenErr := errors.New("test error")
+
+	w := testWriter{}
+
+	wa := NewWriteAppender(&w, &failingEncoder{goldenErr})
+	da := NewDiscardAppender()
+	a := NewCompositeAppender(wa, da)
+
+	// Sync should be called once in constructor to check sync possibility.
+	checkWriterData(t, &w, "", 1)
+
+	assert.EqualError(t, a.Append(Entry{}), goldenErr.Error())
+	checkWriterData(t, &w, "", 0)
+
+	wa = NewWriteAppender(&failingWriter{goldenErr}, NewJSONEncoder.Default())
+	a = NewCompositeAppender(wa, da)
+	assert.NoError(t, a.Append(Entry{}))
+	assert.EqualError(t, a.Flush(), goldenErr.Error())
+	assert.EqualError(t, a.Sync(), goldenErr.Error())
+}
+
 func TestCompositeAppender(t *testing.T) {
 	w := testWriter{}
 
