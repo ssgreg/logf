@@ -1,9 +1,11 @@
 package benchmarks
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ssgreg/logf"
+	"github.com/ssgreg/logf/logfc"
 	"go.uber.org/zap"
 )
 
@@ -208,6 +210,18 @@ func BenchmarkAccumulateFields(b *testing.B) {
 			_ = l
 		}
 	})
+	b.Run("logfc", func(b *testing.B) {
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
+
+		ctx := logf.NewContext(context.Background(), logger)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			l := logfc.MustWith(ctx, fakeFields()...)
+			_ = l
+		}
+	})
 	if disableOthers == true {
 		return
 	}
@@ -299,6 +313,18 @@ func BenchmarkAccumulateFieldsWithAccumulatedFields(b *testing.B) {
 			_ = l
 		}
 	})
+	b.Run("logfc", func(b *testing.B) {
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
+
+		logger = logger.With(fakeFields()...)
+		ctx := logf.NewContext(context.Background(), logger)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = logfc.MustWith(ctx, fakeFields()...)
+		}
+	})
 	if disableOthers == true {
 		return
 	}
@@ -375,6 +401,18 @@ func BenchmarkPlainTextWithAccumulatedFields(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			logger.Info(getMessage(0))
+		}
+	})
+	b.Run("logfc", func(b *testing.B) {
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
+
+		logger = logger.With(fakeFields()...)
+		ctx := logf.NewContext(context.Background(), logger)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logfc.MustInfo(ctx, getMessage(0))
 		}
 	})
 	if disableOthers == true {
