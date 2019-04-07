@@ -6,12 +6,13 @@ import (
 	"github.com/ssgreg/logf"
 )
 
-// New returns a new context.Context with the given logger inside it.
+// New returns a new context.Context with the given logger associated with it.
 func New(parent context.Context, logger *logf.Logger) context.Context {
 	return logf.NewContext(parent, logger)
 }
 
-// Get returns the Logger associated with ctx or nil if no value is associated.
+// Get returns the logf.Logger associated with ctx and true
+// or nil and false if no value is associated.
 // Successive calls to Get returns the same result.
 func Get(ctx context.Context) (logger *logf.Logger, ok bool) {
 	logger = logf.FromContext(ctx)
