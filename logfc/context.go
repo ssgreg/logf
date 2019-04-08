@@ -7,53 +7,43 @@ import (
 )
 
 // New returns a new context.Context with the given logger associated with it.
+//
+// Note: the given logger will hide any other logger which
+// was associated with this context before.
 func New(parent context.Context, logger *logf.Logger) context.Context {
 	return logf.NewContext(parent, logger)
 }
 
-// Get returns the logf.Logger associated with ctx and true
-// or nil and false if no value is associated.
+// Get returns the logf.Logger associated with ctx
+// or log.DisabledLogger() if no value is associated.
 // Successive calls to Get returns the same result.
-func Get(ctx context.Context) (logger *logf.Logger, ok bool) {
-	logger = logf.FromContext(ctx)
-
-	return logger, logger != nil
-}
-
-// MustGet returns the logf.Logger associated with ctx
-// or panics if no value is associated.
-// Successive calls to MustGet returns the same result.
-func MustGet(ctx context.Context) *logf.Logger {
-	logger, ok := Get(ctx)
-	if !ok {
-		panic("logfc: provided context has no logf.Logger associated")
-	}
-
-	return logger
-}
-
-// GetOrDisable returns the logf.Logger associated with ctx
-// or logf.DisabledLogger() if no value is associated.
-// Successive calls to GetOrDisable returns the same result.
-func GetOrDisable(ctx context.Context) *logf.Logger {
-	logger, ok := Get(ctx)
-	if !ok {
+func Get(ctx context.Context) *logf.Logger {
+	logger := logf.FromContext(ctx)
+	if logger == nil {
 		logger = logf.DisabledLogger()
 	}
 
 	return logger
 }
 
-// With returns a new context.Context with provided fields appended
-// to fields of logf.Logger associated with ctx
-// or returns unmodified ctx if no logf.Logger is associated with ctx.
-func With(ctx context.Context, fields ...logf.Field) context.Context {
-	logger, ok := Get(ctx)
-	if !ok {
-		return ctx
+// MustGet returns the logf.Logger associated with ctx
+// or panics if no value is associated.
+// Successive calls to MustGet returns the same result.
+func MustGet(ctx context.Context) *logf.Logger {
+	logger := logf.FromContext(ctx)
+	if logger == nil {
+		panic("logfc: provided context has no logf.Logger associated")
 	}
 
-	return New(ctx, logger.With(fields...))
+	return logger
+}
+
+// With returns a new context.Context with new logf.Logger inside
+// with provided fields appended to current logf.Logger associated with ctx
+// If there is no logf.Logger is associated with ctx, logf.DisabledLogger()
+// is used as a base logger.
+func With(ctx context.Context, fields ...logf.Field) context.Context {
+	return New(ctx, Get(ctx).With(fields...))
 }
 
 // MustWith returns a new context.Context with provided fields appended
@@ -64,16 +54,12 @@ func MustWith(ctx context.Context, fields ...logf.Field) context.Context {
 }
 
 // WithName returns a new context.Context with a new logf.Logger
-// adding the given name to the original one
-// or returns unmodified ctx if no logf.Logger is associated with ctx.
+// adding the given name to the original one.
+// If there is no logf.Logger is associated with ctx, logf.DisabledLogger()
+// is used as a base logger.
 // Name separator is a period.
 func WithName(ctx context.Context, name string) context.Context {
-	logger, ok := Get(ctx)
-	if !ok {
-		return ctx
-	}
-
-	return New(ctx, logger.WithName(name))
+	return New(ctx, Get(ctx).WithName(name))
 }
 
 // MustWithName returns a new context.Context with a new logf.Logger
@@ -86,15 +72,11 @@ func MustWithName(ctx context.Context, name string) context.Context {
 
 // WithCaller returns a new context.Context with a new logf.Logger
 // that adds a special annotation parameters
-// to each logging message, such as the filename and line number of a caller
-// or returns unmodified ctx if no logf.Logger is associated with ctx.
+// to each logging message, such as the filename and line number of a caller.
+// If there is no logf.Logger is associated with ctx, logf.DisabledLogger()
+// is used as a base logger.
 func WithCaller(ctx context.Context) context.Context {
-	logger, ok := Get(ctx)
-	if !ok {
-		return ctx
-	}
-
-	return New(ctx, logger.WithCaller())
+	return New(ctx, Get(ctx).WithCaller())
 }
 
 // MustWithCaller returns a new context.Context with a logf.Logger
@@ -107,15 +89,11 @@ func MustWithCaller(ctx context.Context) context.Context {
 
 // WithCallerSkip returns a new context.Context with a new logf.Logger
 // that adds a special annotation parameters with additional n skipped frames
-// to each logging message, such as the filename and line number of a caller
-// or returns unmodified ctx if no logf.Logger is associated with ctx.
+// to each logging message, such as the filename and line number of a caller.
+// If there is no logf.Logger is associated with ctx, logf.DisabledLogger()
+// is used as a base logger.
 func WithCallerSkip(ctx context.Context, n int) context.Context {
-	logger, ok := Get(ctx)
-	if !ok {
-		return ctx
-	}
-
-	return New(ctx, logger.WithCallerSkip(n))
+	return New(ctx, Get(ctx).WithCallerSkip(n))
 }
 
 // MustWithCallerSkip returns a new context.Context with a logf.Logger
@@ -130,12 +108,7 @@ func MustWithCallerSkip(ctx context.Context, n int) context.Context {
 // is enabled, passing a logf.LogFunc with the bound level
 // or does nothing if there is no logf.Logger associated with ctx.
 func AtLevel(ctx context.Context, level logf.Level, fn func(logf.LogFunc)) {
-	logger, ok := Get(ctx)
-	if !ok {
-		return
-	}
-
-	logger.AtLevel(level, fn)
+	Get(ctx).AtLevel(level, fn)
 }
 
 // MustAtLevel calls the given fn if logging a message at the specified level
@@ -149,7 +122,7 @@ func MustAtLevel(ctx context.Context, level logf.Level, fn func(logf.LogFunc)) {
 // fields passed to the logf.Logger using With function
 // or logs nothing if no logf.Logger is associated with ctx.
 func Debug(ctx context.Context, text string, fs ...logf.Field) {
-	GetOrDisable(ctx).Debug(text, fs...)
+	Get(ctx).Debug(text, fs...)
 }
 
 // MustDebug logs a debug message with the given text, optional fields and
@@ -163,7 +136,7 @@ func MustDebug(ctx context.Context, text string, fs ...logf.Field) {
 // fields passed to the logf.Logger using With function
 // or logs nothing if no logf.Logger is associated with ctx.
 func Info(ctx context.Context, text string, fs ...logf.Field) {
-	GetOrDisable(ctx).Info(text, fs...)
+	Get(ctx).Info(text, fs...)
 }
 
 // MustInfo logs an info message with the given text, optional fields and
@@ -177,21 +150,21 @@ func MustInfo(ctx context.Context, text string, fs ...logf.Field) {
 // fields passed to the logf.Logger using With function
 // or logs nothing if no logf.Logger is associated with ctx.
 func Warn(ctx context.Context, text string, fs ...logf.Field) {
-	GetOrDisable(ctx).Warn(text, fs...)
+	Get(ctx).Warn(text, fs...)
 }
 
 // MustWarn logs a warning message with the given text, optional fields and
 // fields passed to the logf.Logger using With function
 // or panics if no logf.Logger is associated with ctx.
 func MustWarn(ctx context.Context, text string, fs ...logf.Field) {
-	GetOrDisable(ctx).Warn(text, fs...)
+	MustGet(ctx).Warn(text, fs...)
 }
 
 // Error logs an error message with the given text, optional fields and
 // fields passed to the logf.Logger using With function
 // or logs nothing if no logf.Logger is associated with ctx.
 func Error(ctx context.Context, text string, fs ...logf.Field) {
-	GetOrDisable(ctx).Error(text, fs...)
+	Get(ctx).Error(text, fs...)
 }
 
 // MustError logs an error message with the given text, optional fields and
