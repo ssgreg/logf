@@ -462,6 +462,8 @@ func Any(k string, v interface{}) Field {
 		return Durations(k, rv)
 	case string:
 		return String(k, rv)
+	case nil:
+		break
 
 	default:
 		switch reflect.TypeOf(rv).Kind() {
