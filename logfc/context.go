@@ -16,7 +16,7 @@ func New(parent context.Context, logger *logf.Logger) context.Context {
 
 // Get returns the logf.Logger associated with ctx
 // or log.DisabledLogger() if no value is associated.
-// Successive calls to Get returns the same result.
+// Successive calls to Get return the same result.
 func Get(ctx context.Context) *logf.Logger {
 	logger := logf.FromContext(ctx)
 	if logger == nil {
@@ -28,7 +28,7 @@ func Get(ctx context.Context) *logf.Logger {
 
 // MustGet returns the logf.Logger associated with ctx
 // or panics if no value is associated.
-// Successive calls to MustGet returns the same result.
+// Successive calls to MustGet return the same result.
 func MustGet(ctx context.Context) *logf.Logger {
 	logger := logf.FromContext(ctx)
 	if logger == nil {
