@@ -25,6 +25,14 @@ func NewDisabledLogger() *Logger {
 		}), nil)
 }
 
+var defaultDisabledLogger = NewDisabledLogger()
+
+// DisabledLogger returns a default instance of a Logger that logs nothing
+// as fast as possible.
+func DisabledLogger() *Logger {
+	return defaultDisabledLogger
+}
+
 // Logger is the fast, asynchronous, structured logger.
 //
 // The Logger wraps EntryWriter to check logging level and provide a bit of

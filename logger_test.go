@@ -187,7 +187,7 @@ func TestLoggerChecker(t *testing.T) {
 }
 
 func TestLoggerDisabled(t *testing.T) {
-	logger := NewDisabledLogger()
+	logger := DisabledLogger()
 	assert.Equal(t, 0, logger.callerSkip)
 	assert.Equal(t, false, logger.addCaller)
 	assert.True(t, logger.id > 0)
@@ -213,4 +213,33 @@ func TestLoggerDisabled(t *testing.T) {
 	logger.Warn("")
 	logger.Error("")
 	logger.AtLevel(LevelError, func(LogFunc) { require.FailNow(t, "can't be here") })
+}
+
+func TestUnbufferedWriter(t *testing.T) {
+	a := &testAppender{}
+	w := NewUnbufferedEntryWriter(a)
+	logger := NewLogger(LevelDebug, w)
+
+	// Check function not panic.
+	logger.Debug("debug")
+	logger.Info("info")
+	logger.Warn("warn")
+	logger.Error("error")
+	logger.AtLevel(LevelError, func(log LogFunc) {
+		log("at-level-error")
+	})
+
+	require.Equal(t, 5, len(a.Entries))
+
+	assert.Equal(t, "debug", a.Entries[0].Text)
+	assert.Equal(t, "info", a.Entries[1].Text)
+	assert.Equal(t, "warn", a.Entries[2].Text)
+	assert.Equal(t, "error", a.Entries[3].Text)
+	assert.Equal(t, "at-level-error", a.Entries[4].Text)
+
+	assert.Equal(t, LevelDebug, a.Entries[0].Level)
+	assert.Equal(t, LevelInfo, a.Entries[1].Level)
+	assert.Equal(t, LevelWarn, a.Entries[2].Level)
+	assert.Equal(t, LevelError, a.Entries[3].Level)
+	assert.Equal(t, LevelError, a.Entries[4].Level)
 }
