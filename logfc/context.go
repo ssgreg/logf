@@ -122,54 +122,54 @@ func MustAtLevel(ctx context.Context, level logf.Level, fn func(logf.LogFunc)) {
 // fields passed to the logf.Logger using With function
 // or logs nothing if no logf.Logger is associated with ctx.
 func Debug(ctx context.Context, text string, fs ...logf.Field) {
-	Get(ctx).Debug(text, fs...)
+	Get(ctx).WithCallerSkip(1).Debug(text, fs...)
 }
 
 // MustDebug logs a debug message with the given text, optional fields and
 // fields passed to the logf.Logger using With function
 // or panics if no logf.Logger is associated with ctx.
 func MustDebug(ctx context.Context, text string, fs ...logf.Field) {
-	MustGet(ctx).Debug(text, fs...)
+	MustGet(ctx).WithCallerSkip(1).Debug(text, fs...)
 }
 
 // Info logs an info message with the given text, optional fields and
 // fields passed to the logf.Logger using With function
 // or logs nothing if no logf.Logger is associated with ctx.
 func Info(ctx context.Context, text string, fs ...logf.Field) {
-	Get(ctx).Info(text, fs...)
+	Get(ctx).WithCallerSkip(1).Info(text, fs...)
 }
 
 // MustInfo logs an info message with the given text, optional fields and
 // fields passed to the logf.Logger using With function
 // or panics if no logf.Logger is associated with ctx.
 func MustInfo(ctx context.Context, text string, fs ...logf.Field) {
-	MustGet(ctx).Info(text, fs...)
+	MustGet(ctx).WithCallerSkip(1).Info(text, fs...)
 }
 
 // Warn logs a warning message with the given text, optional fields and
 // fields passed to the logf.Logger using With function
 // or logs nothing if no logf.Logger is associated with ctx.
 func Warn(ctx context.Context, text string, fs ...logf.Field) {
-	Get(ctx).Warn(text, fs...)
+	Get(ctx).WithCallerSkip(1).Warn(text, fs...)
 }
 
 // MustWarn logs a warning message with the given text, optional fields and
 // fields passed to the logf.Logger using With function
 // or panics if no logf.Logger is associated with ctx.
 func MustWarn(ctx context.Context, text string, fs ...logf.Field) {
-	MustGet(ctx).Warn(text, fs...)
+	MustGet(ctx).WithCallerSkip(1).Warn(text, fs...)
 }
 
 // Error logs an error message with the given text, optional fields and
 // fields passed to the logf.Logger using With function
 // or logs nothing if no logf.Logger is associated with ctx.
 func Error(ctx context.Context, text string, fs ...logf.Field) {
-	Get(ctx).Error(text, fs...)
+	Get(ctx).WithCallerSkip(1).Error(text, fs...)
 }
 
 // MustError logs an error message with the given text, optional fields and
 // fields passed to the logf.Logger using With function
 // or panics if no logf.Logger is associated with ctx.
 func MustError(ctx context.Context, text string, fs ...logf.Field) {
-	MustGet(ctx).Error(text, fs...)
+	MustGet(ctx).WithCallerSkip(1).Error(text, fs...)
 }
