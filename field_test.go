@@ -555,6 +555,11 @@ func TestFieldAnyReflect(t *testing.T) {
 			original: customFloat32Type(42),
 			expected: float64(42),
 		},
+		{
+			name:     "nil",
+			original: nil,
+			expected: nil,
+		},
 	}
 
 	for _, c := range cases {
