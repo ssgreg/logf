@@ -33,3 +33,26 @@ func TestDefaultErrorEncoderWithNil(t *testing.T) {
 	assert.EqualValues(t, 1, len(enc.result))
 	assert.EqualValues(t, "<nil>", enc.result["error"])
 }
+
+func TestNewErrorEncoderWithCustomVerboseFieldSuffix(t *testing.T) {
+	e := &verboseError{"short", "verbose"}
+	enc := newTestFieldEncoder()
+	NewErrorEncoder(ErrorEncoderConfig{
+		VerboseFieldSuffix: "-verbose",
+	})("error", e, enc)
+
+	assert.EqualValues(t, 2, len(enc.result))
+	assert.EqualValues(t, e.short, enc.result["error"])
+	assert.EqualValues(t, e.full, enc.result["error-verbose"])
+}
+
+func TestNewErrorEncoderWithNoVerboseField(t *testing.T) {
+	e := &verboseError{"short", "verbose"}
+	enc := newTestFieldEncoder()
+	NewErrorEncoder(ErrorEncoderConfig{
+		NoVerboseField: true,
+	})("error", e, enc)
+
+	assert.EqualValues(t, 1, len(enc.result))
+	assert.EqualValues(t, e.short, enc.result["error"])
+}
