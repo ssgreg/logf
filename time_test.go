@@ -47,6 +47,14 @@ func TestNanoDurationEncoder(t *testing.T) {
 	assert.EqualValues(t, 66559305941000, enc.result)
 }
 
+func TestFloatSecondsDurationEncoder(t *testing.T) {
+	d := time.Duration(66559305941000)
+	enc := testTypeEncoder{}
+	FloatSecondsDurationEncoder(d, &enc)
+
+	assert.InDelta(t, 66559.305941, enc.result, 0.0000005)
+}
+
 func TestStringDurationEncoder(t *testing.T) {
 	d := time.Duration(66559305941000)
 	enc := testTypeEncoder{}
