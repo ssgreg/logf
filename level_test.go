@@ -1,6 +1,7 @@
 package logf
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -139,4 +140,24 @@ func TestMutableLevel(t *testing.T) {
 
 	level.Set(LevelDebug)
 	assert.Equal(t, LevelDebug, level.Level())
+}
+
+func TestLevelUnmarshal(t *testing.T) {
+	v := struct {
+		Level Level `json:"level"`
+	}{}
+
+	err := json.Unmarshal([]byte(`{"level": "warn"}`), &v)
+	assert.NoError(t, err)
+	assert.Equal(t, LevelWarn, v.Level)
+}
+
+func TestLevelUnmarshalInvalid(t *testing.T) {
+	v := struct {
+		Level Level `json:"level"`
+	}{}
+
+	err := json.Unmarshal([]byte(`{"level": "some-invalid-value"}`), &v)
+	assert.EqualError(t, err, `invalid logging level "some-invalid-value"`)
+	assert.Equal(t, LevelError, v.Level)
 }
