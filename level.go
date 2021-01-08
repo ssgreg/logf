@@ -1,6 +1,7 @@
 package logf
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -68,6 +69,24 @@ func (l Level) UpperCaseString() string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+// MarshalText marshals the Level to text.
+func (l Level) MarshalText() ([]byte, error) {
+	return []byte(l.String()), nil
+}
+
+// UnmarshalText marshals the Level to text.
+func (l *Level) UnmarshalText(text []byte) error {
+	s := string(text)
+	lvl, ok := LevelFromString(s)
+	if !ok {
+		return fmt.Errorf("invalid logging level %q", s)
+	}
+
+	*l = lvl
+
+	return nil
 }
 
 // LevelFromString creates the new Level with the given string.
