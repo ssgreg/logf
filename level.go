@@ -21,6 +21,10 @@ const (
 
 // Checker is the common way to get LevelChecker. Use it with every custom
 // implementation of Level.
+//
+// TODO: remove me.
+// This a test change to check if CI is working.
+//
 func (l Level) Checker() LevelChecker {
 	return func(o Level) bool {
 		return l.Enabled(o)
