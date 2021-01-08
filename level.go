@@ -76,7 +76,7 @@ func (l Level) MarshalText() ([]byte, error) {
 	return []byte(l.String()), nil
 }
 
-// UnmarshalText marshals the Level to text.
+// UnmarshalText unmarshals the Level from text.
 func (l *Level) UnmarshalText(text []byte) error {
 	s := string(text)
 	lvl, ok := LevelFromString(s)
