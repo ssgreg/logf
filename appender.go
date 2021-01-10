@@ -3,6 +3,7 @@ package logf
 import (
 	"io"
 	"os"
+	"sync"
 	"syscall"
 )
 
@@ -109,4 +110,74 @@ func (a *writeAppender) Flush() error {
 	}
 
 	return nil
+}
+
+type compositeAppender struct {
+	appenders []Appender
+}
+
+// NewCompositeAppender returns appender which can concurrently perform operations
+// for several appenders.
+func NewCompositeAppender(appenders ...Appender) Appender {
+	return &compositeAppender{appenders}
+}
+
+func (ca *compositeAppender) Append(entry Entry) (lastErr error) {
+	var wg sync.WaitGroup
+	wg.Add(len(ca.appenders))
+
+	for _, a := range ca.appenders {
+		go func(a Appender) {
+			defer wg.Done()
+
+			err := a.Append(entry)
+			if err != nil {
+				lastErr = err
+			}
+		}(a)
+	}
+
+	wg.Wait()
+
+	return lastErr
+}
+
+func (ca *compositeAppender) Sync() (lastErr error) {
+	var wg sync.WaitGroup
+	wg.Add(len(ca.appenders))
+
+	for _, a := range ca.appenders {
+		go func(a Appender) {
+			defer wg.Done()
+
+			err := a.Sync()
+			if err != nil {
+				lastErr = err
+			}
+		}(a)
+	}
+
+	wg.Wait()
+
+	return lastErr
+}
+
+func (ca *compositeAppender) Flush() (lastErr error) {
+	var wg sync.WaitGroup
+	wg.Add(len(ca.appenders))
+
+	for _, a := range ca.appenders {
+		go func(a Appender) {
+			defer wg.Done()
+
+			err := a.Flush()
+			if err != nil {
+				lastErr = err
+			}
+		}(a)
+	}
+
+	wg.Wait()
+
+	return lastErr
 }
