@@ -77,7 +77,9 @@ type channelWriter struct {
 }
 
 func (l *channelWriter) WriteEntry(e Entry) {
+	l.Lock()
 	l.ch <- e
+	l.Unlock()
 }
 
 func (l *channelWriter) init(cfg ChannelWriterConfig) {
