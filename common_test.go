@@ -142,6 +142,10 @@ func (e *testTypeEncoder) EncodeTypeString(v string) {
 	e.result = v
 }
 
+func (e *testTypeEncoder) EncodeTypeStrings(v []string) {
+	e.result = v
+}
+
 func (e *testTypeEncoder) EncodeTypeBytes(v []byte) {
 	e.result = v
 }
