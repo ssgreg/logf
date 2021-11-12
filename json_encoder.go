@@ -174,6 +174,11 @@ func (f *jsonEncoder) EncodeFieldString(k string, v string) {
 	f.EncodeTypeString(v)
 }
 
+func (f *jsonEncoder) EncodeFieldStrings(k string, v []string) {
+	f.addKey(k)
+	f.EncodeTypeStrings(v)
+}
+
 func (f *jsonEncoder) EncodeFieldDuration(k string, v time.Duration) {
 	f.addKey(k)
 	f.EncodeTypeDuration(v)
@@ -365,6 +370,15 @@ func (f *jsonEncoder) EncodeTypeBools(v []bool) {
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.EncodeTypeBool(v[i])
+	}
+	f.buf.AppendByte(']')
+}
+
+func (f *jsonEncoder) EncodeTypeStrings(v []string) {
+	f.appendSeparator()
+	f.buf.AppendByte('[')
+	for i := range v {
+		f.EncodeTypeString(v[i])
 	}
 	f.buf.AppendByte(']')
 }

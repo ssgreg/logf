@@ -279,6 +279,10 @@ func (e *testFieldEncoder) EncodeFieldString(k string, v string) {
 	e.result[k] = v
 }
 
+func (e *testFieldEncoder) EncodeFieldStrings(k string, v []string) {
+	e.result[k] = v
+}
+
 func (e *testFieldEncoder) EncodeFieldBytes(k string, v []byte) {
 	e.result[k] = v
 }
