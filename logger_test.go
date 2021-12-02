@@ -76,6 +76,23 @@ func TestLoggerName(t *testing.T) {
 	assert.Equal(t, "1.2", w.Entry.LoggerName)
 }
 
+func TestLoggerWithLevel(t *testing.T) {
+	w := &testEntryWriter{}
+
+	// Set a name for the logger.
+	logger := NewLogger(LevelInfo, w).WithLevel(
+		func(lvl Level) bool {
+			return lvl == LevelError
+		},
+	)
+
+	logger.Info("")
+	assert.Nil(t, w.Entry)
+
+	logger.Error("")
+	assert.NotNil(t, w.Entry)
+}
+
 func TestLoggerAtLevel(t *testing.T) {
 	w := &testEntryWriter{}
 	logger := NewLogger(LevelError, w)

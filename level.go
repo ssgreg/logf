@@ -12,7 +12,7 @@ type Level int8
 const (
 	// LevelError allows to log errors only.
 	LevelError Level = iota
-	// LevelWarning allows to log errors and warnings.
+	// LevelWarn allows to log errors and warnings.
 	LevelWarn
 	// LevelInfo is the default logging level. Allows to log errors, warnings and infos.
 	LevelInfo

@@ -63,10 +63,22 @@ func (l *Logger) AtLevel(lvl Level, fn func(LogFunc)) {
 	})
 }
 
+// WithLevel returns a new logger with the given additional level checker.
+func (l *Logger) WithLevel(levelChecker LevelChecker) *Logger {
+	newLevel := levelChecker //levelChecker.LevelChecker()
+
+	cc := l.clone()
+	cc.level = func(lvl Level) bool {
+		return newLevel(lvl) && l.level(lvl)
+	}
+
+	return cc
+}
+
 // WithName returns a new Logger adding the given name to the calling one.
 // Name separator is a period.
 //
-// Loggers has no name by default.
+// Loggers have no name by default.
 func (l *Logger) WithName(n string) *Logger {
 	if n == "" {
 		return l
