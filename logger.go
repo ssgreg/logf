@@ -64,10 +64,10 @@ func (l *Logger) AtLevel(lvl Level, fn func(LogFunc)) {
 }
 
 // WithLevel returns a new logger with the given additional level checker.
-func (l *Logger) WithLevel(level LevelChecker) *Logger {
+func (l *Logger) WithLevel(level LevelCheckerGetter) *Logger {
 	cc := l.clone()
 	cc.level = func(lvl Level) bool {
-		return level(lvl) && l.level(lvl)
+		return level.LevelChecker()(lvl) && l.level(lvl)
 	}
 
 	return cc
