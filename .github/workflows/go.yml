@@ -10,6 +10,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v2
 
@@ -22,4 +23,9 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: go test -v ./...
+      run: |
+        go test -race -coverprofile=cover.out -coverpkg=./... ./...
+        go tool cover -html=cover.out -o cover.html
+
+    - name: Upload coverage to codecov.io
+      uses: codecov/codecov-action@v1
