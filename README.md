@@ -3,7 +3,7 @@
 [![GoDoc](https://godoc.org/github.com/ssgreg/logf?status.svg)](https://godoc.org/github.com/ssgreg/logf)
 [![Build Status](https://github.com/ssgreg/logf/actions/workflows/go.yml/badge.svg)](https://github.com/ssgreg/logf/actions/workflows/go.yml)
 [![Go Report Status](https://goreportcard.com/badge/github.com/ssgreg/logf)](https://goreportcard.com/report/github.com/ssgreg/logf)
-[![Coverage Status](https://coveralls.io/repos/github/ssgreg/logf/badge.svg?branch=master&service=github)](https://coveralls.io/github/ssgreg/logf?branch=master)
+[![Coverage Status](https://codecov.io/gh/ssgreg/logf/branch/master/graph/badge.svg)](https://codecov.io/gh/ssgreg/logf)
 
 Faster-than-light, asynchronous, structured logger in Go with zero allocation count.
 
