@@ -47,155 +47,127 @@ func TestSnapshotBytes(t *testing.T) {
 }
 
 func TestSnapshotBools(t *testing.T) {
-	f := Bools("", []bool{true})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []bool{true}
+	f := Bools("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = false
+	assert.Equal(t, []bool{true}, []bool(f.Any.(boolArray)))
 }
 
 func TestSnapshotInts(t *testing.T) {
-	f := Ints("", []int{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []int{0}
+	f := Ints("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []int{0}, []int(f.Any.(intArray)))
 }
 
 func TestSnapshotInts64(t *testing.T) {
-	f := Ints64("", []int64{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []int64{0}
+	f := Ints64("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []int64{0}, []int64(f.Any.(int64Array)))
 }
 
 func TestSnapshotInts32(t *testing.T) {
-	f := Ints32("", []int32{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []int32{0}
+	f := Ints32("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []int32{0}, []int32(f.Any.(int32Array)))
 }
 
 func TestSnapshotInts16(t *testing.T) {
-	f := Ints16("", []int16{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []int16{0}
+	f := Ints16("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []int16{0}, []int16(f.Any.(int16Array)))
 }
 
 func TestSnapshotInts8(t *testing.T) {
-	f := Ints8("", []int8{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []int8{0}
+	f := Ints8("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []int8{0}, []int8(f.Any.(int8Array)))
 }
 
 func TestSnapshotUints(t *testing.T) {
-	f := Uints("", []uint{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []uint{0}
+	f := Uints("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []uint{0}, []uint(f.Any.(uintArray)))
 }
 
 func TestSnapshotUints64(t *testing.T) {
-	f := Uints64("", []uint64{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []uint64{0}
+	f := Uints64("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []uint64{0}, []uint64(f.Any.(uint64Array)))
 }
 
 func TestSnapshotUints32(t *testing.T) {
-	f := Uints32("", []uint32{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []uint32{0}
+	f := Uints32("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []uint32{0}, []uint32(f.Any.(uint32Array)))
 }
 
 func TestSnapshotUints16(t *testing.T) {
-	f := Uints16("", []uint16{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []uint16{0}
+	f := Uints16("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []uint16{0}, []uint16(f.Any.(uint16Array)))
 }
 
 func TestSnapshotUints8(t *testing.T) {
-	f := Uints8("", []uint8{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []uint8{0}
+	f := Uints8("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []uint8{0}, []uint8(f.Any.(uint8Array)))
 }
 
 func TestSnapshotFloats64(t *testing.T) {
-	f := Floats64("", []float64{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []float64{0}
+	f := Floats64("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []float64{0}, []float64(f.Any.(float64Array)))
 }
 
 func TestSnapshotFloats32(t *testing.T) {
-	f := Floats32("", []float32{0})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []float32{0}
+	f := Floats32("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = 1
+	assert.Equal(t, []float32{0}, []float32(f.Any.(float32Array)))
 }
 
 func TestSnapshotDurations(t *testing.T) {
-	f := Durations("", []time.Duration{time.Second})
-	assert.True(t, f.Type&FieldTypeRawMask != 0)
-	rawArray := f.Bytes
+	v := []time.Duration{time.Second}
+	f := Durations("", v)
 
 	snapshotField(&f)
-	assert.True(t, f.Type&FieldTypeRawMask == 0)
-	assert.NotEqual(t, unsafe.Pointer(&f.Bytes), unsafe.Pointer(&rawArray))
-	assert.Equal(t, f.Bytes, rawArray)
+	v[0] = time.Minute
+	assert.Equal(t, []time.Duration{time.Second}, []time.Duration(f.Any.(durationArray)))
 }

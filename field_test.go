@@ -14,6 +14,7 @@ func TestField(t *testing.T) {
 		fn       func(interface{}) Field
 		original interface{}
 		expected interface{}
+		cast     func(interface{}) interface{}
 	}{
 		{
 			name:     "Bool",
@@ -116,60 +117,86 @@ func TestField(t *testing.T) {
 			fn:       func(v interface{}) Field { return ConstBools("k", v.([]bool)) },
 			original: []bool{true},
 			expected: []bool{true},
+			cast:     func(v interface{}) interface{} { return []bool(v.(boolArray)) },
 		},
 		{
 			name:     "ConstInts",
 			fn:       func(v interface{}) Field { return ConstInts("k", v.([]int)) },
 			original: []int{42},
 			expected: []int64{42},
+			cast: func(v interface{}) interface{} {
+				vArr := v.(intArray)
+				res := make([]int64, 0, len(vArr))
+				for _, intEl := range vArr {
+					res = append(res, int64(intEl))
+				}
+
+				return res
+			},
 		},
 		{
 			name:     "ConstInts64",
 			fn:       func(v interface{}) Field { return ConstInts64("k", v.([]int64)) },
 			original: []int64{42},
 			expected: []int64{42},
+			cast:     func(v interface{}) interface{} { return []int64(v.(int64Array)) },
 		},
 		{
 			name:     "ConstInts32",
 			fn:       func(v interface{}) Field { return ConstInts32("k", v.([]int32)) },
 			original: []int32{42},
 			expected: []int32{42},
+			cast:     func(v interface{}) interface{} { return []int32(v.(int32Array)) },
 		},
 		{
 			name:     "ConstInts16",
 			fn:       func(v interface{}) Field { return ConstInts16("k", v.([]int16)) },
 			original: []int16{42},
 			expected: []int16{42},
+			cast:     func(v interface{}) interface{} { return []int16(v.(int16Array)) },
 		},
 		{
 			name:     "ConstInts8",
 			fn:       func(v interface{}) Field { return ConstInts8("k", v.([]int8)) },
 			original: []int8{42},
 			expected: []int8{42},
+			cast:     func(v interface{}) interface{} { return []int8(v.(int8Array)) },
 		},
 		{
 			name:     "ConstUints",
 			fn:       func(v interface{}) Field { return ConstUints("k", v.([]uint)) },
 			original: []uint{42},
 			expected: []uint64{42},
+			cast: func(v interface{}) interface{} {
+				vArr := v.(uintArray)
+				res := make([]uint64, 0, len(vArr))
+				for _, intEl := range vArr {
+					res = append(res, uint64(intEl))
+				}
+
+				return res
+			},
 		},
 		{
 			name:     "ConstUints64",
 			fn:       func(v interface{}) Field { return ConstUints64("k", v.([]uint64)) },
 			original: []uint64{42},
 			expected: []uint64{42},
+			cast:     func(v interface{}) interface{} { return []uint64(v.(uint64Array)) },
 		},
 		{
 			name:     "ConstUints32",
 			fn:       func(v interface{}) Field { return ConstUints32("k", v.([]uint32)) },
 			original: []uint32{42},
 			expected: []uint32{42},
+			cast:     func(v interface{}) interface{} { return []uint32(v.(uint32Array)) },
 		},
 		{
 			name:     "ConstUints16",
 			fn:       func(v interface{}) Field { return ConstUints16("k", v.([]uint16)) },
 			original: []uint16{42},
 			expected: []uint16{42},
+			cast:     func(v interface{}) interface{} { return []uint16(v.(uint16Array)) },
 		},
 		{
 			name:     "ConstUints8",
@@ -182,18 +209,21 @@ func TestField(t *testing.T) {
 			fn:       func(v interface{}) Field { return ConstFloats64("k", v.([]float64)) },
 			original: []float64{42},
 			expected: []float64{42},
+			cast:     func(v interface{}) interface{} { return []float64(v.(float64Array)) },
 		},
 		{
 			name:     "ConstFloats32",
 			fn:       func(v interface{}) Field { return ConstFloats32("k", v.([]float32)) },
 			original: []float32{42},
 			expected: []float32{42},
+			cast:     func(v interface{}) interface{} { return []float32(v.(float32Array)) },
 		},
 		{
 			name:     "ConstDurations",
 			fn:       func(v interface{}) Field { return ConstDurations("k", v.([]time.Duration)) },
 			original: []time.Duration{time.Second},
 			expected: []time.Duration{time.Second},
+			cast:     func(v interface{}) interface{} { return []time.Duration(v.(durationArray)) },
 		},
 	}
 
@@ -213,7 +243,11 @@ func TestField(t *testing.T) {
 			e := newTestFieldEncoder()
 			f.Accept(e)
 
-			assert.Equal(t, c.expected, e.result["k"])
+			result := e.result["k"]
+			if c.cast != nil {
+				result = c.cast(result)
+			}
+			assert.Equal(t, c.expected, result)
 		})
 	}
 }

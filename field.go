@@ -108,74 +108,274 @@ func (o stringArray) EncodeLogfArray(e TypeEncoder) error {
 	return nil
 }
 
+func (o stringArray) TakeSnapshot() interface{} {
+	return stringArray(append([]string{}, o...))
+}
+
 // Bools returns a new Field with the given key and slice of bools.
 func Bools(k string, v []bool) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToBools, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: boolArray(v)}
+}
+
+type boolArray []bool
+
+func (o boolArray) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeBool(o[i])
+	}
+
+	return nil
+}
+
+func (o boolArray) TakeSnapshot() interface{} {
+	return boolArray(append([]bool{}, o...))
 }
 
 // Ints returns a new Field with the given key and slice of ints.
 func Ints(k string, v []int) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToInts64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: intArray(v)}
+}
+
+type intArray []int
+
+func (o intArray) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeInt64(int64(o[i]))
+	}
+
+	return nil
+}
+
+func (o intArray) TakeSnapshot() interface{} {
+	return intArray(append([]int{}, o...))
 }
 
 // Ints64 returns a new Field with the given key and slice of 64-bit ints.
 func Ints64(k string, v []int64) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToInts64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: int64Array(v)}
+}
+
+type int64Array []int64
+
+func (o int64Array) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeInt64(o[i])
+	}
+
+	return nil
+}
+
+func (o int64Array) TakeSnapshot() interface{} {
+	return int64Array(append([]int64{}, o...))
 }
 
 // Ints32 returns a new Field with the given key and slice of 32-bit ints.
 func Ints32(k string, v []int32) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToInts32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: int32Array(v)}
+}
+
+type int32Array []int32
+
+func (o int32Array) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeInt32(o[i])
+	}
+
+	return nil
+}
+
+func (o int32Array) TakeSnapshot() interface{} {
+	return int32Array(append([]int32{}, o...))
 }
 
 // Ints16 returns a new Field with the given key and slice of 16-bit ints.
 func Ints16(k string, v []int16) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToInts16, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: int16Array(v)}
+}
+
+type int16Array []int16
+
+func (o int16Array) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeInt16(o[i])
+	}
+
+	return nil
+}
+
+func (o int16Array) TakeSnapshot() interface{} {
+	return int16Array(append([]int16{}, o...))
 }
 
 // Ints8 returns a new Field with the given key and slice of 8-bit ints.
 func Ints8(k string, v []int8) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToInts8, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: int8Array(v)}
+}
+
+type int8Array []int8
+
+func (o int8Array) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeInt8(o[i])
+	}
+
+	return nil
+}
+
+func (o int8Array) TakeSnapshot() interface{} {
+	return int8Array(append([]int8{}, o...))
 }
 
 // Uints returns a new Field with the given key and slice of uints.
 func Uints(k string, v []uint) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToUints64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: uintArray(v)}
+}
+
+type uintArray []uint
+
+func (o uintArray) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeUint64(uint64(o[i]))
+	}
+
+	return nil
+}
+
+func (o uintArray) TakeSnapshot() interface{} {
+	return uintArray(append([]uint{}, o...))
 }
 
 // Uints64 returns a new Field with the given key and slice of 64-bit uints.
 func Uints64(k string, v []uint64) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToUints64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: uint64Array(v)}
+}
+
+type uint64Array []uint64
+
+func (o uint64Array) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeUint64(o[i])
+	}
+
+	return nil
+}
+
+func (o uint64Array) TakeSnapshot() interface{} {
+	return uint64Array(append([]uint64{}, o...))
 }
 
 // Uints32 returns a new Field with the given key and slice of 32-bit uints.
 func Uints32(k string, v []uint32) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToUints32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: uint32Array(v)}
+}
+
+type uint32Array []uint32
+
+func (o uint32Array) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeUint32(o[i])
+	}
+
+	return nil
+}
+
+func (o uint32Array) TakeSnapshot() interface{} {
+	return uint32Array(append([]uint32{}, o...))
 }
 
 // Uints16 returns a new Field with the given key and slice of 16-bit uints.
 func Uints16(k string, v []uint16) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToUints16, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: uint16Array(v)}
+}
+
+type uint16Array []uint16
+
+func (o uint16Array) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeUint16(o[i])
+	}
+
+	return nil
+}
+
+func (o uint16Array) TakeSnapshot() interface{} {
+	return uint16Array(append([]uint16{}, o...))
 }
 
 // Uints8 returns a new Field with the given key and slice of 8-bit uints.
 func Uints8(k string, v []uint8) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToUints8, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: uint8Array(v)}
+}
+
+type uint8Array []uint8
+
+func (o uint8Array) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeUint8(o[i])
+	}
+
+	return nil
+}
+
+func (o uint8Array) TakeSnapshot() interface{} {
+	return uint8Array(append([]uint8{}, o...))
 }
 
 // Floats64 returns a new Field with the given key and slice of 64-biy floats.
 func Floats64(k string, v []float64) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToFloats64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: float64Array(v)}
+}
+
+type float64Array []float64
+
+func (o float64Array) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeFloat64(o[i])
+	}
+
+	return nil
+}
+
+func (o float64Array) TakeSnapshot() interface{} {
+	return float64Array(append([]float64{}, o...))
 }
 
 // Floats32 returns a new Field with the given key and slice of 32-bit floats.
 func Floats32(k string, v []float32) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToFloats32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: float32Array(v)}
+}
+
+type float32Array []float32
+
+func (o float32Array) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeFloat32(o[i])
+	}
+
+	return nil
+}
+
+func (o float32Array) TakeSnapshot() interface{} {
+	return float32Array(append([]float32{}, o...))
 }
 
 // Durations returns a new Field with the given key and slice of time.Duration.
 func Durations(k string, v []time.Duration) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToDurations, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeArray, Any: durationArray(v)}
+}
+
+type durationArray []time.Duration
+
+func (o durationArray) EncodeLogfArray(e TypeEncoder) error {
+	for i := range o {
+		e.EncodeTypeDuration(o[i])
+	}
+
+	return nil
+}
+
+func (o durationArray) TakeSnapshot() interface{} {
+	return durationArray(append([]time.Duration{}, o...))
 }
 
 // ConstBytes returns a new Field with the given key and slice of bytes.
@@ -530,18 +730,6 @@ const (
 const (
 	FieldTypeRawMask FieldType = 1<<7 + iota
 	FieldTypeRawBytes
-	FieldTypeRawBytesToBools
-	FieldTypeRawBytesToInts64
-	FieldTypeRawBytesToInts32
-	FieldTypeRawBytesToInts16
-	FieldTypeRawBytesToInts8
-	FieldTypeRawBytesToUints64
-	FieldTypeRawBytesToUints32
-	FieldTypeRawBytesToUints16
-	FieldTypeRawBytesToUints8
-	FieldTypeRawBytesToFloats64
-	FieldTypeRawBytesToFloats32
-	FieldTypeRawBytesToDurations
 )
 
 // Field hold data of a specific field.

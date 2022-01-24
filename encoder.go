@@ -31,6 +31,14 @@ type ArrayEncoder interface {
 	EncodeLogfArray(TypeEncoder) error
 }
 
+// ArrayEncodeFunc represents the function that allows to encode array.
+type ArrayEncodeFunc func(TypeEncoder) error
+
+// EncodeLogfArray encodes array using the given encoder.
+func (f ArrayEncodeFunc) EncodeLogfArray(enc TypeEncoder) error {
+	return f(enc)
+}
+
 // ObjectEncoder defines the interface to create your own object logger.
 //
 // Example:
@@ -49,6 +57,14 @@ type ArrayEncoder interface {
 //
 type ObjectEncoder interface {
 	EncodeLogfObject(FieldEncoder) error
+}
+
+// ObjectEncodeFunc represents the function that allows to encode array.
+type ObjectEncodeFunc func(FieldEncoder) error
+
+// EncodeLogfObject encodes object using the given encoder.
+func (f ObjectEncodeFunc) EncodeLogfObject(enc FieldEncoder) error {
+	return f(enc)
 }
 
 // TypeEncoder defines the interface that allows to encode basic types.
