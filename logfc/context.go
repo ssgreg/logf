@@ -62,20 +62,20 @@ func WithName(ctx context.Context, name string) context.Context {
 	return New(ctx, Get(ctx).WithName(name))
 }
 
-// WithLevel returns a new context.Context with a new logf.Logger
-// with the given additional level checker.
-// If there is no logf.Logger is associated with ctx, logf.DisabledLogger()
-// is used as a base logger.
-func WithLevel(ctx context.Context, level logf.LevelCheckerGetter) context.Context {
-	return New(ctx, Get(ctx).WithLevel(level))
-}
-
 // MustWithName returns a new context.Context with a new logf.Logger
 // adding the given name to the original one
 // or panics if no logf.Logger is associated with ctx.
 // Name separator is a period.
 func MustWithName(ctx context.Context, name string) context.Context {
 	return New(ctx, MustGet(ctx).WithName(name))
+}
+
+// WithLevel returns a new context.Context with a new logf.Logger
+// with the given additional level checker.
+// If there is no logf.Logger is associated with ctx, logf.DisabledLogger()
+// is used as a base logger.
+func WithLevel(ctx context.Context, level logf.LevelCheckerGetter) context.Context {
+	return New(ctx, Get(ctx).WithLevel(level))
 }
 
 // WithCaller returns a new context.Context with a new logf.Logger
