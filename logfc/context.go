@@ -78,6 +78,14 @@ func WithLevel(ctx context.Context, level logf.LevelCheckerGetter) context.Conte
 	return New(ctx, Get(ctx).WithLevel(level))
 }
 
+// MustWithLevel returns a new context.Context with a new logf.Logger
+// with the given additional level checker.
+// MustWithLevel panics if no logf.Logger is associated with ctx.
+// Name separator is a period.
+func MustWithLevel(ctx context.Context, level logf.LevelCheckerGetter) context.Context {
+	return New(ctx, MustGet(ctx).WithLevel(level))
+}
+
 // WithCaller returns a new context.Context with a new logf.Logger
 // that adds a special annotation parameters
 // to each logging message, such as the filename and line number of a caller.
