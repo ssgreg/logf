@@ -86,6 +86,22 @@ func MustWithLevel(ctx context.Context, level logf.LevelCheckerGetter) context.C
 	return New(ctx, MustGet(ctx).WithLevel(level))
 }
 
+// WithSoftLevel returns a new context.Context with a new logf.Logger
+// with the given level checker that can be overridden in sub-loggers.
+// If there is no logf.Logger is associated with ctx, logf.DisabledLogger()
+// is used as a base logger.
+func WithSoftLevel(ctx context.Context, level logf.LevelCheckerGetter) context.Context {
+	return New(ctx, Get(ctx).WithSoftLevel(level))
+}
+
+// WithSoftLevel returns a new context.Context with a new logf.Logger
+// with the given level checker that can be overridden in sub-loggers.
+// MustWithSoftLevel panics if no logf.Logger is associated with ctx.
+// Name separator is a period.
+func MustWithSoftLevel(ctx context.Context, level logf.LevelCheckerGetter) context.Context {
+	return New(ctx, MustGet(ctx).WithSoftLevel(level))
+}
+
 // WithCaller returns a new context.Context with a new logf.Logger
 // that adds a special annotation parameters
 // to each logging message, such as the filename and line number of a caller.
