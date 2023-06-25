@@ -182,7 +182,6 @@ func Durations(k string, v []time.Duration) Field {
 //
 // Call ConstBytes if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstBytes(k string, v []byte) Field {
 	return Field{Key: k, Type: FieldTypeBytes, Bytes: v}
 }
@@ -191,7 +190,6 @@ func ConstBytes(k string, v []byte) Field {
 //
 // Call ConstBools if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstBools(k string, v []bool) Field {
 	return Field{Key: k, Type: FieldTypeBytesToBools, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -200,7 +198,6 @@ func ConstBools(k string, v []bool) Field {
 //
 // Call ConstInts if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstInts(k string, v []int) Field {
 	return Field{Key: k, Type: FieldTypeBytesToInts64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -209,7 +206,6 @@ func ConstInts(k string, v []int) Field {
 //
 // Call ConstInts64 if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstInts64(k string, v []int64) Field {
 	return Field{Key: k, Type: FieldTypeBytesToInts64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -218,7 +214,6 @@ func ConstInts64(k string, v []int64) Field {
 //
 // Call ConstInts32 if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstInts32(k string, v []int32) Field {
 	return Field{Key: k, Type: FieldTypeBytesToInts32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -227,7 +222,6 @@ func ConstInts32(k string, v []int32) Field {
 //
 // Call ConstInts16 if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstInts16(k string, v []int16) Field {
 	return Field{Key: k, Type: FieldTypeBytesToInts16, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -236,7 +230,6 @@ func ConstInts16(k string, v []int16) Field {
 //
 // Call ConstInts8 if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstInts8(k string, v []int8) Field {
 	return Field{Key: k, Type: FieldTypeBytesToInts8, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -245,7 +238,6 @@ func ConstInts8(k string, v []int8) Field {
 //
 // Call ConstUints if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstUints(k string, v []uint) Field {
 	return Field{Key: k, Type: FieldTypeBytesToUints64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -254,7 +246,6 @@ func ConstUints(k string, v []uint) Field {
 //
 // Call ConstUints64 if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstUints64(k string, v []uint64) Field {
 	return Field{Key: k, Type: FieldTypeBytesToUints64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -263,7 +254,6 @@ func ConstUints64(k string, v []uint64) Field {
 //
 // Call ConstUints32 if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstUints32(k string, v []uint32) Field {
 	return Field{Key: k, Type: FieldTypeBytesToUints32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -272,7 +262,6 @@ func ConstUints32(k string, v []uint32) Field {
 //
 // Call ConstUints16 if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstUints16(k string, v []uint16) Field {
 	return Field{Key: k, Type: FieldTypeBytesToUints16, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -281,7 +270,6 @@ func ConstUints16(k string, v []uint16) Field {
 //
 // Call ConstUints8 if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstUints8(k string, v []uint8) Field {
 	return Field{Key: k, Type: FieldTypeBytesToUints8, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -290,7 +278,6 @@ func ConstUints8(k string, v []uint8) Field {
 //
 // Call ConstFloats64 if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstFloats64(k string, v []float64) Field {
 	return Field{Key: k, Type: FieldTypeBytesToFloats64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -299,7 +286,6 @@ func ConstFloats64(k string, v []float64) Field {
 //
 // Call ConstFloats32 if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstFloats32(k string, v []float32) Field {
 	return Field{Key: k, Type: FieldTypeBytesToFloats32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -308,7 +294,6 @@ func ConstFloats32(k string, v []float32) Field {
 //
 // Call ConstDurations if your array is const. It has significantly less impact
 // on the calling goroutine.
-//
 func ConstDurations(k string, v []time.Duration) Field {
 	return Field{Key: k, Type: FieldTypeBytesToDurations, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
@@ -359,7 +344,6 @@ func Stringer(k string, v fmt.Stringer) Field {
 //
 // Call ConstFormatter if your object is const. It has significantly less
 // impact on the calling goroutine.
-//
 func ConstFormatter(k string, verb string, v interface{}) Field {
 	return Field{Key: k, Type: FieldTypeFormatter, Bytes: *(*[]byte)(unsafe.Pointer(&verb)), Any: v}
 }
@@ -370,7 +354,6 @@ func ConstFormatter(k string, verb string, v interface{}) Field {
 //
 // Call ConstFormatterV if your object is const. It has significantly less
 // impact on the calling goroutine.
-//
 func ConstFormatterV(k string, v interface{}) Field {
 	return ConstFormatter(k, "%#v", v)
 }
@@ -615,33 +598,33 @@ func (fd Field) Accept(v FieldEncoder) {
 		}
 	case FieldTypeFormatter:
 		v.EncodeFieldString(fd.Key, fmt.Sprintf(*(*string)(unsafe.Pointer(&fd.Bytes)), fd.Any))
-	case FieldTypeBytes:
+	case FieldTypeBytes, FieldTypeRawBytes:
 		v.EncodeFieldBytes(fd.Key, fd.Bytes)
 	case FieldTypeBytesToString:
 		v.EncodeFieldString(fd.Key, *(*string)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToBools:
+	case FieldTypeBytesToBools, FieldTypeRawBytesToBools:
 		v.EncodeFieldBools(fd.Key, *(*[]bool)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts64:
+	case FieldTypeBytesToInts64, FieldTypeRawBytesToInts64:
 		v.EncodeFieldInts64(fd.Key, *(*[]int64)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts32:
+	case FieldTypeBytesToInts32, FieldTypeRawBytesToInts32:
 		v.EncodeFieldInts32(fd.Key, *(*[]int32)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts16:
+	case FieldTypeBytesToInts16, FieldTypeRawBytesToInts16:
 		v.EncodeFieldInts16(fd.Key, *(*[]int16)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts8:
+	case FieldTypeBytesToInts8, FieldTypeRawBytesToInts8:
 		v.EncodeFieldInts8(fd.Key, *(*[]int8)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints64:
+	case FieldTypeBytesToUints64, FieldTypeRawBytesToUints64:
 		v.EncodeFieldUints64(fd.Key, *(*[]uint64)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints32:
+	case FieldTypeBytesToUints32, FieldTypeRawBytesToUints32:
 		v.EncodeFieldUints32(fd.Key, *(*[]uint32)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints16:
+	case FieldTypeBytesToUints16, FieldTypeRawBytesToUints16:
 		v.EncodeFieldUints16(fd.Key, *(*[]uint16)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints8:
+	case FieldTypeBytesToUints8, FieldTypeRawBytesToUints8:
 		v.EncodeFieldUints8(fd.Key, *(*[]uint8)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToFloats64:
+	case FieldTypeBytesToFloats64, FieldTypeRawBytesToFloats64:
 		v.EncodeFieldFloats64(fd.Key, *(*[]float64)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToFloats32:
+	case FieldTypeBytesToFloats32, FieldTypeRawBytesToFloats32:
 		v.EncodeFieldFloats32(fd.Key, *(*[]float32)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToDurations:
+	case FieldTypeBytesToDurations, FieldTypeRawBytesToDurations:
 		v.EncodeFieldDurations(fd.Key, *(*[]time.Duration)(unsafe.Pointer(&fd.Bytes)))
 	}
 }
