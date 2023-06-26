@@ -572,3 +572,310 @@ func TestFieldAnyReflect(t *testing.T) {
 	}
 
 }
+
+func TestFieldAccept(t *testing.T) {
+	type customStruct struct {
+		v int
+	}
+
+	cases := []struct {
+		name     string
+		original Field
+		expected interface{}
+	}{
+		{
+			name:     "String",
+			original: String("k", "42"),
+			expected: "42",
+		},
+		{
+			name:     "Bool",
+			original: Bool("k", true),
+			expected: true,
+		},
+		{
+			name:     "Int",
+			original: Int("k", 42),
+			expected: int64(42),
+		},
+		{
+			name:     "Int64",
+			original: Int64("k", 42),
+			expected: int64(42),
+		},
+		{
+			name:     "Int32",
+			original: Int32("k", 42),
+			expected: int32(42),
+		},
+		{
+			name:     "Int16",
+			original: Int16("k", 42),
+			expected: int16(42),
+		},
+		{
+			name:     "Int8",
+			original: Int8("k", 42),
+			expected: int8(42),
+		},
+		{
+			name:     "Uint",
+			original: Uint("k", 42),
+			expected: uint64(42),
+		},
+		{
+			name:     "Uint64",
+			original: Uint64("k", 42),
+			expected: uint64(42),
+		},
+		{
+			name:     "Uint32",
+			original: Uint32("k", 42),
+			expected: uint32(42),
+		},
+		{
+			name:     "Uint16",
+			original: Uint16("k", 42),
+			expected: uint16(42),
+		},
+		{
+			name:     "Uint8",
+			original: Uint8("k", 42),
+			expected: uint8(42),
+		},
+		{
+			name:     "Float64",
+			original: Float64("k", 42),
+			expected: float64(42),
+		},
+		{
+			name:     "Float32",
+			original: Float32("k", 42),
+			expected: float32(42),
+		},
+		{
+			name:     "Strings",
+			original: Strings("k", []string{"42", "43"}),
+			expected: stringArray{"42", "43"}, // FIXME
+		},
+		{
+			name:     "Bools",
+			original: Bools("k", []bool{true, false}),
+			expected: []bool{true, false},
+		},
+		{
+			name:     "ConstBools",
+			original: ConstBools("k", []bool{true, false}),
+			expected: []bool{true, false},
+		},
+		{
+			name:     "Ints",
+			original: Ints("k", []int{42, 43}),
+			expected: []int64{42, 43},
+		},
+		{
+			name:     "ConstInts",
+			original: ConstInts("k", []int{42, 43}),
+			expected: []int64{42, 43},
+		},
+		{
+			name:     "Ints64",
+			original: Ints64("k", []int64{42, 43}),
+			expected: []int64{42, 43},
+		},
+		{
+			name:     "ConstInts64",
+			original: ConstInts64("k", []int64{42, 43}),
+			expected: []int64{42, 43},
+		},
+		{
+			name:     "Ints32",
+			original: Ints32("k", []int32{42, 43}),
+			expected: []int32{42, 43},
+		},
+		{
+			name:     "ConstInts32",
+			original: ConstInts32("k", []int32{42, 43}),
+			expected: []int32{42, 43},
+		},
+		{
+			name:     "Ints16",
+			original: Ints16("k", []int16{42, 43}),
+			expected: []int16{42, 43},
+		},
+		{
+			name:     "ConstInts16",
+			original: ConstInts16("k", []int16{42, 43}),
+			expected: []int16{42, 43},
+		},
+		{
+			name:     "Ints8",
+			original: Ints8("k", []int8{42}),
+			expected: []int8{42},
+		},
+		{
+			name:     "ConstInts8",
+			original: ConstInts8("k", []int8{42}),
+			expected: []int8{42},
+		},
+		{
+			name:     "Uints",
+			original: Uints("k", []uint{42, 43}),
+			expected: []uint64{42, 43},
+		},
+		{
+			name:     "ConstUints",
+			original: ConstUints("k", []uint{42, 43}),
+			expected: []uint64{42, 43},
+		},
+		{
+			name:     "Uints64",
+			original: Uints64("k", []uint64{42, 43}),
+			expected: []uint64{42, 43},
+		},
+		{
+			name:     "ConstUints64",
+			original: ConstUints64("k", []uint64{42, 43}),
+			expected: []uint64{42, 43},
+		},
+		{
+			name:     "Uints32",
+			original: Uints32("k", []uint32{42, 43}),
+			expected: []uint32{42, 43},
+		},
+		{
+			name:     "ConstUints32",
+			original: ConstUints32("k", []uint32{42, 43}),
+			expected: []uint32{42, 43},
+		},
+		{
+			name:     "Uints16",
+			original: Uints16("k", []uint16{42, 43}),
+			expected: []uint16{42, 43},
+		},
+		{
+			name:     "ConstUints16",
+			original: ConstUints16("k", []uint16{42, 43}),
+			expected: []uint16{42, 43},
+		},
+		{
+			name:     "Uints8",
+			original: Uints8("k", []uint8{42}),
+			expected: []uint8{42},
+		},
+		{
+			name:     "ConstUints8",
+			original: ConstUints8("k", []uint8{42}),
+			expected: []uint8{42},
+		},
+		{
+			name:     "Floats64",
+			original: Floats64("k", []float64{42}),
+			expected: []float64{42},
+		},
+		{
+			name:     "ConstFloats64",
+			original: ConstFloats64("k", []float64{42}),
+			expected: []float64{42},
+		},
+		{
+			name:     "Floats32",
+			original: Floats32("k", []float32{42}),
+			expected: []float32{42},
+		},
+		{
+			name:     "ConstFloats32",
+			original: ConstFloats32("k", []float32{42}),
+			expected: []float32{42},
+		},
+		{
+			name:     "nil",
+			original: Any("k", nil),
+			expected: nil,
+		},
+		{
+			name:     "Bytes",
+			original: Bytes("k", []byte{42, 43}),
+			expected: []byte{42, 43},
+		},
+		{
+			name:     "ConstBytes",
+			original: ConstBytes("k", []byte{42, 43}),
+			expected: []byte{42, 43},
+		},
+		{
+			name:     "Error",
+			original: NamedError("k", errors.New("test")),
+			expected: errors.New("test"),
+		},
+		{
+			name:     "Time",
+			original: Time("k", time.Date(2020, 1, 2, 3, 4, 5, 6, time.UTC)),
+			expected: time.Date(2020, 1, 2, 3, 4, 5, 6, time.UTC),
+		},
+		{
+			name:     "Duration",
+			original: Duration("k", time.Minute),
+			expected: time.Minute,
+		},
+		{
+			name:     "Stringer",
+			original: Stringer("k", &testStringer{"stringer"}),
+			expected: "stringer",
+		},
+		{
+			name:     "ConstStringer",
+			original: ConstStringer("k", &testStringer{"stringer"}),
+			expected: "stringer",
+		},
+		{
+			name:     "Stringer/Nil",
+			original: Stringer("k", nil),
+			expected: "nil", // FIXME
+		},
+		{
+			name:     "ConstStringer/Nil",
+			original: ConstStringer("k", nil),
+			expected: "nil", // FIXME
+		},
+		{
+			name:     "Array",
+			original: Array("k", &testArrayEncoder{}),
+			expected: &testArrayEncoder{},
+		},
+		{
+			name:     "Array/Nil",
+			original: Array("k", nil),
+			expected: "nil", // FIXME
+		},
+		{
+			name:     "Object",
+			original: Object("k", &testObjectEncoder{}),
+			expected: &testObjectEncoder{},
+		},
+		{
+			name:     "Object/Nil",
+			original: Object("k", nil),
+			expected: "nil", // FIXME
+		},
+		{
+			name:     "Object/Nil",
+			original: Object("k", nil),
+			expected: "nil", // FIXME
+		},
+		{
+			name:     "Any",
+			original: Any("k", customStruct{42}),
+			expected: customStruct{42},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e := newTestFieldEncoder()
+			c.original.Accept(e)
+			assert.Equal(t, c.expected, e.result["k"])
+		})
+	}
+
+}
