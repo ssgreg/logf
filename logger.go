@@ -7,10 +7,13 @@ import (
 
 // NewLogger returns a new Logger with a given Level and EntryWriter.
 func NewLogger(level LevelCheckerGetter, w EntryWriter) *Logger {
+	levelChecker := level.LevelChecker()
+
 	return &Logger{
-		level: level.LevelChecker(),
-		id:    atomic.AddInt32(&nextID, 1),
-		w:     w,
+		level:     levelChecker,
+		hardLevel: levelChecker,
+		id:        atomic.AddInt32(&nextID, 1),
+		w:         w,
 	}
 }
 
@@ -38,9 +41,10 @@ func DisabledLogger() *Logger {
 // The Logger wraps EntryWriter to check logging level and provide a bit of
 // syntactic sugar.
 type Logger struct {
-	level LevelChecker
-	id    int32
-	w     EntryWriter
+	level     LevelChecker
+	hardLevel LevelChecker
+	id        int32
+	w         EntryWriter
 
 	fields     []Field
 	name       string
@@ -65,9 +69,18 @@ func (l *Logger) AtLevel(lvl Level, fn func(LogFunc)) {
 
 // WithLevel returns a new logger with the given additional level checker.
 func (l *Logger) WithLevel(level LevelCheckerGetter) *Logger {
+	cc := l.WithSoftLevel(level)
+	cc.hardLevel = cc.level
+
+	return cc
+}
+
+// WithSoftLevel returns a new logger with the given level checker that can be overridden in sub-loggers.
+func (l *Logger) WithSoftLevel(level LevelCheckerGetter) *Logger {
+	check := level.LevelChecker()
 	cc := l.clone()
 	cc.level = func(lvl Level) bool {
-		return level.LevelChecker()(lvl) && l.level(lvl)
+		return check(lvl) && l.hardLevel(lvl)
 	}
 
 	return cc
@@ -198,6 +211,7 @@ func (l *Logger) clone() *Logger {
 	// Field names should be omitted in order not to forget the new fields.
 	return &Logger{
 		l.level,
+		l.hardLevel,
 		atomic.AddInt32(&nextID, 1),
 		l.w,
 		l.fields,
