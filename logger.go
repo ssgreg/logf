@@ -133,10 +133,6 @@ func (l *Logger) With(fs ...Field) *Logger {
 		cc.fields = c
 	}
 
-	for i := range cc.fields[len(l.fields):] {
-		snapshotField(&cc.fields[i])
-	}
-
 	return cc
 }
 
@@ -181,11 +177,6 @@ func (l *Logger) Error(text string, fs ...Field) {
 }
 
 func (l *Logger) write(lv Level, text string, fs []Field) {
-	// Snapshot non-const fields.
-	for i := range fs {
-		snapshotField(&fs[i])
-	}
-
 	e := Entry{l.id, l.name, l.fields, fs, lv, time.Now(), text, EntryCaller{}}
 	if l.addCaller {
 		e.Caller = NewEntryCaller(2 + l.callerSkip)

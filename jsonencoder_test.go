@@ -12,17 +12,15 @@ import (
 )
 
 type encoderTestCase struct {
-	Name   string
-	Entry  Entry
-	Golden string
+	name   string
+	entry  Entry
+	golden string
 }
 
-var loggerID = int32(0)
+var loggerID int32
 
 func newLoggerID() int32 {
-	atomic.AddInt32(&loggerID, 1)
-
-	return loggerID
+	return atomic.AddInt32(&loggerID, 1)
 }
 
 func TestEncoder(t *testing.T) {
@@ -37,16 +35,16 @@ func TestEncoder(t *testing.T) {
 		{
 			"LevelDebug",
 			Entry{
-				Level: LevelInfo,
+				Level: LevelDebug,
 			},
-			`{"level":"info","ts":"0001-01-01T00:00:00Z","msg":""}` + "\n",
+			`{"level":"debug","ts":"0001-01-01T00:00:00Z","msg":""}` + "\n",
 		},
 		{
 			"LevelInfo",
 			Entry{
-				Level: LevelDebug,
+				Level: LevelInfo,
 			},
-			`{"level":"debug","ts":"0001-01-01T00:00:00Z","msg":""}` + "\n",
+			`{"level":"info","ts":"0001-01-01T00:00:00Z","msg":""}` + "\n",
 		},
 		{
 			"LevelWarn",
@@ -70,7 +68,7 @@ func TestEncoder(t *testing.T) {
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","logger":"logger.name","msg":""}` + "\n",
 		},
 		{
-			"LoggerName",
+			"Caller",
 			Entry{
 				Caller: EntryCaller{
 					File:      "/a/b/c/f.go",
@@ -93,13 +91,25 @@ func TestEncoder(t *testing.T) {
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bool":true,"int":42,"int64":42,"int32":42,"int16":42,"int8":42,"uint":42,"uint64":42,"uint32":42,"uint16":42,"uint8":42,"float64":4.2,"float32":4.2}` + "\n",
 		},
 		{
-			"FieldsSlicesWithNumbers",
+			"FieldsConstSlices",
 			Entry{
 				Fields: []Field{
 					ConstBools("bools", []bool{true}),
 					ConstInts("ints", []int{42}), ConstInts64("ints64", []int64{42}), ConstInts32("ints32", []int32{42}), ConstInts16("ints16", []int16{42}), ConstInts8("ints8", []int8{42}),
 					ConstUints("uints", []uint{42}), ConstUints64("uints64", []uint64{42}), ConstUints32("uints32", []uint32{42}), ConstUints16("uints16", []uint16{42}), ConstUints8("uints8", []uint8{42}),
 					ConstFloats64("floats64", []float64{4.2}), ConstFloats32("floats32", []float32{4.2}),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bools":[true],"ints":[42],"ints64":[42],"ints32":[42],"ints16":[42],"ints8":[42],"uints":[42],"uints64":[42],"uints32":[42],"uints16":[42],"uints8":[42],"floats64":[4.2],"floats32":[4.2]}` + "\n",
+		},
+		{
+			"FieldsSlices",
+			Entry{
+				Fields: []Field{
+					Bools("bools", []bool{true}),
+					Ints("ints", []int{42}), Ints64("ints64", []int64{42}), Ints32("ints32", []int32{42}), Ints16("ints16", []int16{42}), Ints8("ints8", []int8{42}),
+					Uints("uints", []uint{42}), Uints64("uints64", []uint64{42}), Uints32("uints32", []uint32{42}), Uints16("uints16", []uint16{42}), Uints8("uints8", []uint8{42}),
+					Floats64("floats64", []float64{4.2}), Floats32("floats32", []float32{4.2}),
 				},
 			},
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bools":[true],"ints":[42],"ints64":[42],"ints32":[42],"ints16":[42],"ints8":[42],"uints":[42],"uints64":[42],"uints32":[42],"uints16":[42],"uints8":[42],"floats64":[4.2],"floats32":[4.2]}` + "\n",
@@ -151,6 +161,15 @@ func TestEncoder(t *testing.T) {
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","error":"short","error.verbose":"verbose"}` + "\n",
 		},
 		{
+			"FieldsNilError",
+			Entry{
+				Fields: []Field{
+					NamedError("error", nil),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","error":"<nil>"}` + "\n",
+		},
+		{
 			"FieldsBytes",
 			Entry{
 				Fields: []Field{
@@ -158,6 +177,51 @@ func TestEncoder(t *testing.T) {
 				},
 			},
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bytes":"Qg=="}` + "\n",
+		},
+		{
+			"FieldsStrings",
+			Entry{
+				Fields: []Field{
+					Strings("strings", []string{"a", "b"}),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","strings":["a","b"]}` + "\n",
+		},
+		{
+			"FieldsStringer",
+			Entry{
+				Fields: []Field{
+					Stringer("stringer", time.Second),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","stringer":"1s"}` + "\n",
+		},
+		{
+			"FieldsConstStringer",
+			Entry{
+				Fields: []Field{
+					ConstStringer("stringer", time.Second),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","stringer":"1s"}` + "\n",
+		},
+		{
+			"FieldsNilStringer",
+			Entry{
+				Fields: []Field{
+					Stringer("stringer", nil),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","stringer":"nil"}` + "\n",
+		},
+		{
+			"FieldsFormatter",
+			Entry{
+				Fields: []Field{
+					Formatter("fmt", "%d", 42),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","fmt":"42"}` + "\n",
 		},
 		{
 			"FieldsAny",
@@ -194,17 +258,15 @@ func TestEncoder(t *testing.T) {
 	enc := NewJSONEncoder.Default()
 
 	for _, tc := range testCases {
-		t.Run(tc.Name, func(t *testing.T) {
-			// Setup skipped fields (skipped for short test case description).
-			tc.Entry.LoggerID = newLoggerID()
+		t.Run(tc.name, func(t *testing.T) {
+			tc.entry.LoggerID = newLoggerID()
 
 			b := NewBuffer()
-			enc.Encode(b, tc.Entry)
-			require.EqualValues(t, tc.Golden, b.String())
+			_ = enc.Encode(b, tc.entry)
+			require.EqualValues(t, tc.golden, b.String())
 
-			// Check for correct json.
 			var a map[string]interface{}
-			require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&a), "generated json expected to be parsed by native golang json encoder")
+			require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&a))
 		})
 	}
 }
