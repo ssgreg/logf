@@ -1,4 +1,4 @@
-module github.com/ssgreg/logf
+module github.com/ssgreg/logf/v2
 
 go 1.21
 

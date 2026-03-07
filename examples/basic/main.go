@@ -3,7 +3,7 @@ package main
 import (
 	"runtime"
 
-	"github.com/ssgreg/logf"
+	"github.com/ssgreg/logf/v2"
 )
 
 func main() {

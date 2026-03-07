@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ssgreg/logf"
+	"github.com/ssgreg/logf/v2"
 	"go.uber.org/zap/zapcore"
 )
 

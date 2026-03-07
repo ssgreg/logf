@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ssgreg/logf"
-	"github.com/ssgreg/logf/logfc"
+	"github.com/ssgreg/logf/v2"
+	"github.com/ssgreg/logf/v2/logfc"
 	"go.uber.org/zap"
 )
 

@@ -3,7 +3,7 @@ package logfc
 import (
 	"context"
 
-	"github.com/ssgreg/logf"
+	"github.com/ssgreg/logf/v2"
 )
 
 // New returns a new context.Context with the given logger associated with it.

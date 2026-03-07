@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ssgreg/logf"
+	"github.com/ssgreg/logf/v2"
 
 	"github.com/stretchr/testify/assert"
 )

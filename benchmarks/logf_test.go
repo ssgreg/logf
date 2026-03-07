@@ -3,7 +3,7 @@ package benchmarks
 import (
 	"io/ioutil"
 
-	"github.com/ssgreg/logf"
+	"github.com/ssgreg/logf/v2"
 )
 
 func fakeFields() []logf.Field {
