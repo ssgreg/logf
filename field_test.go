@@ -206,10 +206,6 @@ func TestField(t *testing.T) {
 		})
 		t.Run(c.name+"->Any", func(t *testing.T) {
 			f := Any("k", c.original)
-
-			// Need to snapshot fields because Any could return raw byte
-			// types that need to be copied.
-			snapshotField(&f)
 			e := newTestFieldEncoder()
 			f.Accept(e)
 
@@ -225,7 +221,7 @@ func TestFieldStrings(t *testing.T) {
 
 		ae := e.result["k"].(ArrayEncoder)
 		te := testTypeEncoder{}
-		ae.EncodeLogfArray(&te)
+		_ = ae.EncodeLogfArray(&te)
 
 		assert.Equal(t, "42", te.result)
 	}

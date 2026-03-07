@@ -85,7 +85,10 @@ func Duration(k string, v time.Duration) Field {
 
 // Bytes returns a new Field with the given key and slice of bytes.
 func Bytes(k string, v []byte) Field {
-	return Field{Key: k, Type: FieldTypeRawBytes, Bytes: v}
+	cc := make([]byte, len(v))
+	copy(cc, v)
+
+	return ConstBytes(k, cc)
 }
 
 // String returns a new Field with the given key and string.
@@ -110,72 +113,114 @@ func (o stringArray) EncodeLogfArray(e TypeEncoder) error {
 
 // Bools returns a new Field with the given key and slice of bools.
 func Bools(k string, v []bool) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToBools, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]bool, len(v))
+	copy(cc, v)
+
+	return ConstBools(k, cc)
 }
 
 // Ints returns a new Field with the given key and slice of ints.
 func Ints(k string, v []int) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToInts64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]int, len(v))
+	copy(cc, v)
+
+	return ConstInts(k, cc)
 }
 
 // Ints64 returns a new Field with the given key and slice of 64-bit ints.
 func Ints64(k string, v []int64) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToInts64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]int64, len(v))
+	copy(cc, v)
+
+	return ConstInts64(k, cc)
 }
 
 // Ints32 returns a new Field with the given key and slice of 32-bit ints.
 func Ints32(k string, v []int32) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToInts32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]int32, len(v))
+	copy(cc, v)
+
+	return ConstInts32(k, cc)
 }
 
 // Ints16 returns a new Field with the given key and slice of 16-bit ints.
 func Ints16(k string, v []int16) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToInts16, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]int16, len(v))
+	copy(cc, v)
+
+	return ConstInts16(k, cc)
 }
 
 // Ints8 returns a new Field with the given key and slice of 8-bit ints.
 func Ints8(k string, v []int8) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToInts8, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]int8, len(v))
+	copy(cc, v)
+
+	return ConstInts8(k, cc)
 }
 
 // Uints returns a new Field with the given key and slice of uints.
 func Uints(k string, v []uint) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToUints64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]uint, len(v))
+	copy(cc, v)
+
+	return ConstUints(k, cc)
 }
 
 // Uints64 returns a new Field with the given key and slice of 64-bit uints.
 func Uints64(k string, v []uint64) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToUints64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]uint64, len(v))
+	copy(cc, v)
+
+	return ConstUints64(k, cc)
 }
 
 // Uints32 returns a new Field with the given key and slice of 32-bit uints.
 func Uints32(k string, v []uint32) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToUints32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]uint32, len(v))
+	copy(cc, v)
+
+	return ConstUints32(k, cc)
 }
 
 // Uints16 returns a new Field with the given key and slice of 16-bit uints.
 func Uints16(k string, v []uint16) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToUints16, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]uint16, len(v))
+	copy(cc, v)
+
+	return ConstUints16(k, cc)
 }
 
 // Uints8 returns a new Field with the given key and slice of 8-bit uints.
 func Uints8(k string, v []uint8) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToUints8, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]uint8, len(v))
+	copy(cc, v)
+
+	return ConstUints8(k, cc)
 }
 
-// Floats64 returns a new Field with the given key and slice of 64-biy floats.
+// Floats64 returns a new Field with the given key and slice of 64-bit floats.
 func Floats64(k string, v []float64) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToFloats64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]float64, len(v))
+	copy(cc, v)
+
+	return ConstFloats64(k, cc)
 }
 
 // Floats32 returns a new Field with the given key and slice of 32-bit floats.
 func Floats32(k string, v []float32) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToFloats32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]float32, len(v))
+	copy(cc, v)
+
+	return ConstFloats32(k, cc)
 }
 
 // Durations returns a new Field with the given key and slice of time.Duration.
 func Durations(k string, v []time.Duration) Field {
-	return Field{Key: k, Type: FieldTypeRawBytesToDurations, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	cc := make([]time.Duration, len(v))
+	copy(cc, v)
+
+	return ConstDurations(k, cc)
 }
 
 // ConstBytes returns a new Field with the given key and slice of bytes.
@@ -461,6 +506,9 @@ func Any(k string, v interface{}) Field {
 		case reflect.Float32, reflect.Float64:
 			return Float64(k, reflect.ValueOf(rv).Float())
 		}
+		if s, ok := rv.(Snapshotter); ok {
+			return Field{Key: k, Type: FieldTypeAny, Any: s.TakeSnapshot()}
+		}
 	}
 
 	return Field{Key: k, Type: FieldTypeAny, Any: v}
@@ -598,33 +646,40 @@ func (fd Field) Accept(v FieldEncoder) {
 		}
 	case FieldTypeFormatter:
 		v.EncodeFieldString(fd.Key, fmt.Sprintf(*(*string)(unsafe.Pointer(&fd.Bytes)), fd.Any))
-	case FieldTypeBytes, FieldTypeRawBytes:
+	case FieldTypeBytes:
 		v.EncodeFieldBytes(fd.Key, fd.Bytes)
 	case FieldTypeBytesToString:
 		v.EncodeFieldString(fd.Key, *(*string)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToBools, FieldTypeRawBytesToBools:
+	case FieldTypeBytesToBools:
 		v.EncodeFieldBools(fd.Key, *(*[]bool)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts64, FieldTypeRawBytesToInts64:
+	case FieldTypeBytesToInts64:
 		v.EncodeFieldInts64(fd.Key, *(*[]int64)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts32, FieldTypeRawBytesToInts32:
+	case FieldTypeBytesToInts32:
 		v.EncodeFieldInts32(fd.Key, *(*[]int32)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts16, FieldTypeRawBytesToInts16:
+	case FieldTypeBytesToInts16:
 		v.EncodeFieldInts16(fd.Key, *(*[]int16)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToInts8, FieldTypeRawBytesToInts8:
+	case FieldTypeBytesToInts8:
 		v.EncodeFieldInts8(fd.Key, *(*[]int8)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints64, FieldTypeRawBytesToUints64:
+	case FieldTypeBytesToUints64:
 		v.EncodeFieldUints64(fd.Key, *(*[]uint64)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints32, FieldTypeRawBytesToUints32:
+	case FieldTypeBytesToUints32:
 		v.EncodeFieldUints32(fd.Key, *(*[]uint32)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints16, FieldTypeRawBytesToUints16:
+	case FieldTypeBytesToUints16:
 		v.EncodeFieldUints16(fd.Key, *(*[]uint16)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToUints8, FieldTypeRawBytesToUints8:
+	case FieldTypeBytesToUints8:
 		v.EncodeFieldUints8(fd.Key, *(*[]uint8)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToFloats64, FieldTypeRawBytesToFloats64:
+	case FieldTypeBytesToFloats64:
 		v.EncodeFieldFloats64(fd.Key, *(*[]float64)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToFloats32, FieldTypeRawBytesToFloats32:
+	case FieldTypeBytesToFloats32:
 		v.EncodeFieldFloats32(fd.Key, *(*[]float32)(unsafe.Pointer(&fd.Bytes)))
-	case FieldTypeBytesToDurations, FieldTypeRawBytesToDurations:
+	case FieldTypeBytesToDurations:
 		v.EncodeFieldDurations(fd.Key, *(*[]time.Duration)(unsafe.Pointer(&fd.Bytes)))
 	}
+}
+
+// Snapshotter is the interface that allows to do a custom copy of a logging
+// object. If the object type implements TakeSnapshot function it will be
+// called during the logging procedure in a caller's goroutine.
+type Snapshotter interface {
+	TakeSnapshot() interface{}
 }

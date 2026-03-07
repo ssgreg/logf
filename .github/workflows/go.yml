@@ -2,30 +2,33 @@ name: Go
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+
+permissions:
+  contents: read
 
 jobs:
-
-  build:
+  test:
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        go: ["1.22.x", "1.23.x"]
     steps:
-    - uses: actions/checkout@v2
-
-    - name: Set up Go
-      uses: actions/setup-go@v2
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
       with:
-        go-version: 1.16
+        go-version: ${{ matrix.go }}
+    - run: go test -race -coverprofile=coverage.out ./...
+    - uses: codecov/codecov-action@v5
+      if: matrix.go == '1.23.x'
 
-    - name: Build
-      run: go build -v ./...
-
-    - name: Test
-      run: |
-        go test -race -coverprofile=cover.out -coverpkg=./...
-        go tool cover -html=cover.out -o cover.html
-
-    - name: Upload coverage to codecov.io
-      uses: codecov/codecov-action@v1
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: 1.23.x
+        cache: false
+    - uses: golangci/golangci-lint-action@v6

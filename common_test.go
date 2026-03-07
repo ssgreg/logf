@@ -382,5 +382,5 @@ func (e *verboseError) Error() string {
 }
 
 func (e *verboseError) Format(f fmt.State, c rune) {
-	f.Write([]byte(e.full))
+	_, _ = f.Write([]byte(e.full))
 }

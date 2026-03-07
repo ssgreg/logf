@@ -8,6 +8,76 @@ import (
 	"unsafe"
 )
 
+// Default field keys.
+const (
+	DefaultFieldKeyLevel  = "level"
+	DefaultFieldKeyMsg    = "msg"
+	DefaultFieldKeyTime   = "ts"
+	DefaultFieldKeyName   = "logger"
+	DefaultFieldKeyCaller = "caller"
+)
+
+// JSONEncoderConfig allows to configure journal JSON Encoder.
+type JSONEncoderConfig struct {
+	FieldKeyMsg    string
+	FieldKeyTime   string
+	FieldKeyLevel  string
+	FieldKeyName   string
+	FieldKeyCaller string
+
+	DisableFieldMsg    bool
+	DisableFieldTime   bool
+	DisableFieldLevel  bool
+	DisableFieldName   bool
+	DisableFieldCaller bool
+
+	EncodeTime     TimeEncoder
+	EncodeDuration DurationEncoder
+	EncodeError    ErrorEncoder
+	EncodeLevel    LevelEncoder
+	EncodeCaller   CallerEncoder
+}
+
+// WithDefaults returns the new config in which all uninitialized fields are
+// filled with their default values.
+func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
+	// Handle default for predefined field names.
+	if c.FieldKeyMsg == "" {
+		c.FieldKeyMsg = DefaultFieldKeyMsg
+	}
+	if c.FieldKeyTime == "" {
+		c.FieldKeyTime = DefaultFieldKeyTime
+	}
+	if c.FieldKeyLevel == "" {
+		c.FieldKeyLevel = DefaultFieldKeyLevel
+	}
+	if c.FieldKeyName == "" {
+		c.FieldKeyName = DefaultFieldKeyName
+	}
+	if c.FieldKeyCaller == "" {
+		c.FieldKeyCaller = DefaultFieldKeyCaller
+	}
+
+	// Handle defaults for type encoder.
+	if c.EncodeDuration == nil {
+		c.EncodeDuration = StringDurationEncoder
+	}
+	if c.EncodeTime == nil {
+		c.EncodeTime = RFC3339TimeEncoder
+	}
+	if c.EncodeError == nil {
+		c.EncodeError = DefaultErrorEncoder
+	}
+	if c.EncodeLevel == nil {
+		c.EncodeLevel = DefaultLevelEncoder
+	}
+	if c.EncodeCaller == nil {
+		c.EncodeCaller = ShortCallerEncoder
+	}
+
+	return c
+}
+
 // NewJSONEncoder creates the new instance of the JSON Encoder with the
 // given JSONEncoderConfig.
 var NewJSONEncoder = jsonEncoderGetter(
@@ -272,7 +342,7 @@ func (f *jsonEncoder) EncodeFieldDurations(k string, v []time.Duration) {
 
 func (f *jsonEncoder) EncodeTypeAny(v interface{}) {
 	e := json.NewEncoder(f.buf)
-	e.Encode(v)
+	_ = e.Encode(v)
 
 	if !f.empty() && f.buf.Back() == '\n' {
 		f.buf.Data = f.buf.Data[0 : f.buf.Len()-1]
@@ -282,7 +352,7 @@ func (f *jsonEncoder) EncodeTypeAny(v interface{}) {
 func (f *jsonEncoder) EncodeTypeUnsafeBytes(v unsafe.Pointer) {
 	f.appendSeparator()
 	f.buf.AppendByte('"')
-	EscapeByteString(f.buf, *(*[]byte)(v))
+	_ = EscapeByteString(f.buf, *(*[]byte)(v))
 	f.buf.AppendByte('"')
 }
 
@@ -294,7 +364,7 @@ func (f *jsonEncoder) EncodeTypeBool(v bool) {
 func (f *jsonEncoder) EncodeTypeString(v string) {
 	f.appendSeparator()
 	f.buf.AppendByte('"')
-	EscapeString(f.buf, v)
+	_ = EscapeString(f.buf, v)
 	f.buf.AppendByte('"')
 }
 
@@ -485,14 +555,14 @@ func (f *jsonEncoder) EncodeTypeDurations(v []time.Duration) {
 func (f *jsonEncoder) EncodeTypeArray(v ArrayEncoder) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
-	v.EncodeLogfArray(f)
+	_ = v.EncodeLogfArray(f)
 	f.buf.AppendByte(']')
 }
 
 func (f *jsonEncoder) EncodeTypeObject(v ObjectEncoder) {
 	f.appendSeparator()
 	f.buf.AppendByte('{')
-	v.EncodeLogfObject(f)
+	_ = v.EncodeLogfObject(f)
 	f.buf.AppendByte('}')
 }
 
@@ -515,7 +585,7 @@ func (f *jsonEncoder) empty() bool {
 func (f *jsonEncoder) addKey(k string) {
 	f.appendSeparator()
 	f.buf.AppendByte('"')
-	EscapeString(f.buf, k)
+	_ = EscapeString(f.buf, k)
 	f.buf.AppendByte('"')
 	f.buf.AppendByte(':')
 }
