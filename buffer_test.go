@@ -104,23 +104,23 @@ func TestBufferAppendFunctions(t *testing.T) {
 	capacity := 10
 	buf := NewBufferWithCapacity(capacity)
 
-	AppendUint(buf, 123456789012345678)
+	buf.AppendUint(123456789012345678)
 	assert.Equal(t, []byte("123456789012345678"), buf.Bytes())
 	buf.Reset()
 
-	AppendInt(buf, -123456789012345678)
+	buf.AppendInt(-123456789012345678)
 	assert.Equal(t, []byte("-123456789012345678"), buf.Bytes())
 	buf.Reset()
 
-	AppendFloat32(buf, 123456.16)
+	buf.AppendFloat32(123456.16)
 	assert.Equal(t, []byte("123456.16"), buf.Bytes())
 	buf.Reset()
 
-	AppendFloat64(buf, 123456.16)
+	buf.AppendFloat64(123456.16)
 	assert.Equal(t, []byte("123456.16"), buf.Bytes())
 	buf.Reset()
 
-	AppendBool(buf, true)
+	buf.AppendBool(true)
 	assert.Equal(t, []byte("true"), buf.Bytes())
 	buf.Reset()
 }

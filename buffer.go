@@ -39,23 +39,23 @@ func (b *Buffer) String() string {
 
 // EnsureSize ensures that the Buffer is able to append 's' bytes without
 // a further realloc.
-func (b *Buffer) EnsureSize(s int) []byte {
+func (b *Buffer) EnsureSize(s int) {
 	if cap(b.Data)-len(b.Data) < s {
 		tmpLen := len(b.Data)
 		tmp := make([]byte, tmpLen, tmpLen+s+(tmpLen>>1))
 		copy(tmp, b.Data)
 		b.Data = tmp
 	}
-
-	return b.Data
 }
 
 // ExtendBytes extends the Buffer with the given size and returns a slice
-// tp extended part of the Buffer.
+// to the extended part of the Buffer.
 func (b *Buffer) ExtendBytes(s int) []byte {
-	b.Data = append(b.Data, make([]byte, s)...)
+	b.EnsureSize(s)
+	n := len(b.Data)
+	b.Data = b.Data[:n+s]
 
-	return b.Data[len(b.Data)-s:]
+	return b.Data[n:]
 }
 
 // AppendString appends a string to the Buffer.
@@ -71,6 +71,11 @@ func (b *Buffer) AppendBytes(data []byte) {
 // AppendByte appends a single byte to the Buffer.
 func (b *Buffer) AppendByte(data byte) {
 	b.Data = append(b.Data, data)
+}
+
+// Truncate shrinks the Buffer to the given length.
+func (b *Buffer) Truncate(n int) {
+	b.Data = b.Data[:n]
 }
 
 // Reset resets the underlying byte slice.
@@ -100,31 +105,27 @@ func (b *Buffer) Cap() int {
 }
 
 // AppendUint appends the string form in the base 10 of the given unsigned
-// integer to the given Buffer.
-func AppendUint(b *Buffer, n uint64) {
+// integer.
+func (b *Buffer) AppendUint(n uint64) {
 	b.Data = strconv.AppendUint(b.Data, n, 10)
 }
 
-// AppendInt appends the string form in the base 10 of the given integer
-// to the given Buffer.
-func AppendInt(b *Buffer, n int64) {
+// AppendInt appends the string form in the base 10 of the given integer.
+func (b *Buffer) AppendInt(n int64) {
 	b.Data = strconv.AppendInt(b.Data, n, 10)
 }
 
-// AppendFloat32 appends the string form of the given float32 to the given
-// Buffer.
-func AppendFloat32(b *Buffer, n float32) {
+// AppendFloat32 appends the string form of the given float32.
+func (b *Buffer) AppendFloat32(n float32) {
 	b.Data = strconv.AppendFloat(b.Data, float64(n), 'g', -1, 32)
 }
 
-// AppendFloat64 appends the string form of the given float32 to the given
-// Buffer.
-func AppendFloat64(b *Buffer, n float64) {
+// AppendFloat64 appends the string form of the given float64.
+func (b *Buffer) AppendFloat64(n float64) {
 	b.Data = strconv.AppendFloat(b.Data, n, 'g', -1, 64)
 }
 
-// AppendBool appends "true" or "false", according to the given bool to the
-// given Buffer.
-func AppendBool(b *Buffer, n bool) {
+// AppendBool appends "true" or "false" according to the given bool.
+func (b *Buffer) AppendBool(n bool) {
 	b.Data = strconv.AppendBool(b.Data, n)
 }

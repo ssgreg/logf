@@ -1,16 +1,16 @@
 package logf
 
 import (
-	"sync/atomic"
+	"context"
 	"time"
 )
 
 // NewLogger returns a new Logger with a given Level and EntryWriter.
 func NewLogger(level LevelCheckerGetter, w EntryWriter) *Logger {
 	return &Logger{
-		level: level.LevelChecker(),
-		id:    atomic.AddInt32(&nextID, 1),
-		w:     w,
+		level:     level.LevelChecker(),
+		w:         w,
+		addCaller: true,
 	}
 }
 
@@ -39,27 +39,31 @@ func DisabledLogger() *Logger {
 // syntactic sugar.
 type Logger struct {
 	level LevelChecker
-	id    int32
 	w     EntryWriter
 
-	fields     []Field
+	bag        *Bag
 	name       string
 	addCaller  bool
 	callerSkip int
 }
 
 // LogFunc allows to log a message with a bound level.
-type LogFunc func(string, ...Field)
+type LogFunc func(context.Context, string, ...Field)
+
+// Enabled reports whether logging at the given level is enabled.
+func (l *Logger) Enabled(lvl Level) bool {
+	return l.level(lvl)
+}
 
 // AtLevel calls the given fn if logging a message at the specified level
 // is enabled, passing a LogFunc with the bound level.
-func (l *Logger) AtLevel(lvl Level, fn func(LogFunc)) {
+func (l *Logger) AtLevel(ctx context.Context, lvl Level, fn func(LogFunc)) {
 	if !l.level(lvl) {
 		return
 	}
 
-	fn(func(text string, fs ...Field) {
-		l.write(lvl, text, fs)
+	fn(func(ctx context.Context, text string, fs ...Field) {
+		l.write(ctx, 1, lvl, text, fs)
 	})
 }
 
@@ -92,11 +96,10 @@ func (l *Logger) WithName(n string) *Logger {
 	return cc
 }
 
-// WithCaller returns a new Logger that adds a special annotation parameters
-// to each logging message, such as the filename and line number of a caller.
-func (l *Logger) WithCaller() *Logger {
+// WithCaller returns a new Logger with caller reporting enabled or disabled.
+func (l *Logger) WithCaller(enabled bool) *Logger {
 	cc := l.clone()
-	cc.addCaller = true
+	cc.addCaller = enabled
 
 	return cc
 }
@@ -112,90 +115,104 @@ func (l *Logger) WithCallerSkip(skip int) *Logger {
 
 // With returns a new Logger with the given additional fields.
 func (l *Logger) With(fs ...Field) *Logger {
-	// This code attempts to archive optimum performance with minimum
-	// allocations count. Do not change it unless the following benchmarks
-	// will show a better performance:
-	// - BenchmarkAccumulateFields
-	// - BenchmarkAccumulateFieldsWithAccumulatedFields
-
-	var cc *Logger
-	if len(l.fields) == 0 {
-		// The fastest way. Use passed 'fs' as is.
-		cc = l.clone()
-		cc.fields = fs
+	var fields []Field
+	if l.bag == nil {
+		fields = fs
 	} else {
-		// The less efficient path forces us to copy parent's fields.
-		c := make([]Field, 0, len(l.fields)+len(fs))
-		c = append(c, l.fields...)
-		c = append(c, fs...)
-
-		cc = l.clone()
-		cc.fields = c
+		fields = make([]Field, 0, len(l.bag.Fields())+len(fs))
+		fields = append(fields, l.bag.Fields()...)
+		fields = append(fields, fs...)
 	}
+
+	cc := l.clone()
+	cc.bag = NewBag(fields...)
 
 	return cc
 }
 
 // Debug logs a debug message with the given text, optional fields and
 // fields passed to the Logger using With function.
-func (l *Logger) Debug(text string, fs ...Field) {
+func (l *Logger) Debug(ctx context.Context, text string, fs ...Field) {
 	if !l.level(LevelDebug) {
 		return
 	}
 
-	l.write(LevelDebug, text, fs)
+	l.write(ctx, 1, LevelDebug, text, fs)
 }
 
 // Info logs an info message with the given text, optional fields and
 // fields passed to the Logger using With function.
-func (l *Logger) Info(text string, fs ...Field) {
+func (l *Logger) Info(ctx context.Context, text string, fs ...Field) {
 	if !l.level(LevelInfo) {
 		return
 	}
 
-	l.write(LevelInfo, text, fs)
+	l.write(ctx, 1, LevelInfo, text, fs)
 }
 
 // Warn logs a warning message with the given text, optional fields and
 // fields passed to the Logger using With function.
-func (l *Logger) Warn(text string, fs ...Field) {
+func (l *Logger) Warn(ctx context.Context, text string, fs ...Field) {
 	if !l.level(LevelWarn) {
 		return
 	}
 
-	l.write(LevelWarn, text, fs)
+	l.write(ctx, 1, LevelWarn, text, fs)
 }
 
 // Error logs an error message with the given text, optional fields and
 // fields passed to the Logger using With function.
-func (l *Logger) Error(text string, fs ...Field) {
+func (l *Logger) Error(ctx context.Context, text string, fs ...Field) {
 	if !l.level(LevelError) {
 		return
 	}
 
-	l.write(LevelError, text, fs)
+	l.write(ctx, 1, LevelError, text, fs)
 }
 
-func (l *Logger) write(lv Level, text string, fs []Field) {
-	e := Entry{l.id, l.name, l.fields, fs, lv, time.Now(), text, EntryCaller{}}
-	if l.addCaller {
-		e.Caller = NewEntryCaller(2 + l.callerSkip)
+// Log logs a message at the given level.
+func (l *Logger) Log(ctx context.Context, lvl Level, text string, fs ...Field) {
+	if !l.level(lvl) {
+		return
 	}
 
-	l.w.WriteEntry(e)
+	l.write(ctx, 1, lvl, text, fs)
+}
+
+func (l *Logger) write(ctx context.Context, extraSkip int, lv Level, text string, fs []Field) {
+	e := Entry{
+		LoggerBag:  l.bag,
+		Fields:     fs,
+		Level:      lv,
+		Time:       time.Now(),
+		LoggerName: l.name,
+		Text:       text,
+	}
+	if l.addCaller {
+		e.CallerPC = CallerPC(1 + l.callerSkip + extraSkip)
+	}
+
+	l.w.WriteEntry(ctx, e)
 }
 
 func (l *Logger) clone() *Logger {
-	// Field names should be omitted in order not to forget the new fields.
 	return &Logger{
-		l.level,
-		atomic.AddInt32(&nextID, 1),
-		l.w,
-		l.fields,
-		l.name,
-		l.addCaller,
-		l.callerSkip,
+		level:      l.level,
+		w:          l.w,
+		bag:        l.bag,
+		name:       l.name,
+		addCaller:  l.addCaller,
+		callerSkip: l.callerSkip,
 	}
 }
 
-var nextID int32
+// LogDepth logs using the given logger at the specified level, adding depth
+// extra frames to the caller skip count. It is intended for wrapper packages
+// like logfc to avoid Logger allocation on each call.
+func LogDepth(l *Logger, ctx context.Context, depth int, lvl Level, text string, fs ...Field) {
+	if !l.level(lvl) {
+		return
+	}
+
+	l.write(ctx, depth+1, lvl, text, fs)
+}

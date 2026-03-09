@@ -3,7 +3,6 @@ package logf
 import (
 	"bytes"
 	"encoding/json"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,11 +16,6 @@ type encoderTestCase struct {
 	golden string
 }
 
-var loggerID int32
-
-func newLoggerID() int32 {
-	return atomic.AddInt32(&loggerID, 1)
-}
 
 func TestEncoder(t *testing.T) {
 	testCases := []encoderTestCase{
@@ -68,15 +62,11 @@ func TestEncoder(t *testing.T) {
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","logger":"logger.name","msg":""}` + "\n",
 		},
 		{
-			"Caller",
+			"CallerPC",
 			Entry{
-				Caller: EntryCaller{
-					File:      "/a/b/c/f.go",
-					Line:      6,
-					Specified: true,
-				},
+				CallerPC: CallerPC(0),
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","caller":"c/f.go:6"}` + "\n",
+			"", // checked separately below
 		},
 		{
 			"FieldsNumbers",
@@ -233,20 +223,20 @@ func TestEncoder(t *testing.T) {
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","any":{"Field":"42"}}` + "\n",
 		},
 		{
-			"FieldsDerivedFields",
+			"FieldsLoggerBag",
 			Entry{
-				DerivedFields: []Field{
+				LoggerBag: NewBag(
 					Int("int", 42),
-				},
+				),
 			},
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","int":42}` + "\n",
 		},
 		{
-			"FieldsDerivedFieldsFirst",
+			"FieldsLoggerBagFirst",
 			Entry{
-				DerivedFields: []Field{
+				LoggerBag: NewBag(
 					Int("int", 42),
-				},
+				),
 				Fields: []Field{
 					String("string", "42"),
 				},
@@ -259,11 +249,15 @@ func TestEncoder(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.entry.LoggerID = newLoggerID()
-
 			b := NewBuffer()
 			_ = enc.Encode(b, tc.entry)
-			require.EqualValues(t, tc.golden, b.String())
+
+			if tc.golden != "" {
+				require.EqualValues(t, tc.golden, b.String())
+			} else {
+				// CallerPC: line number is dynamic, just check key presence.
+				assert.Contains(t, b.String(), `"caller":"logf/jsonencoder_test.go:`)
+			}
 
 			var a map[string]interface{}
 			require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&a))

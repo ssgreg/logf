@@ -8,11 +8,10 @@ import (
 )
 
 func TestContext(t *testing.T) {
-	var logger *Logger
-	// Check if no logger is associated with the Context.
-	assert.Equal(t, logger, FromContext(context.Background()))
+	// Check if no logger is associated with the Context — returns DisabledLogger.
+	assert.Equal(t, DisabledLogger(), FromContext(context.Background()))
 
-	logger = NewDisabledLogger()
+	logger := NewDisabledLogger()
 	ctx := NewContext(context.Background(), logger)
 	// First try.
 	assert.Equal(t, logger, FromContext(ctx))

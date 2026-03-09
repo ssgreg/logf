@@ -2,6 +2,8 @@ package logfc
 
 import (
 	"context"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/ssgreg/logf/v2"
@@ -15,10 +17,6 @@ func TestNewAndGet(t *testing.T) {
 
 	assert.Equal(t, logf.DisabledLogger(), Get(ctx))
 	assert.Equal(t, logger, Get(New(ctx, logger)))
-	assert.Equal(t, logger, MustGet(New(ctx, logger)))
-	assert.Panics(t, func() {
-		_ = MustGet(ctx)
-	})
 }
 
 func TestWith(t *testing.T) {
@@ -26,7 +24,6 @@ func TestWith(t *testing.T) {
 	ctx := New(context.Background(), logger)
 
 	assert.NotEqual(t, logger, Get(With(ctx, logf.Int("int", 42))))
-	assert.NotEqual(t, logger, Get(MustWith(ctx, logf.Int("int", 42))))
 }
 
 func TestWithName(t *testing.T) {
@@ -34,7 +31,6 @@ func TestWithName(t *testing.T) {
 	ctx := New(context.Background(), logger)
 
 	assert.NotEqual(t, logger, Get(WithName(ctx, "n")))
-	assert.NotEqual(t, logger, Get(MustWithName(ctx, "n")))
 }
 
 func TestCaller(t *testing.T) {
@@ -42,7 +38,6 @@ func TestCaller(t *testing.T) {
 	ctx := New(context.Background(), logger)
 
 	assert.NotEqual(t, logger, Get(WithCaller(ctx)))
-	assert.NotEqual(t, logger, Get(MustWithCaller(ctx)))
 }
 
 func TestCallerSkip(t *testing.T) {
@@ -50,7 +45,6 @@ func TestCallerSkip(t *testing.T) {
 	ctx := New(context.Background(), logger)
 
 	assert.NotEqual(t, logger, Get(WithCallerSkip(ctx, 1)))
-	assert.NotEqual(t, logger, Get(MustWithCallerSkip(ctx, 1)))
 }
 
 func TestAtLevel(t *testing.T) {
@@ -65,85 +59,24 @@ func TestAtLevel(t *testing.T) {
 	assert.Equal(t, true, called)
 }
 
-func TestMustAtLevel(t *testing.T) {
-	logger := logf.NewLogger(logf.LevelInfo, logf.NewUnbufferedEntryWriter(logf.NewDiscardAppender()))
-	ctx := New(context.Background(), logger)
-
-	called := false
-	MustAtLevel(ctx, logf.LevelInfo, func(logf.LogFunc) {
-		called = true
-	})
-
-	assert.Equal(t, true, called)
-}
-
 func TestLevels(t *testing.T) {
 	tests := []struct {
-		Name        string
-		Log         func(ctx context.Context, text string, fs ...logf.Field)
-		Level       logf.Level
-		ShouldPanic bool
+		Name  string
+		Log   func(ctx context.Context, text string, fs ...logf.Field)
+		Level logf.Level
 	}{
-		{
-			Name:        "Debug",
-			Log:         Debug,
-			Level:       logf.LevelDebug,
-			ShouldPanic: false,
-		},
-		{
-			Name:        "MustDebug",
-			Log:         MustDebug,
-			Level:       logf.LevelDebug,
-			ShouldPanic: true,
-		},
-		{
-			Name:        "Info",
-			Log:         Info,
-			Level:       logf.LevelInfo,
-			ShouldPanic: false,
-		},
-		{
-			Name:        "MustInfo",
-			Log:         MustInfo,
-			Level:       logf.LevelInfo,
-			ShouldPanic: true,
-		},
-		{
-			Name:        "Warn",
-			Log:         Warn,
-			Level:       logf.LevelWarn,
-			ShouldPanic: false,
-		},
-		{
-			Name:        "MustWarn",
-			Log:         MustWarn,
-			Level:       logf.LevelWarn,
-			ShouldPanic: true,
-		},
-		{
-			Name:        "Error",
-			Log:         Error,
-			Level:       logf.LevelError,
-			ShouldPanic: false,
-		},
-		{
-			Name:        "MustError",
-			Log:         MustError,
-			Level:       logf.LevelError,
-			ShouldPanic: true,
-		},
+		{"Debug", Debug, logf.LevelDebug},
+		{"Info", Info, logf.LevelInfo},
+		{"Warn", Warn, logf.LevelWarn},
+		{"Error", Error, logf.LevelError},
 	}
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			if test.ShouldPanic {
-				assert.Panics(t, func() {
-					test.Log(context.Background(), "test")
-				})
-			} else {
-				assert.NotPanics(t, func() {
-					test.Log(context.Background(), "test")
-				})
-			}
+			// No panic when no logger in context.
+			assert.NotPanics(t, func() {
+				test.Log(context.Background(), "test")
+			})
+
 			text := "test text"
 			appender := mockAppender{}
 			logger := logf.NewLogger(logf.LevelDebug, logf.NewUnbufferedEntryWriter(&appender))
@@ -154,6 +87,49 @@ func TestLevels(t *testing.T) {
 			assert.Equal(t, test.Level, appender.entries[0].Level)
 		})
 	}
+}
+
+func TestAtLevelCallerPointsToCallSite(t *testing.T) {
+	appender := mockAppender{}
+	logger := logf.NewLogger(logf.LevelDebug, logf.NewUnbufferedEntryWriter(&appender))
+	ctx := New(context.Background(), logger)
+
+	_, _, expectedLine, _ := runtime.Caller(0)
+	AtLevel(ctx, logf.LevelInfo, func(log logf.LogFunc) {
+		log(ctx, "at-level-test") // expectedLine + 2
+	})
+
+	assert.Equal(t, 1, len(appender.entries))
+	pc := appender.entries[0].CallerPC
+	assert.NotZero(t, pc, "CallerPC should be set")
+
+	frames := runtime.CallersFrames([]uintptr{pc})
+	f, _ := frames.Next()
+
+	assert.Equal(t, expectedLine+2, f.Line,
+		"caller should point to log() call site, got %s:%d", f.File, f.Line)
+	assert.True(t, strings.HasSuffix(f.File, "context_test.go"),
+		"expected context_test.go, got %s", f.File)
+}
+
+func TestCallerPointsToCallSite(t *testing.T) {
+	appender := mockAppender{}
+	logger := logf.NewLogger(logf.LevelDebug, logf.NewUnbufferedEntryWriter(&appender))
+	ctx := New(context.Background(), logger)
+
+	_, expectedFile, expectedLine, _ := runtime.Caller(0)
+	Debug(ctx, "caller-test") // expectedLine + 1
+
+	assert.Equal(t, 1, len(appender.entries))
+	pc := appender.entries[0].CallerPC
+	assert.NotZero(t, pc, "CallerPC should be set")
+
+	frames := runtime.CallersFrames([]uintptr{pc})
+	f, _ := frames.Next()
+
+	assert.Equal(t, expectedLine+1, f.Line)
+	assert.True(t, strings.HasSuffix(f.File, expectedFile[strings.LastIndex(expectedFile, "/")+1:]),
+		"expected file %s, got %s", expectedFile, f.File)
 }
 
 type mockAppender struct {

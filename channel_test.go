@@ -1,6 +1,7 @@
 package logf
 
 import (
+	"context"
 	"errors"
 	"runtime"
 	"testing"
@@ -47,7 +48,7 @@ func TestChannelWriterPanicOnWriteWhenClosed(t *testing.T) {
 
 	// Panic is expected calling WriteEnter after close.
 	assert.Panics(t, func() {
-		w.WriteEntry(Entry{})
+		w.WriteEntry(context.Background(), Entry{})
 	})
 }
 
@@ -58,13 +59,13 @@ func TestChannelWriterWrite(t *testing.T) {
 	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
 	defer func() {
 		assert.NotEmpty(t, appender.Entries)
-		assert.EqualValues(t, 42, appender.Entries[0].LoggerID)
+		assert.Equal(t, LevelInfo, appender.Entries[0].Level)
 		assert.True(t, appender.FlushCallCounter > 0 && appender.FlushCallCounter < 3, "expected one flush at exit (and sometimes additional flush on empty channel)")
 		assert.Equal(t, 1, appender.SyncCallCounter, "expected one sync at exit")
 	}()
 	defer close()
 
-	w.WriteEntry(Entry{LoggerID: 42, Level: LevelInfo})
+	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 }
 
 func TestChannelWriterFlushOnEmptyChannel(t *testing.T) {
@@ -74,13 +75,13 @@ func TestChannelWriterFlushOnEmptyChannel(t *testing.T) {
 	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
 	defer func() {
 		assert.Len(t, appender.Entries, 1)
-		assert.EqualValues(t, 42, appender.Entries[0].LoggerID)
+		assert.Equal(t, LevelInfo, appender.Entries[0].Level)
 		assert.True(t, appender.FlushCallCounter > 1 && appender.FlushCallCounter < 4, "expected one flush at exit, one on message add and additional flush on empty channel")
 		assert.Equal(t, 1, appender.SyncCallCounter, "expected one sync at exit")
 	}()
 	defer close()
 
-	w.WriteEntry(Entry{LoggerID: 42, Level: LevelInfo})
+	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 	runtime.Gosched()
 	time.Sleep(time.Second)
 }
@@ -101,7 +102,7 @@ func TestChannelWriterTestAppendError(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(Entry{LoggerID: 42, Level: LevelInfo})
+	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 }
 
 func TestChannelWriterTestFlushError(t *testing.T) {
@@ -113,7 +114,7 @@ func TestChannelWriterTestFlushError(t *testing.T) {
 	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
 	defer func() {
 		assert.Len(t, appender.Entries, 1)
-		assert.EqualValues(t, 42, appender.Entries[0].LoggerID)
+		assert.Equal(t, LevelInfo, appender.Entries[0].Level)
 		assert.Equal(t, 0, appender.FlushCallCounter, "expected no flushes because of error")
 		assert.Equal(t, 1, appender.SyncCallCounter, "expected one sync at exit")
 
@@ -124,7 +125,7 @@ func TestChannelWriterTestFlushError(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(Entry{LoggerID: 42, Level: LevelInfo})
+	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 }
 
 func TestChannelWriterTestSyncError(t *testing.T) {
@@ -136,7 +137,7 @@ func TestChannelWriterTestSyncError(t *testing.T) {
 	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
 	defer func() {
 		assert.Len(t, appender.Entries, 1)
-		assert.EqualValues(t, 42, appender.Entries[0].LoggerID)
+		assert.Equal(t, LevelInfo, appender.Entries[0].Level)
 		assert.Equal(t, 1, appender.FlushCallCounter, "expected one flush at exit")
 		assert.Equal(t, 0, appender.SyncCallCounter, "expected no syncs because of error")
 
@@ -147,7 +148,7 @@ func TestChannelWriterTestSyncError(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(Entry{LoggerID: 42, Level: LevelInfo})
+	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 }
 
 func TestChannelWriterTestAppendErrorAndErrorAppenderError(t *testing.T) {
@@ -163,7 +164,7 @@ func TestChannelWriterTestAppendErrorAndErrorAppenderError(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(Entry{LoggerID: 42, Level: LevelInfo})
+	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 }
 
 func TestChannelWriterSyncOnErrorWhenEnabled(t *testing.T) {
@@ -173,11 +174,11 @@ func TestChannelWriterSyncOnErrorWhenEnabled(t *testing.T) {
 	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender, EnableSyncOnError: true})
 	defer func() {
 		assert.NotEmpty(t, appender.Entries)
-		assert.EqualValues(t, 42, appender.Entries[0].LoggerID)
+		assert.Equal(t, LevelError, appender.Entries[0].Level)
 		assert.True(t, appender.FlushCallCounter > 1 && appender.FlushCallCounter < 4, "expected one flush at exit, one on message add (and sometimes additional flush on empty channel)")
 		assert.Equal(t, 2, appender.SyncCallCounter, "expected one sync at exit and one sync on message add")
 	}()
 	defer close()
 
-	w.WriteEntry(Entry{LoggerID: 42, Level: LevelError})
+	w.WriteEntry(context.Background(), Entry{Level: LevelError})
 }

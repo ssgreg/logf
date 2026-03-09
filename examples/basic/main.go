@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"runtime"
 
 	"github.com/ssgreg/logf/v2"
@@ -13,5 +14,5 @@ func main() {
 
 	logger := logf.NewLogger(logf.LevelInfo, writer)
 
-	logger.Info("got cpu info", logf.Int("count", runtime.NumCPU()))
+	logger.Info(context.Background(), "got cpu info", logf.Int("count", runtime.NumCPU()))
 }

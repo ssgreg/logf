@@ -6,51 +6,43 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEntryCallerFileWithPackage(t *testing.T) {
+func TestFileWithPackage(t *testing.T) {
 	cases := []struct {
-		caller EntryCaller
+		file   string
 		golden string
 	}{
-		{
-			caller: EntryCaller{0, "/a/b/c/d.go", 66, true},
-			golden: "c/d.go",
-		},
-		{
-			caller: EntryCaller{0, "c/d.go", 66, true},
-			golden: "c/d.go",
-		},
-		{
-			caller: EntryCaller{0, "d.go", 66, true},
-			golden: "d.go",
-		},
+		{"/a/b/c/d.go", "c/d.go"},
+		{"c/d.go", "c/d.go"},
+		{"d.go", "d.go"},
 	}
 
 	for _, c := range cases {
-		assert.Equal(t, c.golden, c.caller.FileWithPackage())
+		assert.Equal(t, c.golden, fileWithPackage(c.file))
 	}
 }
 
-func TestEntryCaller(t *testing.T) {
-	caller := NewEntryCaller(0)
+func TestCallerPC(t *testing.T) {
+	pc := CallerPC(0)
+	assert.NotZero(t, pc)
 
-	assert.True(t, caller.Specified)
-	assert.True(t, caller.Line > 0 && caller.Line < 1000)
-	assert.Equal(t, "logf/caller_test.go", caller.FileWithPackage())
-	assert.Contains(t, caller.File, "/logf/caller_test.go")
+	file, line := callerFrame(pc)
+	assert.True(t, line > 0 && line < 1000)
+	assert.Equal(t, "logf/caller_test.go", fileWithPackage(file))
+	assert.Contains(t, file, "/logf/caller_test.go")
 }
 
 func TestShortCallerEncoder(t *testing.T) {
 	enc := testTypeEncoder{}
-	caller := EntryCaller{0, "/a/b/c/d.go", 66, true}
-	ShortCallerEncoder(caller, &enc)
+	pc := CallerPC(0)
+	ShortCallerEncoder(pc, &enc)
 
-	assert.EqualValues(t, "c/d.go:66", enc.result)
+	assert.Contains(t, enc.result, "logf/caller_test.go:")
 }
 
 func TestFullCallerEncoder(t *testing.T) {
 	enc := testTypeEncoder{}
-	caller := EntryCaller{0, "/a/b/c/d.go", 66, true}
-	FullCallerEncoder(caller, &enc)
+	pc := CallerPC(0)
+	FullCallerEncoder(pc, &enc)
 
-	assert.EqualValues(t, "/a/b/c/d.go:66", enc.result)
+	assert.Contains(t, enc.result, "/logf/caller_test.go:")
 }

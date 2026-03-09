@@ -149,24 +149,16 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 	}
 
 	// Caller.
-	if !f.DisableFieldCaller && e.Caller.Specified {
+	if !f.DisableFieldCaller && e.CallerPC != 0 {
 		f.addKey(f.FieldKeyCaller)
-		f.EncodeCaller(e.Caller, f)
+		f.EncodeCaller(e.CallerPC, f)
 	}
 
-	// Logger's fields.
-	if bytes, ok := f.cache.Get(e.LoggerID); ok {
-		buf.AppendBytes(bytes)
-	} else {
-		le := buf.Len()
-		for _, field := range e.DerivedFields {
-			field.Accept(f)
-		}
+	// Context fields (request-scoped, cached).
+	f.encodeBagCached(buf, e.Bag)
 
-		bf := make([]byte, buf.Len()-le)
-		copy(bf, buf.Data[le:])
-		f.cache.Set(e.LoggerID, bf)
-	}
+	// Logger's fields (service-scoped, cached).
+	f.encodeBagCached(buf, e.LoggerBag)
 
 	// Entry's fields.
 	for _, field := range e.Fields {
@@ -177,6 +169,26 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 	buf.AppendByte('\n')
 
 	return nil
+}
+
+func (f *jsonEncoder) encodeBagCached(buf *Buffer, bag *Bag) {
+	v := bag.Version()
+	if v == 0 {
+		return
+	}
+
+	if bytes, ok := f.cache.Get(v); ok {
+		buf.AppendBytes(bytes)
+	} else {
+		le := buf.Len()
+		for _, field := range bag.Fields() {
+			field.Accept(f)
+		}
+
+		bf := make([]byte, buf.Len()-le)
+		copy(bf, buf.Data[le:])
+		f.cache.Set(v, bf)
+	}
 }
 
 func (f *jsonEncoder) EncodeFieldAny(k string, v interface{}) {
@@ -358,7 +370,7 @@ func (f *jsonEncoder) EncodeTypeUnsafeBytes(v unsafe.Pointer) {
 
 func (f *jsonEncoder) EncodeTypeBool(v bool) {
 	f.appendSeparator()
-	AppendBool(f.buf, v)
+	f.buf.AppendBool(v)
 }
 
 func (f *jsonEncoder) EncodeTypeString(v string) {
@@ -370,52 +382,52 @@ func (f *jsonEncoder) EncodeTypeString(v string) {
 
 func (f *jsonEncoder) EncodeTypeInt64(v int64) {
 	f.appendSeparator()
-	AppendInt(f.buf, v)
+	f.buf.AppendInt(v)
 }
 
 func (f *jsonEncoder) EncodeTypeInt32(v int32) {
 	f.appendSeparator()
-	AppendInt(f.buf, int64(v))
+	f.buf.AppendInt(int64(v))
 }
 
 func (f *jsonEncoder) EncodeTypeInt16(v int16) {
 	f.appendSeparator()
-	AppendInt(f.buf, int64(v))
+	f.buf.AppendInt(int64(v))
 }
 
 func (f *jsonEncoder) EncodeTypeInt8(v int8) {
 	f.appendSeparator()
-	AppendInt(f.buf, int64(v))
+	f.buf.AppendInt(int64(v))
 }
 
 func (f *jsonEncoder) EncodeTypeUint64(v uint64) {
 	f.appendSeparator()
-	AppendUint(f.buf, uint64(v))
+	f.buf.AppendUint(uint64(v))
 }
 
 func (f *jsonEncoder) EncodeTypeUint32(v uint32) {
 	f.appendSeparator()
-	AppendUint(f.buf, uint64(v))
+	f.buf.AppendUint(uint64(v))
 }
 
 func (f *jsonEncoder) EncodeTypeUint16(v uint16) {
 	f.appendSeparator()
-	AppendUint(f.buf, uint64(v))
+	f.buf.AppendUint(uint64(v))
 }
 
 func (f *jsonEncoder) EncodeTypeUint8(v uint8) {
 	f.appendSeparator()
-	AppendUint(f.buf, uint64(v))
+	f.buf.AppendUint(uint64(v))
 }
 
 func (f *jsonEncoder) EncodeTypeFloat64(v float64) {
 	f.appendSeparator()
-	AppendFloat64(f.buf, v)
+	f.buf.AppendFloat64(v)
 }
 
 func (f *jsonEncoder) EncodeTypeFloat32(v float32) {
 	f.appendSeparator()
-	AppendFloat32(f.buf, v)
+	f.buf.AppendFloat32(v)
 }
 
 func (f *jsonEncoder) EncodeTypeDuration(v time.Duration) {
