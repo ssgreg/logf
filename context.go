@@ -7,13 +7,12 @@ func NewContext(parent context.Context, logger *Logger) context.Context {
 	return context.WithValue(parent, contextKeyLogger{}, logger)
 }
 
-// FromContext returns the Logger associated with this context or nil if
-// no value is associated. Successive calls to FromContext returns the
-// same result.
+// FromContext returns the Logger associated with this context or
+// DisabledLogger() if no value is associated.
 func FromContext(ctx context.Context) *Logger {
 	value := ctx.Value(contextKeyLogger{})
 	if value == nil {
-		return nil
+		return DisabledLogger()
 	}
 
 	return value.(*Logger)

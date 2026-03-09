@@ -14,19 +14,21 @@ var disableOthers = true
 func BenchmarkDisabledPlainText(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger, _ := newLogger(logf.LevelError)
+		ctx := context.Background()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logger.Info(getMessage(0))
+			logger.Info(ctx, getMessage(0))
 		}
 	})
 	b.Run("logf.check", func(b *testing.B) {
 		logger, _ := newLogger(logf.LevelError)
+		ctx := context.Background()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logger.AtLevel(logf.LevelInfo, func(log logf.LogFunc) {
-				log(getMessage(0))
+			logger.AtLevel(ctx, logf.LevelInfo, func(log logf.LogFunc) {
+				log(ctx, getMessage(0))
 			})
 		}
 	})
@@ -78,17 +80,19 @@ func BenchmarkDisabledPlainText(b *testing.B) {
 func BenchmarkDisabledPlainTextWithAccumulatedFields(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger := logf.NewDisabledLogger().With(fakeFields()...)
+		ctx := context.Background()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logger.Info(getMessage(0))
+			logger.Info(ctx, getMessage(0))
 		}
 	})
 	b.Run("logf.check", func(b *testing.B) {
 		logger := logf.NewDisabledLogger().With(fakeFields()...)
+		ctx := context.Background()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logger.AtLevel(logf.LevelInfo, func(log logf.LogFunc) {
-				log(getMessage(0))
+			logger.AtLevel(ctx, logf.LevelInfo, func(log logf.LogFunc) {
+				log(ctx, getMessage(0))
 			})
 		}
 	})
@@ -140,17 +144,19 @@ func BenchmarkDisabledPlainTextWithAccumulatedFields(b *testing.B) {
 func BenchmarkDisabledTextWithFields(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger := logf.NewDisabledLogger()
+		ctx := context.Background()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logger.Info(getMessage(0), fakeFields()...)
+			logger.Info(ctx, getMessage(0), fakeFields()...)
 		}
 	})
 	b.Run("logf.check", func(b *testing.B) {
 		logger := logf.NewDisabledLogger()
+		ctx := context.Background()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logger.AtLevel(logf.LevelInfo, func(log logf.LogFunc) {
-				logger.Info(getMessage(0), fakeFields()...)
+			logger.AtLevel(ctx, logf.LevelInfo, func(log logf.LogFunc) {
+				logger.Info(ctx, getMessage(0), fakeFields()...)
 			})
 		}
 	})
@@ -218,8 +224,8 @@ func BenchmarkAccumulateFields(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			l := logfc.MustWith(ctx, fakeFields()...)
-			_ = l
+			ctx = logfc.With(ctx, fakeFields()...)
+			_ = ctx
 		}
 	})
 	if disableOthers == true {
@@ -281,11 +287,12 @@ func BenchmarkPlainTextWithCaller(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger, close := newLogger(logf.LevelDebug)
 		defer close()
-		logger = logger.WithCaller()
+		logger = logger.WithCaller(true)
+		ctx := context.Background()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logger.Info(getMessage(0))
+			logger.Info(ctx, getMessage(0))
 		}
 	})
 	if disableOthers == true {
@@ -322,7 +329,7 @@ func BenchmarkAccumulateFieldsWithAccumulatedFields(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_ = logfc.MustWith(ctx, fakeFields()...)
+			ctx = logfc.With(ctx, fakeFields()...)
 		}
 	})
 	if disableOthers == true {
@@ -359,10 +366,11 @@ func BenchmarkPlainText(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger, close := newLogger(logf.LevelDebug)
 		defer close()
+		ctx := context.Background()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logger.Info(getMessage(0))
+			logger.Info(ctx, getMessage(0))
 		}
 	})
 	if disableOthers == true {
@@ -397,10 +405,11 @@ func BenchmarkPlainTextWithAccumulatedFields(b *testing.B) {
 		logger, close := newLogger(logf.LevelDebug)
 		defer close()
 		logger = logger.With(fakeFields()...)
+		ctx := context.Background()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logger.Info(getMessage(0))
+			logger.Info(ctx, getMessage(0))
 		}
 	})
 	b.Run("logfc", func(b *testing.B) {
@@ -412,7 +421,7 @@ func BenchmarkPlainTextWithAccumulatedFields(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logfc.MustInfo(ctx, getMessage(0))
+			logfc.Info(ctx, getMessage(0))
 		}
 	})
 	if disableOthers == true {
@@ -446,10 +455,11 @@ func BenchmarkTextWithFields(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger, close := newLogger(logf.LevelDebug)
 		defer close()
+		ctx := context.Background()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			logger.Info(getMessage(0), fakeFields()...)
+			logger.Info(ctx, getMessage(0), fakeFields()...)
 		}
 	})
 	if disableOthers == true {

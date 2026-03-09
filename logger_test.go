@@ -1,6 +1,7 @@
 package logf
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,49 +9,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var ctx = context.Background()
+
 func TestLoggerNew(t *testing.T) {
 	w := &testEntryWriter{}
 	logger := NewLogger(LevelError, w)
 
 	assert.Equal(t, 0, logger.callerSkip)
-	assert.Equal(t, false, logger.addCaller)
-	assert.True(t, logger.id > 0)
-	assert.Empty(t, logger.fields)
+	assert.Equal(t, true, logger.addCaller)
+	assert.Nil(t, logger.bag)
 	assert.Empty(t, logger.name)
 	assert.Equal(t, w, logger.w)
 }
 
-func TestLoggerCallerNotSpecifiedByDefault(t *testing.T) {
+func TestLoggerCallerSpecifiedByDefault(t *testing.T) {
 	w := &testEntryWriter{}
 	logger := NewLogger(LevelError, w)
 
-	logger.Error("")
-	assert.False(t, w.Entry.Caller.Specified)
+	logger.Error(ctx, "")
+	assert.NotZero(t, w.Entry.CallerPC)
+	file, _ := callerFrame(w.Entry.CallerPC)
+	assert.Equal(t, "logf/logger_test.go", fileWithPackage(file))
 }
 
-func TestLoggerCallerSpecified(t *testing.T) {
+func TestLoggerCallerDisabled(t *testing.T) {
 	w := &testEntryWriter{}
-	logger := NewLogger(LevelError, w).WithCaller()
+	logger := NewLogger(LevelError, w).WithCaller(false)
 
-	logger.Error("")
-	assert.True(t, w.Entry.Caller.Specified)
-	assert.Equal(t, "logf/logger_test.go", w.Entry.Caller.FileWithPackage())
+	logger.Error(ctx, "")
+	assert.Zero(t, w.Entry.CallerPC)
 }
 
 func TestLoggerCallerSpecifiedWithSkip(t *testing.T) {
 	w := &testEntryWriter{}
-	logger := NewLogger(LevelError, w).WithCaller().WithCallerSkip(1)
+	logger := NewLogger(LevelError, w).WithCaller(true).WithCallerSkip(1)
 
-	logger.Error("")
-	assert.True(t, w.Entry.Caller.Specified)
-	assert.Equal(t, "testing/testing.go", w.Entry.Caller.FileWithPackage())
+	logger.Error(ctx, "")
+	assert.NotZero(t, w.Entry.CallerPC)
+	file, _ := callerFrame(w.Entry.CallerPC)
+	assert.Equal(t, "testing/testing.go", fileWithPackage(file))
 }
 
 func TestLoggerNoNameByDefault(t *testing.T) {
 	w := &testEntryWriter{}
 	logger := NewLogger(LevelError, w)
 
-	logger.Error("")
+	logger.Error(ctx, "")
 	assert.Empty(t, w.Entry.LoggerName)
 }
 
@@ -58,7 +62,7 @@ func TestLoggerEmptyName(t *testing.T) {
 	w := &testEntryWriter{}
 	logger := NewLogger(LevelError, w).WithName("")
 
-	logger.Error("")
+	logger.Error(ctx, "")
 	assert.Empty(t, w.Entry.LoggerName)
 }
 
@@ -67,12 +71,12 @@ func TestLoggerName(t *testing.T) {
 
 	// Set a name for the logger.
 	logger := NewLogger(LevelError, w).WithName("1")
-	logger.Error("")
+	logger.Error(ctx, "")
 	assert.Equal(t, "1", w.Entry.LoggerName)
 
 	// Set a nested name for the logger.
 	logger = logger.WithName("2")
-	logger.Error("")
+	logger.Error(ctx, "")
 	assert.Equal(t, "1.2", w.Entry.LoggerName)
 }
 
@@ -82,10 +86,10 @@ func TestLoggerWithLevel(t *testing.T) {
 	// Set a name for the logger.
 	logger := NewLogger(LevelInfo, w).WithLevel(LevelError)
 
-	logger.Info("")
+	logger.Info(ctx, "")
 	assert.Nil(t, w.Entry)
 
-	logger.Error("")
+	logger.Error(ctx, "")
 	assert.NotNil(t, w.Entry)
 }
 
@@ -95,17 +99,17 @@ func TestLoggerAtLevel(t *testing.T) {
 
 	// Expected the callback should be called with the same severity level.
 	called := false
-	logger.AtLevel(LevelError, func(log LogFunc) {
+	logger.AtLevel(ctx, LevelError, func(log LogFunc) {
 		called = true
 		assert.NotEmpty(t, log)
-		log("at-level")
+		log(ctx, "at-level")
 	})
 	assert.Equal(t, "at-level", w.Entry.Text)
 	assert.True(t, called)
 
 	// Expected the callback should NOT be called with DEBUG severity level.
 	called = false
-	logger.AtLevel(LevelDebug, func(log LogFunc) {
+	logger.AtLevel(ctx, LevelDebug, func(log LogFunc) {
 		called = true
 	})
 	assert.False(t, called)
@@ -115,8 +119,8 @@ func TestLoggerNoFieldsByDefault(t *testing.T) {
 	w := &testEntryWriter{}
 
 	logger := NewLogger(LevelError, w)
-	logger.Error("")
-	assert.Empty(t, w.Entry.DerivedFields)
+	logger.Error(ctx, "")
+	assert.Nil(t, w.Entry.LoggerBag)
 }
 
 func TestLoggerFields(t *testing.T) {
@@ -124,18 +128,18 @@ func TestLoggerFields(t *testing.T) {
 
 	// Add one Field.
 	logger := NewLogger(LevelError, w).With(String("first", "v"), String("second", "v"))
-	logger.Error("")
-	assert.Equal(t, 2, len(w.Entry.DerivedFields))
+	logger.Error(ctx, "")
+	assert.Equal(t, 2, len(w.Entry.LoggerBag.Fields()))
 
 	// Add second Field.
 	logger = logger.With(String("third", "v"))
-	logger.Error("")
-	assert.Equal(t, 3, len(w.Entry.DerivedFields))
+	logger.Error(ctx, "")
+	assert.Equal(t, 3, len(w.Entry.LoggerBag.Fields()))
 
 	// Check order. First field should go first.
-	assert.Equal(t, "first", w.Entry.DerivedFields[0].Key)
-	assert.Equal(t, "second", w.Entry.DerivedFields[1].Key)
-	assert.Equal(t, "third", w.Entry.DerivedFields[2].Key)
+	assert.Equal(t, "first", w.Entry.LoggerBag.Fields()[0].Key)
+	assert.Equal(t, "second", w.Entry.LoggerBag.Fields()[1].Key)
+	assert.Equal(t, "third", w.Entry.LoggerBag.Fields()[2].Key)
 }
 
 func TestLoggerWithFieldsCallSnapshotter(t *testing.T) {
@@ -146,12 +150,17 @@ func TestLoggerWithFieldsCallSnapshotter(t *testing.T) {
 	assert.True(t, ts.Called)
 }
 
-func TestLoggerID(t *testing.T) {
+func TestLoggerBag(t *testing.T) {
 	w := &testEntryWriter{}
 	logger := NewLogger(LevelError, w)
 
-	logger.Error("")
-	assert.Equal(t, logger.id, w.Entry.LoggerID)
+	logger.Error(ctx, "")
+	assert.Nil(t, w.Entry.LoggerBag)
+
+	logger = logger.With(String("k", "v"))
+	logger.Error(ctx, "")
+	assert.NotNil(t, w.Entry.LoggerBag)
+	assert.Equal(t, logger.bag, w.Entry.LoggerBag)
 }
 
 func TestLoggerLeveledLog(t *testing.T) {
@@ -160,7 +169,7 @@ func TestLoggerLeveledLog(t *testing.T) {
 
 	cases := []struct {
 		Level Level
-		Fn    func(string, ...Field)
+		Fn    func(context.Context, string, ...Field)
 	}{
 		{LevelError, logger.Error},
 		{LevelWarn, logger.Warn},
@@ -171,7 +180,7 @@ func TestLoggerLeveledLog(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Level.String(), func(t *testing.T) {
 			ts := testSnapshotter{}
-			c.Fn(c.Level.String(), Any("snapshotter", &ts))
+			c.Fn(ctx, c.Level.String(), Any("snapshotter", &ts))
 
 			assert.Equal(t, c.Level.String(), w.Entry.Text)
 			assert.Equal(t, 1, len(w.Entry.Fields))
@@ -186,46 +195,45 @@ func TestLoggerChecker(t *testing.T) {
 	w := &testEntryWriter{}
 	logger := NewLogger(testLevelCheckerReturningFalse{}, w)
 
-	logger.Error("")
+	logger.Error(ctx, "")
 	assert.Nil(t, w.Entry)
 
-	logger.Warn("")
+	logger.Warn(ctx, "")
 	assert.Nil(t, w.Entry)
 
-	logger.Info("")
+	logger.Info(ctx, "")
 	assert.Nil(t, w.Entry)
 
-	logger.Debug("")
+	logger.Debug(ctx, "")
 	assert.Nil(t, w.Entry)
 }
 
 func TestLoggerDisabled(t *testing.T) {
 	logger := DisabledLogger()
 	assert.Equal(t, 0, logger.callerSkip)
-	assert.Equal(t, false, logger.addCaller)
-	assert.True(t, logger.id > 0)
-	assert.Empty(t, logger.fields)
+	assert.Equal(t, true, logger.addCaller)
+	assert.Nil(t, logger.bag)
 	assert.Empty(t, logger.name)
 	assert.Empty(t, logger.w)
 
 	loggerWithCallerSkip := logger.WithCallerSkip(1)
 	assert.Equal(t, 1, loggerWithCallerSkip.callerSkip)
 
-	loggerWithCaller := logger.WithCaller()
+	loggerWithCaller := logger.WithCaller(true)
 	assert.Equal(t, true, loggerWithCaller.addCaller)
 
 	loggerWithName := logger.WithName("name")
 	assert.Equal(t, "name", loggerWithName.name)
 
 	loggerWithFields := logger.With(String("k", "v"))
-	assert.NotEmpty(t, loggerWithFields.fields)
+	assert.NotNil(t, loggerWithFields.bag)
 
 	// Check function not panic.
-	logger.Debug("")
-	logger.Info("")
-	logger.Warn("")
-	logger.Error("")
-	logger.AtLevel(LevelError, func(LogFunc) { require.FailNow(t, "can't be here") })
+	logger.Debug(ctx, "")
+	logger.Info(ctx, "")
+	logger.Warn(ctx, "")
+	logger.Error(ctx, "")
+	logger.AtLevel(ctx, LevelError, func(LogFunc) { require.FailNow(t, "can't be here") })
 }
 
 func TestUnbufferedWriter(t *testing.T) {
@@ -234,12 +242,12 @@ func TestUnbufferedWriter(t *testing.T) {
 	logger := NewLogger(LevelDebug, w)
 
 	// Check function not panic.
-	logger.Debug("debug")
-	logger.Info("info")
-	logger.Warn("warn")
-	logger.Error("error")
-	logger.AtLevel(LevelError, func(log LogFunc) {
-		log("at-level-error")
+	logger.Debug(ctx, "debug")
+	logger.Info(ctx, "info")
+	logger.Warn(ctx, "warn")
+	logger.Error(ctx, "error")
+	logger.AtLevel(ctx, LevelError, func(log LogFunc) {
+		log(ctx, "at-level-error")
 	})
 
 	require.Equal(t, 5, len(a.Entries))

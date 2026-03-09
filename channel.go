@@ -1,6 +1,7 @@
 package logf
 
 import (
+	"context"
 	"os"
 	"runtime"
 	"sync"
@@ -76,7 +77,7 @@ type channelWriter struct {
 	closed bool
 }
 
-func (l *channelWriter) WriteEntry(e Entry) {
+func (l *channelWriter) WriteEntry(_ context.Context, e Entry) {
 	l.ch <- e
 }
 
@@ -171,11 +172,10 @@ func skipError(_ error) {
 
 func newErrorEntry(text string, fs ...Field) Entry {
 	return Entry{
-		LoggerID: -1,
-		Level:    LevelError,
-		Time:     time.Now(),
-		Text:     text,
-		Fields:   fs,
+		Level:  LevelError,
+		Time:   time.Now(),
+		Text:   text,
+		Fields: fs,
 	}
 }
 

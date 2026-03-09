@@ -1,13 +1,32 @@
 package benchmarks
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ssgreg/logf/v2"
 	"go.uber.org/zap/zapcore"
 )
+
+type lockedBufWriter struct {
+	mu sync.Mutex
+	bw *bufio.Writer
+}
+
+func (l *lockedBufWriter) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.bw.Write(p)
+}
+
+func (l *lockedBufWriter) Flush() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.bw.Flush()
+}
 
 type user struct {
 	Name      string    `json:"name"`

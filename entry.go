@@ -1,19 +1,19 @@
 package logf
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Entry holds a single log message and fields.
 type Entry struct {
-	// LoggerID specifies a unique logger identifies.
-	LoggerID int32
+	// LoggerBag holds logger-scoped fields (from Logger.With).
+	// Bag.Version() is used as a cache key by encoders.
+	LoggerBag *Bag
 
-	// LoggerName specifies a non-unique name of a logger.
-	// Can be empty.
-	LoggerName string
-
-	// DeriviedFields specifies logger data fields including fields of
-	// logger parents. The earliest fields (parent's fields) go first.
-	DerivedFields []Field
+	// Bag holds request-scoped fields (from context via ContextWriter).
+	// Bag.Version() is used as a cache key by encoders.
+	Bag *Bag
 
 	// Fields specifies data fields of a log message.
 	Fields []Field
@@ -24,16 +24,21 @@ type Entry struct {
 	// Time specifies a timestamp of a log message.
 	Time time.Time
 
+	// LoggerName specifies a non-unique name of a logger.
+	// Can be empty.
+	LoggerName string
+
 	// Text specifies a text message of a log message.
 	Text string
 
-	// Caller specifies file:line info about an Entry's caller.
-	Caller EntryCaller
+	// CallerPC is the program counter of the caller.
+	// Zero means caller info is not available.
+	CallerPC uintptr
 }
 
 // EntryWriter is the interface that should do real logging stuff.
 type EntryWriter interface {
-	WriteEntry(Entry)
+	WriteEntry(context.Context, Entry)
 }
 
 // NewUnbufferedEntryWriter returns an implementation of EntryWriter which
@@ -46,6 +51,6 @@ type unbufferedEntryWriter struct {
 	appender Appender
 }
 
-func (w unbufferedEntryWriter) WriteEntry(entry Entry) {
+func (w unbufferedEntryWriter) WriteEntry(_ context.Context, entry Entry) {
 	_ = w.appender.Append(entry)
 }

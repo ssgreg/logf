@@ -1,7 +1,7 @@
 package benchmarks
 
 import (
-	"io/ioutil"
+	"io"
 
 	"github.com/ssgreg/logf/v2"
 )
@@ -26,7 +26,7 @@ func fakeFields() []logf.Field {
 func newLogger(l logf.Level) (*logf.Logger, logf.ChannelWriterCloseFunc) {
 	encoder := logf.NewJSONEncoder.Default()
 	w, close := logf.NewChannelWriter(logf.ChannelWriterConfig{
-		Appender: logf.NewWriteAppender(ioutil.Discard, encoder),
+		Appender: logf.NewWriteAppender(io.Discard, encoder),
 	})
 
 	return logf.NewLogger(logf.NewMutableLevel(l), w), close

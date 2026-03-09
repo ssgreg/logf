@@ -1,6 +1,7 @@
 package logf
 
 import (
+	"context"
 	"fmt"
 	"time"
 	"unsafe"
@@ -49,7 +50,7 @@ type testEntryWriter struct {
 	Entry *Entry
 }
 
-func (w *testEntryWriter) WriteEntry(e Entry) {
+func (w *testEntryWriter) WriteEntry(_ context.Context, e Entry) {
 	w.Entry = &e
 }
 
