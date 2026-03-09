@@ -141,7 +141,7 @@ func BenchmarkSlogParallelPlainText(b *testing.B) {
 // --- slog via logf handler ---
 
 func BenchmarkSlogViaLogfDiscard(b *testing.B) {
-	w, close := logf.NewChannelWriter(logf.ChannelWriterConfig{
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
 		Appender: logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()),
 	})
 	defer close()
@@ -161,7 +161,7 @@ func BenchmarkSlogViaLogfFileIO(b *testing.B) {
 	defer os.Remove(f.Name())
 	defer f.Close()
 
-	w, close := logf.NewChannelWriter(logf.ChannelWriterConfig{
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
 		Appender: logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()),
 	})
 	defer close()
@@ -181,7 +181,7 @@ func BenchmarkSlogViaLogfParallelFileIO(b *testing.B) {
 	defer os.Remove(f.Name())
 	defer f.Close()
 
-	w, close := logf.NewChannelWriter(logf.ChannelWriterConfig{
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
 		Appender: logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()),
 	})
 	defer close()

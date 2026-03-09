@@ -10,10 +10,10 @@ import (
 
 func benchLogger(lvl Level, addCaller bool) (*Logger, ChannelWriterCloseFunc) {
 	enc := NewJSONEncoder.Default()
-	w, close := NewChannelWriter(ChannelWriterConfig{
+	w, close := NewChannelWriter(lvl, ChannelWriterConfig{
 		Appender: NewWriteAppender(io.Discard, enc),
 	})
-	l := NewLogger(NewMutableLevel(lvl), w).WithCaller(addCaller)
+	l := NewLogger(w).WithCaller(addCaller)
 	return l, close
 }
 
@@ -122,12 +122,12 @@ func BenchmarkTextWithFieldsAndCaller(b *testing.B) {
 
 func BenchmarkContextBag(b *testing.B) {
 	enc := NewJSONEncoder.Default()
-	w, close := NewChannelWriter(ChannelWriterConfig{
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
 		Appender: NewWriteAppender(io.Discard, enc),
 	})
 	defer close()
 	cw := NewContextWriter(w)
-	logger := NewLogger(NewMutableLevel(LevelDebug), cw)
+	logger := NewLogger(cw)
 
 	ctx := With(benchCtx, String("request_id", "abc-123"), String("user_id", "u42"))
 
@@ -143,7 +143,7 @@ type traceKeyBench struct{}
 
 func BenchmarkFieldSource(b *testing.B) {
 	enc := NewJSONEncoder.Default()
-	w, close := NewChannelWriter(ChannelWriterConfig{
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
 		Appender: NewWriteAppender(io.Discard, enc),
 	})
 	defer close()
@@ -155,7 +155,7 @@ func BenchmarkFieldSource(b *testing.B) {
 		return nil
 	})
 	cw := NewContextWriter(w, src)
-	logger := NewLogger(NewMutableLevel(LevelDebug), cw)
+	logger := NewLogger(cw)
 
 	ctx := context.WithValue(benchCtx, traceKeyBench{}, "trace-abc")
 
@@ -204,8 +204,8 @@ func BenchmarkLogDepth(b *testing.B) {
 
 func benchSyncLogger(lvl Level, addCaller bool) *Logger {
 	enc := NewJSONEncoder.Default()
-	w := NewUnbufferedEntryWriter(NewWriteAppender(io.Discard, enc))
-	return NewLogger(NewMutableLevel(lvl), w).WithCaller(addCaller)
+	w := NewUnbufferedEntryWriter(lvl, NewWriteAppender(io.Discard, enc))
+	return NewLogger(w).WithCaller(addCaller)
 }
 
 func BenchmarkSyncPlainText(b *testing.B) {
@@ -260,11 +260,11 @@ func BenchmarkParallelFileIO(b *testing.B) {
 	defer f.Close()
 
 	enc := NewJSONEncoder.Default()
-	w, close := NewChannelWriter(ChannelWriterConfig{
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
 		Appender: NewWriteAppender(f, enc),
 	})
 	defer close()
-	logger := NewLogger(NewMutableLevel(LevelDebug), w).WithCaller(false)
+	logger := NewLogger(w).WithCaller(false)
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -283,8 +283,8 @@ func BenchmarkSyncFileIOWithFields(b *testing.B) {
 	defer f.Close()
 
 	enc := NewJSONEncoder.Default()
-	w := NewUnbufferedEntryWriter(NewWriteAppender(f, enc))
-	logger := NewLogger(NewMutableLevel(LevelDebug), w).WithCaller(false).With(benchFields()...)
+	w := NewUnbufferedEntryWriter(LevelDebug, NewWriteAppender(f, enc))
+	logger := NewLogger(w).WithCaller(false).With(benchFields()...)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -301,8 +301,8 @@ func BenchmarkSyncParallelFileIOWithFields(b *testing.B) {
 	defer f.Close()
 
 	enc := NewJSONEncoder.Default()
-	w := &lockedEntryWriter{w: NewUnbufferedEntryWriter(NewWriteAppender(f, enc))}
-	logger := NewLogger(NewMutableLevel(LevelDebug), w).WithCaller(false).With(benchFields()...)
+	w := &lockedEntryWriter{w: NewUnbufferedEntryWriter(LevelDebug, NewWriteAppender(f, enc))}
+	logger := NewLogger(w).WithCaller(false).With(benchFields()...)
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -321,8 +321,8 @@ func BenchmarkSyncFileIO(b *testing.B) {
 	defer f.Close()
 
 	enc := NewJSONEncoder.Default()
-	w := NewUnbufferedEntryWriter(NewWriteAppender(f, enc))
-	logger := NewLogger(NewMutableLevel(LevelDebug), w).WithCaller(false)
+	w := NewUnbufferedEntryWriter(LevelDebug, NewWriteAppender(f, enc))
+	logger := NewLogger(w).WithCaller(false)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -336,10 +336,14 @@ type lockedEntryWriter struct {
 	w  EntryWriter
 }
 
-func (l *lockedEntryWriter) WriteEntry(ctx context.Context, e Entry) {
-	l.mu.Lock()
-	l.w.WriteEntry(ctx, e)
-	l.mu.Unlock()
+func (w *lockedEntryWriter) WriteEntry(ctx context.Context, e Entry) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.w.WriteEntry(ctx, e)
+}
+
+func (w *lockedEntryWriter) Enabled(ctx context.Context, lvl Level) bool {
+	return w.w.Enabled(ctx, lvl)
 }
 
 func BenchmarkSyncParallelFileIO(b *testing.B) {
@@ -351,8 +355,8 @@ func BenchmarkSyncParallelFileIO(b *testing.B) {
 	defer f.Close()
 
 	enc := NewJSONEncoder.Default()
-	w := &lockedEntryWriter{w: NewUnbufferedEntryWriter(NewWriteAppender(f, enc))}
-	logger := NewLogger(NewMutableLevel(LevelDebug), w).WithCaller(false)
+	w := &lockedEntryWriter{w: NewUnbufferedEntryWriter(LevelDebug, NewWriteAppender(f, enc))}
+	logger := NewLogger(w).WithCaller(false)
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -366,12 +370,12 @@ func BenchmarkSyncParallelFileIO(b *testing.B) {
 
 func BenchmarkRealisticPipeline(b *testing.B) {
 	enc := NewJSONEncoder.Default()
-	w, close := NewChannelWriter(ChannelWriterConfig{
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
 		Appender: NewWriteAppender(io.Discard, enc),
 	})
 	defer close()
 	cw := NewContextWriter(w)
-	logger := NewLogger(NewMutableLevel(LevelDebug), cw).WithCaller(true)
+	logger := NewLogger(cw).WithCaller(true)
 
 	ctx := With(benchCtx, String("request_id", "abc-123"))
 	ctx = NewContext(ctx, logger)

@@ -54,6 +54,10 @@ func (w *testEntryWriter) WriteEntry(_ context.Context, e Entry) {
 	w.Entry = &e
 }
 
+func (w *testEntryWriter) Enabled(_ context.Context, _ Level) bool {
+	return true
+}
+
 // testSnapshotter implements Snapshotter allowing to check whether
 // TakeSnapshot was called or not. TakeSnapshot returns new object of
 // this type.
@@ -65,17 +69,6 @@ func (s *testSnapshotter) TakeSnapshot() interface{} {
 	s.Called = true
 
 	return &testSnapshotter{}
-}
-
-// testLevelCheckerReturningFalse implements LevelCheckerGetter that always
-// returns false.
-type testLevelCheckerReturningFalse struct {
-}
-
-func (g testLevelCheckerReturningFalse) LevelChecker() LevelChecker {
-	return func(Level) bool {
-		return false
-	}
 }
 
 // testTypeEncoder implements TypeEncoder storing the last encoding value.

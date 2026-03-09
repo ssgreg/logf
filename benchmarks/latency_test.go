@@ -65,11 +65,11 @@ func TestLatencyDistribution(t *testing.T) {
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		w, cl := logf.NewChannelWriter(logf.ChannelWriterConfig{
+		w, cl := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
 			Appender: logf.NewWriteAppender(ff, logf.NewJSONEncoder.Default()),
 		})
 		defer cl()
-		logger := logf.NewLogger(logf.NewMutableLevel(logf.LevelDebug), w).WithCaller(false)
+		logger := logf.NewLogger(w).WithCaller(false)
 		ctx := context.Background()
 
 		samples := make([]time.Duration, latencySamples)
@@ -89,8 +89,8 @@ func TestLatencyDistribution(t *testing.T) {
 		defer ff.Close()
 
 		enc := logf.NewJSONEncoder.Default()
-		w := logf.NewUnbufferedEntryWriter(logf.NewWriteAppender(ff, enc))
-		logger := logf.NewLogger(logf.NewMutableLevel(logf.LevelDebug), w).WithCaller(false)
+		w := logf.NewUnbufferedEntryWriter(logf.LevelDebug, logf.NewWriteAppender(ff, enc))
+		logger := logf.NewLogger(w).WithCaller(false)
 		ctx := context.Background()
 
 		samples := make([]time.Duration, latencySamples)
@@ -283,11 +283,11 @@ func TestSlowIOLatency(t *testing.T) {
 		defer ff.Close()
 
 		sw := &slowWriter{w: ff, slowPct: 0.02, delay: 1 * time.Millisecond}
-		w, cl := logf.NewChannelWriter(logf.ChannelWriterConfig{
+		w, cl := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
 			Appender: logf.NewWriteAppender(sw, logf.NewJSONEncoder.Default()),
 		})
 		defer cl()
-		logger := logf.NewLogger(logf.NewMutableLevel(logf.LevelDebug), w).WithCaller(false)
+		logger := logf.NewLogger(w).WithCaller(false)
 
 		samples := collectParallelLatency(func() {
 			logger.Info(context.Background(), "request handled")
@@ -420,10 +420,10 @@ func TestGoroutineScalability(t *testing.T) {
 		results := make([]float64, len(goroutineCounts))
 		for gi, numG := range goroutineCounts {
 			ff, _ := os.CreateTemp("", "scale-logf-*.log")
-			w, cl := logf.NewChannelWriter(logf.ChannelWriterConfig{
+			w, cl := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
 				Appender: logf.NewWriteAppender(ff, logf.NewJSONEncoder.Default()),
 			})
-			logger := logf.NewLogger(logf.NewMutableLevel(logf.LevelDebug), w).WithCaller(false)
+			logger := logf.NewLogger(w).WithCaller(false)
 
 			results[gi] = measureThroughput(numG, totalOps, func() {
 				logger.Info(context.Background(), "request handled")

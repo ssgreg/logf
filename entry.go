@@ -39,18 +39,32 @@ type Entry struct {
 // EntryWriter is the interface that should do real logging stuff.
 type EntryWriter interface {
 	WriteEntry(context.Context, Entry)
+	Enabled(context.Context, Level) bool
 }
 
 // NewUnbufferedEntryWriter returns an implementation of EntryWriter which
 // puts entries directly to the appender immediately and synchronously.
-func NewUnbufferedEntryWriter(appender Appender) EntryWriter {
-	return unbufferedEntryWriter{appender}
+func NewUnbufferedEntryWriter(level Level, appender Appender) EntryWriter {
+	return unbufferedEntryWriter{level: level, appender: appender}
 }
 
 type unbufferedEntryWriter struct {
+	level    Level
 	appender Appender
 }
 
 func (w unbufferedEntryWriter) WriteEntry(_ context.Context, entry Entry) {
 	_ = w.appender.Append(entry)
 }
+
+func (w unbufferedEntryWriter) Enabled(_ context.Context, lvl Level) bool {
+	return w.level.Enabled(lvl)
+}
+
+// nopWriter is an EntryWriter that discards everything.
+// Used by NewDisabledLogger.
+type nopWriter struct{}
+
+func (nopWriter) WriteEntry(context.Context, Entry) {}
+
+func (nopWriter) Enabled(context.Context, Level) bool { return false }

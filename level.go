@@ -1,6 +1,7 @@
 package logf
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -20,19 +21,6 @@ const (
 	// LevelDebug allows to log messages with all severity levels.
 	LevelDebug
 )
-
-// Checker is the common way to get LevelChecker. Use it with every custom
-// implementation of Level.
-func (l Level) Checker() LevelChecker {
-	return func(o Level) bool {
-		return l.Enabled(o)
-	}
-}
-
-// LevelChecker implements LevelCheckerGetter.
-func (l Level) LevelChecker() LevelChecker {
-	return l.Checker()
-}
 
 // Enabled returns true if the given level is allowed within the current level.
 func (l Level) Enabled(o Level) bool {
@@ -106,23 +94,6 @@ func LevelFromString(lvl string) (Level, bool) {
 	return LevelError, false
 }
 
-// LevelChecker abstracts level checking process.
-type LevelChecker func(Level) bool
-
-// LevelCheckerGetter allows the implementor to act like a common Level
-// checker for the Logger.
-type LevelCheckerGetter interface {
-	LevelChecker() LevelChecker
-}
-
-// LevelCheckerGetterFunc defines a function that returns LevelChecker.
-type LevelCheckerGetterFunc func() LevelChecker
-
-// LevelChecker implements LevelCheckerGetter interface.
-func (fn LevelCheckerGetterFunc) LevelChecker() LevelChecker {
-	return fn()
-}
-
 // LevelEncoder is the function type to encode Level.
 type LevelEncoder func(Level, TypeEncoder)
 
@@ -149,17 +120,10 @@ type MutableLevel struct {
 	level uint32
 }
 
-// Checker is common way to get LevelChecker. Use it with every custom
-// implementation of Level.
-func (l *MutableLevel) Checker() LevelChecker {
-	return func(o Level) bool {
-		return l.Level().Enabled(o)
-	}
-}
-
-// LevelChecker implements LevelCheckerGetter.
-func (l *MutableLevel) LevelChecker() LevelChecker {
-	return l.Checker()
+// Enabled reports whether the given level is enabled at the current
+// mutable level.
+func (l *MutableLevel) Enabled(_ context.Context, lvl Level) bool {
+	return l.Level().Enabled(lvl)
 }
 
 // Level returns the current logging level.

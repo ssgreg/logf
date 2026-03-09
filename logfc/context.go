@@ -29,12 +29,6 @@ func WithName(ctx context.Context, name string) context.Context {
 	return New(ctx, Get(ctx).WithName(name))
 }
 
-// WithLevel returns a new context with the logger derived from ctx
-// with the given additional level checker.
-func WithLevel(ctx context.Context, level logf.LevelCheckerGetter) context.Context {
-	return New(ctx, Get(ctx).WithLevel(level))
-}
-
 // WithCaller returns a new context with the logger derived from ctx
 // with caller reporting enabled.
 func WithCaller(ctx context.Context) context.Context {

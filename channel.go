@@ -54,8 +54,8 @@ func (c ChannelWriterConfig) WithDefaults() ChannelWriterConfig {
 
 // NewChannelWriter returns a new ChannelWriter with the given config.
 var NewChannelWriter = channelWriterGetter(
-	func(cfg ChannelWriterConfig) (EntryWriter, ChannelWriterCloseFunc) {
-		l := &channelWriter{}
+	func(level Level, cfg ChannelWriterConfig) (EntryWriter, ChannelWriterCloseFunc) {
+		l := &channelWriter{level: level}
 		l.init(cfg.WithDefaults())
 
 		return l, ChannelWriterCloseFunc(
@@ -73,12 +73,17 @@ type channelWriter struct {
 	sync.Mutex
 	sync.WaitGroup
 
+	level  Level
 	ch     chan Entry
 	closed bool
 }
 
 func (l *channelWriter) WriteEntry(_ context.Context, e Entry) {
 	l.ch <- e
+}
+
+func (l *channelWriter) Enabled(_ context.Context, lvl Level) bool {
+	return l.level.Enabled(lvl)
 }
 
 func (l *channelWriter) init(cfg ChannelWriterConfig) {
@@ -179,8 +184,8 @@ func newErrorEntry(text string, fs ...Field) Entry {
 	}
 }
 
-type channelWriterGetter func(cfg ChannelWriterConfig) (EntryWriter, ChannelWriterCloseFunc)
+type channelWriterGetter func(level Level, cfg ChannelWriterConfig) (EntryWriter, ChannelWriterCloseFunc)
 
 func (c channelWriterGetter) Default() (EntryWriter, ChannelWriterCloseFunc) {
-	return c(ChannelWriterConfig{})
+	return c(LevelDebug, ChannelWriterConfig{})
 }

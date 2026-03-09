@@ -41,6 +41,10 @@ func NewContextWriter(next EntryWriter, sources ...FieldSource) *ContextWriter {
 
 // WriteEntry extracts the Bag from ctx, collects fields from external sources,
 // and delegates to the next EntryWriter.
+func (w *ContextWriter) Enabled(ctx context.Context, lvl Level) bool {
+	return w.next.Enabled(ctx, lvl)
+}
+
 func (w *ContextWriter) WriteEntry(ctx context.Context, e Entry) {
 	if bag := BagFromContext(ctx); bag != nil {
 		e.Bag = bag

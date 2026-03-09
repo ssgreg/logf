@@ -25,9 +25,9 @@ func fakeFields() []logf.Field {
 
 func newLogger(l logf.Level) (*logf.Logger, logf.ChannelWriterCloseFunc) {
 	encoder := logf.NewJSONEncoder.Default()
-	w, close := logf.NewChannelWriter(logf.ChannelWriterConfig{
+	w, close := logf.NewChannelWriter(l, logf.ChannelWriterConfig{
 		Appender: logf.NewWriteAppender(io.Discard, encoder),
 	})
 
-	return logf.NewLogger(logf.NewMutableLevel(l), w), close
+	return logf.NewLogger(w), close
 }

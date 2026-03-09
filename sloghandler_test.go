@@ -32,6 +32,10 @@ func (s *entrySink) WriteEntry(_ context.Context, e Entry) {
 	s.entries = append(s.entries, e)
 }
 
+func (s *entrySink) Enabled(_ context.Context, _ Level) bool {
+	return true
+}
+
 func (s *entrySink) last() Entry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
