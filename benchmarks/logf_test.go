@@ -9,6 +9,16 @@ import (
 	"github.com/ssgreg/logf/v2"
 )
 
+func logfFields() []logf.Field {
+	return []logf.Field{
+		logf.Int("int", 42),
+		logf.String("string", "hello"),
+		logf.String("path", "/api/v1/users"),
+		logf.Int64("latency_us", 1234),
+		logf.Bool("ok", true),
+	}
+}
+
 func fakeFields() []logf.Field {
 	return []logf.Field{
 		logf.Int("int", tenInts[0]),
@@ -42,6 +52,28 @@ func newSyncLogger(l logf.Level) *logf.Logger {
 }
 
 var benchCtx = context.Background()
+
+// --- Disabled path ---
+
+func BenchmarkLogfDisabledLog(b *testing.B) {
+	logger := logf.NewDisabledLogger()
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(ctx, "request handled")
+	}
+}
+
+func BenchmarkLogfDisabledLogWithFields(b *testing.B) {
+	logger := logf.NewDisabledLogger()
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(ctx, "request handled", logfFields()...)
+	}
+}
 
 // --- File I/O (async via ChannelWriter) ---
 

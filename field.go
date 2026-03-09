@@ -15,72 +15,72 @@ func Bool(k string, v bool) Field {
 		tmp = 1
 	}
 
-	return Field{Key: k, Type: FieldTypeBool, Int: tmp}
+	return Field{Key: k, Type: FieldTypeBool, Val: tmp}
 }
 
 // Int returns a new Field with the given key and int.
 func Int(k string, v int) Field {
-	return Field{Key: k, Type: FieldTypeInt64, Int: int64(v)}
+	return Field{Key: k, Type: FieldTypeInt64, Val: int64(v)}
 }
 
 // Int64 returns a new Field with the given key and int64.
 func Int64(k string, v int64) Field {
-	return Field{Key: k, Type: FieldTypeInt64, Int: v}
+	return Field{Key: k, Type: FieldTypeInt64, Val: v}
 }
 
 // Int32 returns a new Field with the given key and int32.
 func Int32(k string, v int32) Field {
-	return Field{Key: k, Type: FieldTypeInt32, Int: int64(v)}
+	return Field{Key: k, Type: FieldTypeInt32, Val: int64(v)}
 }
 
 // Int16 returns a new Field with the given key and int16.
 func Int16(k string, v int16) Field {
-	return Field{Key: k, Type: FieldTypeInt16, Int: int64(v)}
+	return Field{Key: k, Type: FieldTypeInt16, Val: int64(v)}
 }
 
 // Int8 returns a new Field with the given key and int.8
 func Int8(k string, v int8) Field {
-	return Field{Key: k, Type: FieldTypeInt8, Int: int64(v)}
+	return Field{Key: k, Type: FieldTypeInt8, Val: int64(v)}
 }
 
 // Uint returns a new Field with the given key and uint.
 func Uint(k string, v uint) Field {
-	return Field{Key: k, Type: FieldTypeUint64, Int: int64(v)}
+	return Field{Key: k, Type: FieldTypeUint64, Val: int64(v)}
 }
 
 // Uint64 returns a new Field with the given key and uint64.
 func Uint64(k string, v uint64) Field {
-	return Field{Key: k, Type: FieldTypeUint64, Int: int64(v)}
+	return Field{Key: k, Type: FieldTypeUint64, Val: int64(v)}
 }
 
 // Uint32 returns a new Field with the given key and uint32.
 func Uint32(k string, v uint32) Field {
-	return Field{Key: k, Type: FieldTypeUint32, Int: int64(v)}
+	return Field{Key: k, Type: FieldTypeUint32, Val: int64(v)}
 }
 
 // Uint16 returns a new Field with the given key and uint16.
 func Uint16(k string, v uint16) Field {
-	return Field{Key: k, Type: FieldTypeUint16, Int: int64(v)}
+	return Field{Key: k, Type: FieldTypeUint16, Val: int64(v)}
 }
 
 // Uint8 returns a new Field with the given key and uint8.
 func Uint8(k string, v uint8) Field {
-	return Field{Key: k, Type: FieldTypeUint8, Int: int64(v)}
+	return Field{Key: k, Type: FieldTypeUint8, Val: int64(v)}
 }
 
 // Float64 returns a new Field with the given key and float64.
 func Float64(k string, v float64) Field {
-	return Field{Key: k, Type: FieldTypeFloat64, Int: int64(math.Float64bits(v))}
+	return Field{Key: k, Type: FieldTypeFloat64, Val: int64(math.Float64bits(v))}
 }
 
 // Float32 returns a new Field with the given key and float32.
 func Float32(k string, v float32) Field {
-	return Field{Key: k, Type: FieldTypeFloat32, Int: int64(math.Float32bits(v))}
+	return Field{Key: k, Type: FieldTypeFloat32, Val: int64(math.Float32bits(v))}
 }
 
 // Duration returns a new Field with the given key and time.Duration.
 func Duration(k string, v time.Duration) Field {
-	return Field{Key: k, Type: FieldTypeDuration, Int: int64(v)}
+	return Field{Key: k, Type: FieldTypeDuration, Val: int64(v)}
 }
 
 // Bytes returns a new Field with the given key and slice of bytes.
@@ -93,12 +93,12 @@ func Bytes(k string, v []byte) Field {
 
 // String returns a new Field with the given key and string.
 func String(k string, v string) Field {
-	return Field{Key: k, Type: FieldTypeBytesToString, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToString, Ptr: unsafe.Pointer(unsafe.StringData(v)), Val: int64(len(v))}
 }
 
 // Strings returns a new Field with the given key and slice of strings.
 func Strings(k string, v []string) Field {
-	return Field{Key: k, Type: FieldTypeBytesToStrings, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToStrings, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // Bools returns a new Field with the given key and slice of bools.
@@ -218,7 +218,7 @@ func Durations(k string, v []time.Duration) Field {
 // Call ConstBytes if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstBytes(k string, v []byte) Field {
-	return Field{Key: k, Type: FieldTypeBytes, Bytes: v}
+	return Field{Key: k, Type: FieldTypeBytes, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstBools returns a new Field with the given key and slice of bools.
@@ -226,7 +226,7 @@ func ConstBytes(k string, v []byte) Field {
 // Call ConstBools if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstBools(k string, v []bool) Field {
-	return Field{Key: k, Type: FieldTypeBytesToBools, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToBools, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstInts returns a new Field with the given key and slice of ints.
@@ -234,7 +234,7 @@ func ConstBools(k string, v []bool) Field {
 // Call ConstInts if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstInts(k string, v []int) Field {
-	return Field{Key: k, Type: FieldTypeBytesToInts64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToInts64, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstInts64 returns a new Field with the given key and slice of 64-bit ints.
@@ -242,7 +242,7 @@ func ConstInts(k string, v []int) Field {
 // Call ConstInts64 if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstInts64(k string, v []int64) Field {
-	return Field{Key: k, Type: FieldTypeBytesToInts64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToInts64, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstInts32 returns a new Field with the given key and slice of 32-bit ints.
@@ -250,7 +250,7 @@ func ConstInts64(k string, v []int64) Field {
 // Call ConstInts32 if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstInts32(k string, v []int32) Field {
-	return Field{Key: k, Type: FieldTypeBytesToInts32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToInts32, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstInts16 returns a new Field with the given key and slice of 16-bit ints.
@@ -258,7 +258,7 @@ func ConstInts32(k string, v []int32) Field {
 // Call ConstInts16 if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstInts16(k string, v []int16) Field {
-	return Field{Key: k, Type: FieldTypeBytesToInts16, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToInts16, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstInts8 returns a new Field with the given key and slice of 8-bit ints.
@@ -266,7 +266,7 @@ func ConstInts16(k string, v []int16) Field {
 // Call ConstInts8 if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstInts8(k string, v []int8) Field {
-	return Field{Key: k, Type: FieldTypeBytesToInts8, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToInts8, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstUints returns a new Field with the given key and slice of uints.
@@ -274,7 +274,7 @@ func ConstInts8(k string, v []int8) Field {
 // Call ConstUints if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstUints(k string, v []uint) Field {
-	return Field{Key: k, Type: FieldTypeBytesToUints64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToUints64, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstUints64 returns a new Field with the given key and slice of 64-bit uints.
@@ -282,7 +282,7 @@ func ConstUints(k string, v []uint) Field {
 // Call ConstUints64 if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstUints64(k string, v []uint64) Field {
-	return Field{Key: k, Type: FieldTypeBytesToUints64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToUints64, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstUints32 returns a new Field with the given key and slice of 32-bit uints.
@@ -290,7 +290,7 @@ func ConstUints64(k string, v []uint64) Field {
 // Call ConstUints32 if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstUints32(k string, v []uint32) Field {
-	return Field{Key: k, Type: FieldTypeBytesToUints32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToUints32, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstUints16 returns a new Field with the given key and slice of 16-bit uints.
@@ -298,7 +298,7 @@ func ConstUints32(k string, v []uint32) Field {
 // Call ConstUints16 if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstUints16(k string, v []uint16) Field {
-	return Field{Key: k, Type: FieldTypeBytesToUints16, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToUints16, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstUints8 returns a new Field with the given key and slice of 8-bit uints.
@@ -306,7 +306,7 @@ func ConstUints16(k string, v []uint16) Field {
 // Call ConstUints8 if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstUints8(k string, v []uint8) Field {
-	return Field{Key: k, Type: FieldTypeBytesToUints8, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToUints8, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstFloats64 returns a new Field with the given key and slice of 64-bit floats.
@@ -314,7 +314,7 @@ func ConstUints8(k string, v []uint8) Field {
 // Call ConstFloats64 if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstFloats64(k string, v []float64) Field {
-	return Field{Key: k, Type: FieldTypeBytesToFloats64, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToFloats64, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstFloats32 returns a new Field with the given key and slice of 32-bit floats.
@@ -322,7 +322,7 @@ func ConstFloats64(k string, v []float64) Field {
 // Call ConstFloats32 if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstFloats32(k string, v []float32) Field {
-	return Field{Key: k, Type: FieldTypeBytesToFloats32, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToFloats32, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // ConstDurations returns a new Field with the given key and slice of time.Duration.
@@ -330,7 +330,7 @@ func ConstFloats32(k string, v []float32) Field {
 // Call ConstDurations if your array is const. It has significantly less impact
 // on the calling goroutine.
 func ConstDurations(k string, v []time.Duration) Field {
-	return Field{Key: k, Type: FieldTypeBytesToDurations, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
+	return Field{Key: k, Type: FieldTypeBytesToDurations, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
 // NamedError returns a new Field with the given key and error.
@@ -345,7 +345,7 @@ func Error(v error) Field {
 
 // Time returns a new Field with the given key and time.Time.
 func Time(k string, v time.Time) Field {
-	return Field{Key: k, Type: FieldTypeTime, Int: v.UnixNano(), Any: v.Location()}
+	return Field{Key: k, Type: FieldTypeTime, Val: v.UnixNano(), Any: v.Location()}
 }
 
 // Array returns a new Field with the given key and ArrayEncoder.
@@ -380,7 +380,7 @@ func Stringer(k string, v fmt.Stringer) Field {
 // Call ConstFormatter if your object is const. It has significantly less
 // impact on the calling goroutine.
 func ConstFormatter(k string, verb string, v interface{}) Field {
-	return Field{Key: k, Type: FieldTypeFormatter, Bytes: *(*[]byte)(unsafe.Pointer(&verb)), Any: v}
+	return Field{Key: k, Type: FieldTypeFormatter, Ptr: unsafe.Pointer(unsafe.StringData(verb)), Val: int64(len(verb)), Any: v}
 }
 
 // ConstFormatterV returns a new Field with the given key and interface to
@@ -567,12 +567,20 @@ const (
 )
 
 // Field hold data of a specific field.
+//
+// Layout (56 bytes):
+//
+//	Key  string         // 16  field name
+//	Type FieldType      //  8  (1 byte + 7 padding)
+//	Any  interface{}    // 16  error, object, array, stringer, any
+//	Ptr  unsafe.Pointer //  8  slice/string data pointer
+//	Val  int64          //  8  scalar value OR slice/string length
 type Field struct {
-	Key   string
-	Type  FieldType
-	Any   interface{}
-	Int   int64
-	Bytes []byte
+	Key  string
+	Type FieldType
+	Any  interface{}
+	Ptr  unsafe.Pointer
+	Val  int64
 }
 
 // Accept interprets Field data according to FieldType and calls appropriate
@@ -582,29 +590,29 @@ func (fd Field) Accept(v FieldEncoder) {
 	case FieldTypeAny:
 		v.EncodeFieldAny(fd.Key, fd.Any)
 	case FieldTypeBool:
-		v.EncodeFieldBool(fd.Key, fd.Int != 0)
+		v.EncodeFieldBool(fd.Key, fd.Val != 0)
 	case FieldTypeInt64:
-		v.EncodeFieldInt64(fd.Key, fd.Int)
+		v.EncodeFieldInt64(fd.Key, fd.Val)
 	case FieldTypeInt32:
-		v.EncodeFieldInt32(fd.Key, int32(fd.Int))
+		v.EncodeFieldInt32(fd.Key, int32(fd.Val))
 	case FieldTypeInt16:
-		v.EncodeFieldInt16(fd.Key, int16(fd.Int))
+		v.EncodeFieldInt16(fd.Key, int16(fd.Val))
 	case FieldTypeInt8:
-		v.EncodeFieldInt8(fd.Key, int8(fd.Int))
+		v.EncodeFieldInt8(fd.Key, int8(fd.Val))
 	case FieldTypeUint64:
-		v.EncodeFieldUint64(fd.Key, uint64(fd.Int))
+		v.EncodeFieldUint64(fd.Key, uint64(fd.Val))
 	case FieldTypeUint32:
-		v.EncodeFieldUint32(fd.Key, uint32(fd.Int))
+		v.EncodeFieldUint32(fd.Key, uint32(fd.Val))
 	case FieldTypeUint16:
-		v.EncodeFieldUint16(fd.Key, uint16(fd.Int))
+		v.EncodeFieldUint16(fd.Key, uint16(fd.Val))
 	case FieldTypeUint8:
-		v.EncodeFieldUint8(fd.Key, uint8(fd.Int))
+		v.EncodeFieldUint8(fd.Key, uint8(fd.Val))
 	case FieldTypeFloat32:
-		v.EncodeFieldFloat32(fd.Key, math.Float32frombits(uint32(fd.Int)))
+		v.EncodeFieldFloat32(fd.Key, math.Float32frombits(uint32(fd.Val)))
 	case FieldTypeFloat64:
-		v.EncodeFieldFloat64(fd.Key, math.Float64frombits(uint64(fd.Int)))
+		v.EncodeFieldFloat64(fd.Key, math.Float64frombits(uint64(fd.Val)))
 	case FieldTypeDuration:
-		v.EncodeFieldDuration(fd.Key, time.Duration(fd.Int))
+		v.EncodeFieldDuration(fd.Key, time.Duration(fd.Val))
 	case FieldTypeError:
 		if fd.Any != nil {
 			v.EncodeFieldError(fd.Key, fd.Any.(error))
@@ -613,9 +621,9 @@ func (fd Field) Accept(v FieldEncoder) {
 		}
 	case FieldTypeTime:
 		if fd.Any != nil {
-			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Int).In(fd.Any.(*time.Location)))
+			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Val).In(fd.Any.(*time.Location)))
 		} else {
-			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Int))
+			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Val))
 		}
 	case FieldTypeArray:
 		if fd.Any != nil {
@@ -636,37 +644,37 @@ func (fd Field) Accept(v FieldEncoder) {
 			v.EncodeFieldString(fd.Key, "nil")
 		}
 	case FieldTypeFormatter:
-		v.EncodeFieldString(fd.Key, fmt.Sprintf(*(*string)(unsafe.Pointer(&fd.Bytes)), fd.Any))
+		v.EncodeFieldString(fd.Key, fmt.Sprintf(unsafe.String((*byte)(fd.Ptr), int(fd.Val)), fd.Any))
 	case FieldTypeBytes:
-		v.EncodeFieldBytes(fd.Key, fd.Bytes)
+		v.EncodeFieldBytes(fd.Key, unsafe.Slice((*byte)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToString:
-		v.EncodeFieldString(fd.Key, *(*string)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldString(fd.Key, unsafe.String((*byte)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToBools:
-		v.EncodeFieldBools(fd.Key, *(*[]bool)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldBools(fd.Key, unsafe.Slice((*bool)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToInts64:
-		v.EncodeFieldInts64(fd.Key, *(*[]int64)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldInts64(fd.Key, unsafe.Slice((*int64)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToInts32:
-		v.EncodeFieldInts32(fd.Key, *(*[]int32)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldInts32(fd.Key, unsafe.Slice((*int32)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToInts16:
-		v.EncodeFieldInts16(fd.Key, *(*[]int16)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldInts16(fd.Key, unsafe.Slice((*int16)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToInts8:
-		v.EncodeFieldInts8(fd.Key, *(*[]int8)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldInts8(fd.Key, unsafe.Slice((*int8)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToUints64:
-		v.EncodeFieldUints64(fd.Key, *(*[]uint64)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldUints64(fd.Key, unsafe.Slice((*uint64)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToUints32:
-		v.EncodeFieldUints32(fd.Key, *(*[]uint32)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldUints32(fd.Key, unsafe.Slice((*uint32)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToUints16:
-		v.EncodeFieldUints16(fd.Key, *(*[]uint16)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldUints16(fd.Key, unsafe.Slice((*uint16)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToUints8:
-		v.EncodeFieldUints8(fd.Key, *(*[]uint8)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldUints8(fd.Key, unsafe.Slice((*uint8)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToFloats64:
-		v.EncodeFieldFloats64(fd.Key, *(*[]float64)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldFloats64(fd.Key, unsafe.Slice((*float64)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToFloats32:
-		v.EncodeFieldFloats32(fd.Key, *(*[]float32)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldFloats32(fd.Key, unsafe.Slice((*float32)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToDurations:
-		v.EncodeFieldDurations(fd.Key, *(*[]time.Duration)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldDurations(fd.Key, unsafe.Slice((*time.Duration)(fd.Ptr), int(fd.Val)))
 	case FieldTypeBytesToStrings:
-		v.EncodeFieldStrings(fd.Key, *(*[]string)(unsafe.Pointer(&fd.Bytes)))
+		v.EncodeFieldStrings(fd.Key, unsafe.Slice((*string)(fd.Ptr), int(fd.Val)))
 	}
 }
 
