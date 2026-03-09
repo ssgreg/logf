@@ -24,6 +24,16 @@ func newLogrus() *logrus.Logger {
 	}
 }
 
+func logrusFields() logrus.Fields {
+	return logrus.Fields{
+		"int":        42,
+		"string":     "hello",
+		"path":       "/api/v1/users",
+		"latency_us": int64(1234),
+		"ok":         true,
+	}
+}
+
 func fakeLogrusFields() logrus.Fields {
 	return logrus.Fields{
 		"int":     tenInts[0],

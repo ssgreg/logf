@@ -17,6 +17,15 @@ func newDisabledZerolog() zerolog.Logger {
 	return newZerolog().Level(zerolog.Disabled)
 }
 
+func zerologFields(e *zerolog.Event) *zerolog.Event {
+	return e.
+		Int("int", 42).
+		Str("string", "hello").
+		Str("path", "/api/v1/users").
+		Int64("latency_us", 1234).
+		Bool("ok", true)
+}
+
 func fakeZerologFields(e *zerolog.Event) *zerolog.Event {
 	return e.
 		Int("int", tenInts[0]).
@@ -43,15 +52,6 @@ func fakeZerologContext(c zerolog.Context) zerolog.Context {
 		// Interface("user2", oneUser).
 		// Interface("users", tenUsers).
 		Err(errExample)
-}
-
-func zerologFields(e *zerolog.Event) *zerolog.Event {
-	return e.
-		Int("int", 42).
-		Str("string", "hello").
-		Str("path", "/api/v1/users").
-		Int64("latency_us", 1234).
-		Bool("ok", true)
 }
 
 // --- Disabled path ---

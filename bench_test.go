@@ -3,7 +3,6 @@ package logf
 import (
 	"context"
 	"io"
-	"os"
 	"testing"
 )
 
@@ -28,94 +27,14 @@ func benchFields() []Field {
 
 var benchCtx = context.Background()
 
-// --- Disabled path ---
-
-func BenchmarkDisabledLog(b *testing.B) {
-	logger, close := benchLogger(LevelError, false)
-	defer close()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled")
-	}
-}
-
-func BenchmarkDisabledLogWithFields(b *testing.B) {
-	logger, close := benchLogger(LevelError, false)
-	defer close()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled", benchFields()...)
-	}
-}
-
-func BenchmarkDisabledAtLevel(b *testing.B) {
-	logger, close := benchLogger(LevelError, false)
-	defer close()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.AtLevel(benchCtx, LevelInfo, func(log LogFunc) {
-			log(benchCtx, "request handled")
-		})
-	}
-}
-
-// --- Enabled path ---
-
-func BenchmarkPlainText(b *testing.B) {
-	logger, close := benchLogger(LevelDebug, false)
-	defer close()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled")
-	}
-}
-
-func BenchmarkTextWithFields(b *testing.B) {
-	logger, close := benchLogger(LevelDebug, false)
-	defer close()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled", benchFields()...)
-	}
-}
-
-func BenchmarkTextWithAccumulatedFields(b *testing.B) {
-	logger, close := benchLogger(LevelDebug, false)
-	defer close()
-	logger = logger.With(benchFields()...)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled")
-	}
-}
-
-// --- Caller ---
-
-func BenchmarkPlainTextWithCaller(b *testing.B) {
-	logger, close := benchLogger(LevelDebug, true)
-	defer close()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled")
-	}
-}
-
-func BenchmarkTextWithFieldsAndCaller(b *testing.B) {
-	logger, close := benchLogger(LevelDebug, true)
-	defer close()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled", benchFields()...)
-	}
-}
+// Internal API benchmarks that require package-level access (package logf).
+// These test functionality not reachable from the external benchmarks/ package:
+//   - ContextWriter, FieldSource, With(ctx), FromContext, NewContext
+//   - LogDepth (unexported-friendly caller depth)
+//   - Bag.With (context-based field accumulation)
+//
+// Plain logging, sync/async, file I/O, and cross-logger comparisons
+// live in benchmarks/ (external package).
 
 // --- Context bag ---
 
@@ -197,156 +116,6 @@ func BenchmarkLogDepth(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		LogDepth(logger, benchCtx, 1, LevelInfo, "request handled")
 	}
-}
-
-// --- Sync (no channel, encoding in caller goroutine) ---
-
-func benchSyncLogger(lvl Level, addCaller bool) *Logger {
-	enc := NewJSONEncoder.Default()
-	w := NewSyncWriter(lvl, NewWriteAppender(io.Discard, enc))
-	return NewLogger(w).WithCaller(addCaller)
-}
-
-func BenchmarkSyncPlainText(b *testing.B) {
-	logger := benchSyncLogger(LevelDebug, false)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled")
-	}
-}
-
-func BenchmarkSyncTextWithFields(b *testing.B) {
-	logger := benchSyncLogger(LevelDebug, false)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled", benchFields()...)
-	}
-}
-
-func BenchmarkSyncPlainTextWithCaller(b *testing.B) {
-	logger := benchSyncLogger(LevelDebug, true)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled")
-	}
-}
-
-// --- Parallel (shows lock contention effect) ---
-
-func BenchmarkParallelPlainText(b *testing.B) {
-	logger, close := benchLogger(LevelDebug, false)
-	defer close()
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info(benchCtx, "request handled")
-		}
-	})
-}
-
-// --- Parallel with real file I/O ---
-
-func BenchmarkParallelFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "logf-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	enc := NewJSONEncoder.Default()
-	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
-		Appender: NewWriteAppender(f, enc),
-	})
-	defer close()
-	logger := NewLogger(w).WithCaller(false)
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info(benchCtx, "request handled")
-		}
-	})
-}
-
-func BenchmarkSyncFileIOWithFields(b *testing.B) {
-	f, err := os.CreateTemp("", "logf-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	enc := NewJSONEncoder.Default()
-	w := NewSyncWriter(LevelDebug, NewWriteAppender(f, enc))
-	logger := NewLogger(w).WithCaller(false).With(benchFields()...)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled")
-	}
-}
-
-func BenchmarkSyncParallelFileIOWithFields(b *testing.B) {
-	f, err := os.CreateTemp("", "logf-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	enc := NewJSONEncoder.Default()
-	w := NewSyncWriter(LevelDebug, NewWriteAppender(f, enc))
-	logger := NewLogger(w).WithCaller(false).With(benchFields()...)
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info(benchCtx, "request handled")
-		}
-	})
-}
-
-func BenchmarkSyncFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "logf-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	enc := NewJSONEncoder.Default()
-	w := NewSyncWriter(LevelDebug, NewWriteAppender(f, enc))
-	logger := NewLogger(w).WithCaller(false)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info(benchCtx, "request handled")
-	}
-}
-
-func BenchmarkSyncParallelFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "logf-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	enc := NewJSONEncoder.Default()
-	w := NewSyncWriter(LevelDebug, NewWriteAppender(f, enc))
-	logger := NewLogger(w).WithCaller(false)
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info(benchCtx, "request handled")
-		}
-	})
 }
 
 // --- Realistic pipeline ---
