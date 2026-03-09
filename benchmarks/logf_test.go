@@ -1,7 +1,10 @@
 package benchmarks
 
 import (
+	"context"
 	"io"
+	"os"
+	"testing"
 
 	"github.com/ssgreg/logf/v2"
 )
@@ -30,4 +33,113 @@ func newLogger(l logf.Level) (*logf.Logger, logf.ChannelWriterCloseFunc) {
 	})
 
 	return logf.NewLogger(w), close
+}
+
+var benchCtx = context.Background()
+
+// --- File I/O (async via ChannelWriter) ---
+
+func BenchmarkLogfBufferedFileIOWithFields(b *testing.B) {
+	f, err := os.CreateTemp("", "logf-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
+		Appender: logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()),
+	})
+	defer close()
+	logger := logf.NewLogger(w).WithCaller(false)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(benchCtx, "request handled", fakeFields()...)
+	}
+}
+
+func BenchmarkLogfBufferedParallelFileIOWithFields(b *testing.B) {
+	f, err := os.CreateTemp("", "logf-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
+		Appender: logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()),
+	})
+	defer close()
+	logger := logf.NewLogger(w).WithCaller(false)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info(benchCtx, "request handled", fakeFields()...)
+		}
+	})
+}
+
+func BenchmarkLogfBufferedFileIO(b *testing.B) {
+	f, err := os.CreateTemp("", "logf-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
+		Appender: logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()),
+	})
+	defer close()
+	logger := logf.NewLogger(w).WithCaller(false)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(benchCtx, "request handled")
+	}
+}
+
+func BenchmarkLogfBufferedParallelFileIO(b *testing.B) {
+	f, err := os.CreateTemp("", "logf-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
+		Appender: logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()),
+	})
+	defer close()
+	logger := logf.NewLogger(w).WithCaller(false)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info(benchCtx, "request handled")
+		}
+	})
+}
+
+// --- File I/O (sync via UnbufferedEntryWriter) ---
+// Note: UnbufferedEntryWriter is not goroutine-safe (encoder shares buffer).
+// No parallel variant here — use ChannelWriter for concurrent workloads.
+
+func BenchmarkLogfFileIO(b *testing.B) {
+	f, err := os.CreateTemp("", "logf-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w := logf.NewUnbufferedEntryWriter(logf.LevelDebug, logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()))
+	logger := logf.NewLogger(w).WithCaller(false)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(benchCtx, "request handled")
+	}
 }
