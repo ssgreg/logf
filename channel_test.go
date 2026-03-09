@@ -56,7 +56,7 @@ func TestChannelWriterWrite(t *testing.T) {
 	appender := testAppender{}
 	errorAppender := testAppender{}
 
-	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
 	defer func() {
 		assert.NotEmpty(t, appender.Entries)
 		assert.Equal(t, LevelInfo, appender.Entries[0].Level)
@@ -72,7 +72,7 @@ func TestChannelWriterFlushOnEmptyChannel(t *testing.T) {
 	appender := testAppender{}
 	errorAppender := testAppender{}
 
-	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
 	defer func() {
 		assert.Len(t, appender.Entries, 1)
 		assert.Equal(t, LevelInfo, appender.Entries[0].Level)
@@ -92,7 +92,7 @@ func TestChannelWriterTestAppendError(t *testing.T) {
 	appender := testAppender{AppendError: appendErr}
 	errorAppender := testAppender{}
 
-	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
 	defer func() {
 		assert.Empty(t, appender.Entries, "no entries expected")
 		assert.Len(t, errorAppender.Entries, 1, "expected a error message in error appender")
@@ -111,7 +111,7 @@ func TestChannelWriterTestFlushError(t *testing.T) {
 	appender := testAppender{FlushError: flushErr}
 	errorAppender := testAppender{}
 
-	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
 	defer func() {
 		assert.Len(t, appender.Entries, 1)
 		assert.Equal(t, LevelInfo, appender.Entries[0].Level)
@@ -134,7 +134,7 @@ func TestChannelWriterTestSyncError(t *testing.T) {
 	appender := testAppender{SyncError: syncErr}
 	errorAppender := testAppender{}
 
-	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
 	defer func() {
 		assert.Len(t, appender.Entries, 1)
 		assert.Equal(t, LevelInfo, appender.Entries[0].Level)
@@ -157,7 +157,7 @@ func TestChannelWriterTestAppendErrorAndErrorAppenderError(t *testing.T) {
 	appender := testAppender{AppendError: appendErr}
 	errorAppender := testAppender{AppendError: appendErr}
 
-	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender})
 	defer func() {
 		assert.Empty(t, appender.Entries, "no entries expected")
 		assert.Empty(t, errorAppender.Entries, "no entries expected")
@@ -171,7 +171,7 @@ func TestChannelWriterSyncOnErrorWhenEnabled(t *testing.T) {
 	appender := testAppender{}
 	errorAppender := testAppender{}
 
-	w, close := NewChannelWriter(ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender, EnableSyncOnError: true})
+	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{Appender: &appender, ErrorAppender: &errorAppender, EnableSyncOnError: true})
 	defer func() {
 		assert.NotEmpty(t, appender.Entries)
 		assert.Equal(t, LevelError, appender.Entries[0].Level)

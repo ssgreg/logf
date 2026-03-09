@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-// NewLogger returns a new Logger with a given Level and EntryWriter.
-func NewLogger(level LevelCheckerGetter, w EntryWriter) *Logger {
+// NewLogger returns a new Logger with the given EntryWriter.
+// Level filtering is controlled by the writer's Enabled method.
+func NewLogger(w EntryWriter) *Logger {
 	return &Logger{
-		level:     level.LevelChecker(),
 		w:         w,
 		addCaller: true,
 	}
@@ -17,12 +17,7 @@ func NewLogger(level LevelCheckerGetter, w EntryWriter) *Logger {
 // NewDisabledLogger return a new Logger that logs nothing as fast as
 // possible.
 func NewDisabledLogger() *Logger {
-	return NewLogger(
-		LevelCheckerGetterFunc(func() LevelChecker {
-			return func(Level) bool {
-				return false
-			}
-		}), nil)
+	return NewLogger(nopWriter{})
 }
 
 var defaultDisabledLogger = NewDisabledLogger()
@@ -38,8 +33,7 @@ func DisabledLogger() *Logger {
 // The Logger wraps EntryWriter to check logging level and provide a bit of
 // syntactic sugar.
 type Logger struct {
-	level LevelChecker
-	w     EntryWriter
+	w EntryWriter
 
 	bag        *Bag
 	name       string
@@ -51,30 +45,20 @@ type Logger struct {
 type LogFunc func(context.Context, string, ...Field)
 
 // Enabled reports whether logging at the given level is enabled.
-func (l *Logger) Enabled(lvl Level) bool {
-	return l.level(lvl)
+func (l *Logger) Enabled(ctx context.Context, lvl Level) bool {
+	return l.w.Enabled(ctx, lvl)
 }
 
 // AtLevel calls the given fn if logging a message at the specified level
 // is enabled, passing a LogFunc with the bound level.
 func (l *Logger) AtLevel(ctx context.Context, lvl Level, fn func(LogFunc)) {
-	if !l.level(lvl) {
+	if !l.w.Enabled(ctx, lvl) {
 		return
 	}
 
 	fn(func(ctx context.Context, text string, fs ...Field) {
 		l.write(ctx, 1, lvl, text, fs)
 	})
-}
-
-// WithLevel returns a new logger with the given additional level checker.
-func (l *Logger) WithLevel(level LevelCheckerGetter) *Logger {
-	cc := l.clone()
-	cc.level = func(lvl Level) bool {
-		return level.LevelChecker()(lvl) && l.level(lvl)
-	}
-
-	return cc
 }
 
 // WithName returns a new Logger adding the given name to the calling one.
@@ -133,7 +117,7 @@ func (l *Logger) With(fs ...Field) *Logger {
 // Debug logs a debug message with the given text, optional fields and
 // fields passed to the Logger using With function.
 func (l *Logger) Debug(ctx context.Context, text string, fs ...Field) {
-	if !l.level(LevelDebug) {
+	if !l.w.Enabled(ctx, LevelDebug) {
 		return
 	}
 
@@ -143,7 +127,7 @@ func (l *Logger) Debug(ctx context.Context, text string, fs ...Field) {
 // Info logs an info message with the given text, optional fields and
 // fields passed to the Logger using With function.
 func (l *Logger) Info(ctx context.Context, text string, fs ...Field) {
-	if !l.level(LevelInfo) {
+	if !l.w.Enabled(ctx, LevelInfo) {
 		return
 	}
 
@@ -153,7 +137,7 @@ func (l *Logger) Info(ctx context.Context, text string, fs ...Field) {
 // Warn logs a warning message with the given text, optional fields and
 // fields passed to the Logger using With function.
 func (l *Logger) Warn(ctx context.Context, text string, fs ...Field) {
-	if !l.level(LevelWarn) {
+	if !l.w.Enabled(ctx, LevelWarn) {
 		return
 	}
 
@@ -163,7 +147,7 @@ func (l *Logger) Warn(ctx context.Context, text string, fs ...Field) {
 // Error logs an error message with the given text, optional fields and
 // fields passed to the Logger using With function.
 func (l *Logger) Error(ctx context.Context, text string, fs ...Field) {
-	if !l.level(LevelError) {
+	if !l.w.Enabled(ctx, LevelError) {
 		return
 	}
 
@@ -172,7 +156,7 @@ func (l *Logger) Error(ctx context.Context, text string, fs ...Field) {
 
 // Log logs a message at the given level.
 func (l *Logger) Log(ctx context.Context, lvl Level, text string, fs ...Field) {
-	if !l.level(lvl) {
+	if !l.w.Enabled(ctx, lvl) {
 		return
 	}
 
@@ -197,7 +181,6 @@ func (l *Logger) write(ctx context.Context, extraSkip int, lv Level, text string
 
 func (l *Logger) clone() *Logger {
 	return &Logger{
-		level:      l.level,
 		w:          l.w,
 		bag:        l.bag,
 		name:       l.name,
@@ -210,7 +193,7 @@ func (l *Logger) clone() *Logger {
 // extra frames to the caller skip count. It is intended for wrapper packages
 // like logfc to avoid Logger allocation on each call.
 func LogDepth(l *Logger, ctx context.Context, depth int, lvl Level, text string, fs ...Field) {
-	if !l.level(lvl) {
+	if !l.w.Enabled(ctx, lvl) {
 		return
 	}
 

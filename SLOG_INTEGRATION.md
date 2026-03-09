@@ -151,6 +151,23 @@ verbose error field if the error implements `VerboseError`.
 
 **Level lives on Writer (via LevelEnabler), not on Logger. No WithLevel.**
 
+**Current implementation:** `Enabled(context.Context, Level) bool` added directly
+to `EntryWriter` interface. Writer constructors accept level explicitly:
+`NewChannelWriter(level, cfg)`, `NewUnbufferedEntryWriter(level, appender)`.
+Each writer stores level and checks via `Level.Enabled(lvl)` — simple static
+comparison. `ContextWriter` delegates `Enabled` to the next writer.
+
+**TODO:** Revisit level checker design. Current static level on each writer
+doesn't cover: dynamic levels (MutableLevel as writer wrapper?), per-request
+level override via context, LevelEnabler as separate optional interface
+(current design bakes Enabled into EntryWriter — may want to decouple later).
+
+**TODO:** Rename `unbufferedEntryWriter` — name is misleading. It's a
+synchronous writer (encodes and writes in the caller's goroutine), not just
+"unbuffered". Also lacks a mutex, so parallel writes are unsafe. Options:
+rename to `SyncWriter`/`DirectWriter`, add mutex or document single-goroutine
+contract.
+
 Logger has no level field. Level check is delegated to Writer via optional
 `LevelEnabler` interface with context:
 

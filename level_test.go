@@ -1,13 +1,14 @@
 package logf
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLevelChecker(t *testing.T) {
+func TestLevelEnabled(t *testing.T) {
 	type LevelCheck struct {
 		level   Level
 		enabled bool
@@ -36,9 +37,8 @@ func TestLevelChecker(t *testing.T) {
 	}
 
 	for _, cs := range cases {
-		checker := cs.level.LevelChecker()
 		for _, golden := range cs.goldens {
-			assert.Equal(t, golden.enabled, checker(golden.level), "%q checks with %q", cs.level, golden.level)
+			assert.Equal(t, golden.enabled, cs.level.Enabled(golden.level), "%q checks with %q", cs.level, golden.level)
 		}
 	}
 }
@@ -99,37 +99,37 @@ func TestUpperCaseLevelEncoder(t *testing.T) {
 	assert.EqualValues(t, "ERROR", enc.result)
 }
 
-func TestMutableLevelChecker(t *testing.T) {
+func TestMutableLevelEnabled(t *testing.T) {
 	type LevelCheck struct {
 		level   Level
 		enabled bool
 	}
 
 	cases := []struct {
-		checker LevelChecker
+		ml      *MutableLevel
 		goldens []LevelCheck
 	}{
 		{
-			NewMutableLevel(LevelError).LevelChecker(),
+			NewMutableLevel(LevelError),
 			[]LevelCheck{{LevelError, true}, {LevelWarn, false}, {LevelInfo, false}, {LevelDebug, false}},
 		},
 		{
-			NewMutableLevel(LevelWarn).LevelChecker(),
+			NewMutableLevel(LevelWarn),
 			[]LevelCheck{{LevelError, true}, {LevelWarn, true}, {LevelInfo, false}, {LevelDebug, false}},
 		},
 		{
-			NewMutableLevel(LevelInfo).LevelChecker(),
+			NewMutableLevel(LevelInfo),
 			[]LevelCheck{{LevelError, true}, {LevelWarn, true}, {LevelInfo, true}, {LevelDebug, false}},
 		},
 		{
-			NewMutableLevel(LevelDebug).LevelChecker(),
+			NewMutableLevel(LevelDebug),
 			[]LevelCheck{{LevelError, true}, {LevelWarn, true}, {LevelInfo, true}, {LevelDebug, true}},
 		},
 	}
 
 	for i, cs := range cases {
 		for _, golden := range cs.goldens {
-			assert.Equal(t, golden.enabled, cs.checker(golden.level), "%d checks with %q", i, golden.level)
+			assert.Equal(t, golden.enabled, cs.ml.Enabled(context.TODO(), golden.level), "%d checks with %q", i, golden.level)
 		}
 	}
 }

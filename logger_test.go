@@ -13,7 +13,7 @@ var ctx = context.Background()
 
 func TestLoggerNew(t *testing.T) {
 	w := &testEntryWriter{}
-	logger := NewLogger(LevelError, w)
+	logger := NewLogger(w)
 
 	assert.Equal(t, 0, logger.callerSkip)
 	assert.Equal(t, true, logger.addCaller)
@@ -24,7 +24,7 @@ func TestLoggerNew(t *testing.T) {
 
 func TestLoggerCallerSpecifiedByDefault(t *testing.T) {
 	w := &testEntryWriter{}
-	logger := NewLogger(LevelError, w)
+	logger := NewLogger(w)
 
 	logger.Error(ctx, "")
 	assert.NotZero(t, w.Entry.CallerPC)
@@ -34,7 +34,7 @@ func TestLoggerCallerSpecifiedByDefault(t *testing.T) {
 
 func TestLoggerCallerDisabled(t *testing.T) {
 	w := &testEntryWriter{}
-	logger := NewLogger(LevelError, w).WithCaller(false)
+	logger := NewLogger(w).WithCaller(false)
 
 	logger.Error(ctx, "")
 	assert.Zero(t, w.Entry.CallerPC)
@@ -42,7 +42,7 @@ func TestLoggerCallerDisabled(t *testing.T) {
 
 func TestLoggerCallerSpecifiedWithSkip(t *testing.T) {
 	w := &testEntryWriter{}
-	logger := NewLogger(LevelError, w).WithCaller(true).WithCallerSkip(1)
+	logger := NewLogger(w).WithCaller(true).WithCallerSkip(1)
 
 	logger.Error(ctx, "")
 	assert.NotZero(t, w.Entry.CallerPC)
@@ -52,7 +52,7 @@ func TestLoggerCallerSpecifiedWithSkip(t *testing.T) {
 
 func TestLoggerNoNameByDefault(t *testing.T) {
 	w := &testEntryWriter{}
-	logger := NewLogger(LevelError, w)
+	logger := NewLogger(w)
 
 	logger.Error(ctx, "")
 	assert.Empty(t, w.Entry.LoggerName)
@@ -60,7 +60,7 @@ func TestLoggerNoNameByDefault(t *testing.T) {
 
 func TestLoggerEmptyName(t *testing.T) {
 	w := &testEntryWriter{}
-	logger := NewLogger(LevelError, w).WithName("")
+	logger := NewLogger(w).WithName("")
 
 	logger.Error(ctx, "")
 	assert.Empty(t, w.Entry.LoggerName)
@@ -70,7 +70,7 @@ func TestLoggerName(t *testing.T) {
 	w := &testEntryWriter{}
 
 	// Set a name for the logger.
-	logger := NewLogger(LevelError, w).WithName("1")
+	logger := NewLogger(w).WithName("1")
 	logger.Error(ctx, "")
 	assert.Equal(t, "1", w.Entry.LoggerName)
 
@@ -80,22 +80,23 @@ func TestLoggerName(t *testing.T) {
 	assert.Equal(t, "1.2", w.Entry.LoggerName)
 }
 
-func TestLoggerWithLevel(t *testing.T) {
-	w := &testEntryWriter{}
+func TestLoggerLevelFiltering(t *testing.T) {
+	a := &testAppender{}
+	w := NewUnbufferedEntryWriter(LevelError, a)
+	logger := NewLogger(w)
 
-	// Set a name for the logger.
-	logger := NewLogger(LevelInfo, w).WithLevel(LevelError)
+	logger.Info(ctx, "filtered")
+	assert.Empty(t, a.Entries)
 
-	logger.Info(ctx, "")
-	assert.Nil(t, w.Entry)
-
-	logger.Error(ctx, "")
-	assert.NotNil(t, w.Entry)
+	logger.Error(ctx, "passed")
+	assert.Len(t, a.Entries, 1)
+	assert.Equal(t, "passed", a.Entries[0].Text)
 }
 
 func TestLoggerAtLevel(t *testing.T) {
-	w := &testEntryWriter{}
-	logger := NewLogger(LevelError, w)
+	a := &testAppender{}
+	w := NewUnbufferedEntryWriter(LevelError, a)
+	logger := NewLogger(w)
 
 	// Expected the callback should be called with the same severity level.
 	called := false
@@ -104,7 +105,8 @@ func TestLoggerAtLevel(t *testing.T) {
 		assert.NotEmpty(t, log)
 		log(ctx, "at-level")
 	})
-	assert.Equal(t, "at-level", w.Entry.Text)
+	assert.Len(t, a.Entries, 1)
+	assert.Equal(t, "at-level", a.Entries[0].Text)
 	assert.True(t, called)
 
 	// Expected the callback should NOT be called with DEBUG severity level.
@@ -118,7 +120,7 @@ func TestLoggerAtLevel(t *testing.T) {
 func TestLoggerNoFieldsByDefault(t *testing.T) {
 	w := &testEntryWriter{}
 
-	logger := NewLogger(LevelError, w)
+	logger := NewLogger(w)
 	logger.Error(ctx, "")
 	assert.Nil(t, w.Entry.LoggerBag)
 }
@@ -127,7 +129,7 @@ func TestLoggerFields(t *testing.T) {
 	w := &testEntryWriter{}
 
 	// Add one Field.
-	logger := NewLogger(LevelError, w).With(String("first", "v"), String("second", "v"))
+	logger := NewLogger(w).With(String("first", "v"), String("second", "v"))
 	logger.Error(ctx, "")
 	assert.Equal(t, 2, len(w.Entry.LoggerBag.Fields()))
 
@@ -146,13 +148,13 @@ func TestLoggerWithFieldsCallSnapshotter(t *testing.T) {
 	w := &testEntryWriter{}
 	ts := testSnapshotter{}
 
-	NewLogger(LevelError, w).With(Any("snapshotter", &ts))
+	NewLogger(w).With(Any("snapshotter", &ts))
 	assert.True(t, ts.Called)
 }
 
 func TestLoggerBag(t *testing.T) {
 	w := &testEntryWriter{}
-	logger := NewLogger(LevelError, w)
+	logger := NewLogger(w)
 
 	logger.Error(ctx, "")
 	assert.Nil(t, w.Entry.LoggerBag)
@@ -165,7 +167,7 @@ func TestLoggerBag(t *testing.T) {
 
 func TestLoggerLeveledLog(t *testing.T) {
 	w := &testEntryWriter{}
-	logger := NewLogger(LevelDebug, w)
+	logger := NewLogger(w)
 
 	cases := []struct {
 		Level Level
@@ -192,20 +194,13 @@ func TestLoggerLeveledLog(t *testing.T) {
 }
 
 func TestLoggerChecker(t *testing.T) {
-	w := &testEntryWriter{}
-	logger := NewLogger(testLevelCheckerReturningFalse{}, w)
+	logger := NewDisabledLogger()
 
 	logger.Error(ctx, "")
-	assert.Nil(t, w.Entry)
-
 	logger.Warn(ctx, "")
-	assert.Nil(t, w.Entry)
-
 	logger.Info(ctx, "")
-	assert.Nil(t, w.Entry)
-
 	logger.Debug(ctx, "")
-	assert.Nil(t, w.Entry)
+	// No panic — disabled logger discards everything.
 }
 
 func TestLoggerDisabled(t *testing.T) {
@@ -214,7 +209,7 @@ func TestLoggerDisabled(t *testing.T) {
 	assert.Equal(t, true, logger.addCaller)
 	assert.Nil(t, logger.bag)
 	assert.Empty(t, logger.name)
-	assert.Empty(t, logger.w)
+	assert.NotNil(t, logger.w)
 
 	loggerWithCallerSkip := logger.WithCallerSkip(1)
 	assert.Equal(t, 1, loggerWithCallerSkip.callerSkip)
@@ -238,8 +233,8 @@ func TestLoggerDisabled(t *testing.T) {
 
 func TestUnbufferedWriter(t *testing.T) {
 	a := &testAppender{}
-	w := NewUnbufferedEntryWriter(a)
-	logger := NewLogger(LevelDebug, w)
+	w := NewUnbufferedEntryWriter(LevelDebug, a)
+	logger := NewLogger(w)
 
 	// Check function not panic.
 	logger.Debug(ctx, "debug")
