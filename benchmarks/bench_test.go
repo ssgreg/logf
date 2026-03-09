@@ -455,6 +455,7 @@ func BenchmarkTextWithFields(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger, close := newLogger(logf.LevelDebug)
 		defer close()
+		logger = logger.WithCaller(false)
 		ctx := context.Background()
 
 		b.ResetTimer()
@@ -462,15 +463,27 @@ func BenchmarkTextWithFields(b *testing.B) {
 			logger.Info(ctx, getMessage(0), fakeFields()...)
 		}
 	})
-	if disableOthers == true {
-		return
-	}
+	b.Run("logf.sync", func(b *testing.B) {
+		logger := newSyncLogger(logf.LevelDebug).WithCaller(false)
+		ctx := context.Background()
 
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info(ctx, getMessage(0), fakeFields()...)
+		}
+	})
 	b.Run("uber/zap", func(b *testing.B) {
 		logger := newZapLogger(zap.DebugLevel)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			logger.Info(getMessage(0), fakeZapFields()...)
+		}
+	})
+	b.Run("log/slog", func(b *testing.B) {
+		logger := newSlogLogger()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info(getMessage(0), fakeSlogFields()...)
 		}
 	})
 	b.Run("rs/zerolog", func(b *testing.B) {

@@ -215,24 +215,19 @@ func TestField(t *testing.T) {
 }
 
 func TestFieldStrings(t *testing.T) {
-	check := func(t *testing.T, f *Field) {
+	t.Run("Strings", func(t *testing.T) {
+		f := Strings("k", []string{"42"})
 		e := newTestFieldEncoder()
 		f.Accept(e)
 
-		ae := e.result["k"].(ArrayEncoder)
-		te := testTypeEncoder{}
-		_ = ae.EncodeLogfArray(&te)
-
-		assert.Equal(t, "42", te.result)
-	}
-
-	t.Run("Time", func(t *testing.T) {
-		f := Strings("k", []string{"42"})
-		check(t, &f)
+		assert.Equal(t, []string{"42"}, e.result["k"])
 	})
-	t.Run("Time->Any", func(t *testing.T) {
+	t.Run("Any", func(t *testing.T) {
 		f := Any("k", []string{"42"})
-		check(t, &f)
+		e := newTestFieldEncoder()
+		f.Accept(e)
+
+		assert.Equal(t, []string{"42"}, e.result["k"])
 	})
 }
 
@@ -652,7 +647,7 @@ func TestFieldAccept(t *testing.T) {
 		{
 			name:     "Strings",
 			original: Strings("k", []string{"42", "43"}),
-			expected: stringArray{"42", "43"}, // FIXME
+			expected: []string{"42", "43"},
 		},
 		{
 			name:     "Bools",
