@@ -48,7 +48,7 @@ func TestCallerSkip(t *testing.T) {
 }
 
 func TestAtLevel(t *testing.T) {
-	logger := logf.NewLogger(logf.NewUnbufferedEntryWriter(logf.LevelDebug, logf.NewDiscardAppender()))
+	logger := logf.NewLogger(logf.NewSyncWriter(logf.LevelDebug, logf.NewDiscardAppender()))
 	ctx := New(context.Background(), logger)
 
 	called := false
@@ -79,7 +79,7 @@ func TestLevels(t *testing.T) {
 
 			text := "test text"
 			appender := mockAppender{}
-			logger := logf.NewLogger(logf.NewUnbufferedEntryWriter(logf.LevelDebug, &appender))
+			logger := logf.NewLogger(logf.NewSyncWriter(logf.LevelDebug, &appender))
 			ctx := New(context.Background(), logger)
 			test.Log(ctx, text)
 			assert.Equal(t, 1, len(appender.entries))
@@ -91,7 +91,7 @@ func TestLevels(t *testing.T) {
 
 func TestAtLevelCallerPointsToCallSite(t *testing.T) {
 	appender := mockAppender{}
-	logger := logf.NewLogger(logf.NewUnbufferedEntryWriter(logf.LevelDebug, &appender))
+	logger := logf.NewLogger(logf.NewSyncWriter(logf.LevelDebug, &appender))
 	ctx := New(context.Background(), logger)
 
 	_, _, expectedLine, _ := runtime.Caller(0)
@@ -114,7 +114,7 @@ func TestAtLevelCallerPointsToCallSite(t *testing.T) {
 
 func TestCallerPointsToCallSite(t *testing.T) {
 	appender := mockAppender{}
-	logger := logf.NewLogger(logf.NewUnbufferedEntryWriter(logf.LevelDebug, &appender))
+	logger := logf.NewLogger(logf.NewSyncWriter(logf.LevelDebug, &appender))
 	ctx := New(context.Background(), logger)
 
 	_, expectedFile, expectedLine, _ := runtime.Caller(0)

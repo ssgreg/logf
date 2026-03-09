@@ -89,7 +89,7 @@ func TestLatencyDistribution(t *testing.T) {
 		defer ff.Close()
 
 		enc := logf.NewJSONEncoder.Default()
-		w := logf.NewUnbufferedEntryWriter(logf.LevelDebug, logf.NewWriteAppender(ff, enc))
+		w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(ff, enc))
 		logger := logf.NewLogger(w).WithCaller(false)
 		ctx := context.Background()
 

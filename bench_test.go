@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"sync"
 	"testing"
 )
 
@@ -204,7 +203,7 @@ func BenchmarkLogDepth(b *testing.B) {
 
 func benchSyncLogger(lvl Level, addCaller bool) *Logger {
 	enc := NewJSONEncoder.Default()
-	w := NewUnbufferedEntryWriter(lvl, NewWriteAppender(io.Discard, enc))
+	w := NewSyncWriter(lvl, NewWriteAppender(io.Discard, enc))
 	return NewLogger(w).WithCaller(addCaller)
 }
 
@@ -283,7 +282,7 @@ func BenchmarkSyncFileIOWithFields(b *testing.B) {
 	defer f.Close()
 
 	enc := NewJSONEncoder.Default()
-	w := NewUnbufferedEntryWriter(LevelDebug, NewWriteAppender(f, enc))
+	w := NewSyncWriter(LevelDebug, NewWriteAppender(f, enc))
 	logger := NewLogger(w).WithCaller(false).With(benchFields()...)
 
 	b.ResetTimer()
@@ -301,7 +300,7 @@ func BenchmarkSyncParallelFileIOWithFields(b *testing.B) {
 	defer f.Close()
 
 	enc := NewJSONEncoder.Default()
-	w := &lockedEntryWriter{w: NewUnbufferedEntryWriter(LevelDebug, NewWriteAppender(f, enc))}
+	w := NewSyncWriter(LevelDebug, NewWriteAppender(f, enc))
 	logger := NewLogger(w).WithCaller(false).With(benchFields()...)
 
 	b.ResetTimer()
@@ -321,29 +320,13 @@ func BenchmarkSyncFileIO(b *testing.B) {
 	defer f.Close()
 
 	enc := NewJSONEncoder.Default()
-	w := NewUnbufferedEntryWriter(LevelDebug, NewWriteAppender(f, enc))
+	w := NewSyncWriter(LevelDebug, NewWriteAppender(f, enc))
 	logger := NewLogger(w).WithCaller(false)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		logger.Info(benchCtx, "request handled")
 	}
-}
-
-// lockedEntryWriter wraps an EntryWriter with a mutex for parallel safety.
-type lockedEntryWriter struct {
-	mu sync.Mutex
-	w  EntryWriter
-}
-
-func (w *lockedEntryWriter) WriteEntry(ctx context.Context, e Entry) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.w.WriteEntry(ctx, e)
-}
-
-func (w *lockedEntryWriter) Enabled(ctx context.Context, lvl Level) bool {
-	return w.w.Enabled(ctx, lvl)
 }
 
 func BenchmarkSyncParallelFileIO(b *testing.B) {
@@ -355,7 +338,7 @@ func BenchmarkSyncParallelFileIO(b *testing.B) {
 	defer f.Close()
 
 	enc := NewJSONEncoder.Default()
-	w := &lockedEntryWriter{w: NewUnbufferedEntryWriter(LevelDebug, NewWriteAppender(f, enc))}
+	w := NewSyncWriter(LevelDebug, NewWriteAppender(f, enc))
 	logger := NewLogger(w).WithCaller(false)
 
 	b.ResetTimer()

@@ -123,9 +123,7 @@ func BenchmarkLogfBufferedParallelFileIO(b *testing.B) {
 	})
 }
 
-// --- File I/O (sync via UnbufferedEntryWriter) ---
-// Note: UnbufferedEntryWriter is not goroutine-safe (encoder shares buffer).
-// No parallel variant here — use ChannelWriter for concurrent workloads.
+// --- File I/O (sync via SyncWriter) ---
 
 func BenchmarkLogfFileIO(b *testing.B) {
 	f, err := os.CreateTemp("", "logf-bench-*.log")
@@ -135,11 +133,30 @@ func BenchmarkLogfFileIO(b *testing.B) {
 	defer os.Remove(f.Name())
 	defer f.Close()
 
-	w := logf.NewUnbufferedEntryWriter(logf.LevelDebug, logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()))
+	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()))
 	logger := logf.NewLogger(w).WithCaller(false)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		logger.Info(benchCtx, "request handled")
 	}
+}
+
+func BenchmarkLogfParallelFileIO(b *testing.B) {
+	f, err := os.CreateTemp("", "logf-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()))
+	logger := logf.NewLogger(w).WithCaller(false)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info(benchCtx, "request handled")
+		}
+	})
 }

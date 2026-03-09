@@ -82,7 +82,7 @@ func TestLoggerName(t *testing.T) {
 
 func TestLoggerLevelFiltering(t *testing.T) {
 	a := &testAppender{}
-	w := NewUnbufferedEntryWriter(LevelError, a)
+	w := NewSyncWriter(LevelError, a)
 	logger := NewLogger(w)
 
 	logger.Info(ctx, "filtered")
@@ -95,7 +95,7 @@ func TestLoggerLevelFiltering(t *testing.T) {
 
 func TestLoggerAtLevel(t *testing.T) {
 	a := &testAppender{}
-	w := NewUnbufferedEntryWriter(LevelError, a)
+	w := NewSyncWriter(LevelError, a)
 	logger := NewLogger(w)
 
 	// Expected the callback should be called with the same severity level.
@@ -233,7 +233,7 @@ func TestLoggerDisabled(t *testing.T) {
 
 func TestUnbufferedWriter(t *testing.T) {
 	a := &testAppender{}
-	w := NewUnbufferedEntryWriter(LevelDebug, a)
+	w := NewSyncWriter(LevelDebug, a)
 	logger := NewLogger(w)
 
 	// Check function not panic.

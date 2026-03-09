@@ -2,6 +2,7 @@ package logf
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -42,22 +43,30 @@ type EntryWriter interface {
 	Enabled(context.Context, Level) bool
 }
 
-// NewUnbufferedEntryWriter returns an implementation of EntryWriter which
-// puts entries directly to the appender immediately and synchronously.
-func NewUnbufferedEntryWriter(level Level, appender Appender) EntryWriter {
-	return unbufferedEntryWriter{level: level, appender: appender}
+// NewSyncWriter returns an EntryWriter that encodes and writes entries
+// synchronously in the caller's goroutine. It is safe for concurrent use.
+func NewSyncWriter(level Level, appender Appender) EntryWriter {
+	return &syncWriter{level: level, appender: appender}
 }
 
-type unbufferedEntryWriter struct {
+// NewUnbufferedEntryWriter is a deprecated alias for NewSyncWriter.
+//
+// Deprecated: Use NewSyncWriter instead.
+var NewUnbufferedEntryWriter = NewSyncWriter
+
+type syncWriter struct {
+	mu       sync.Mutex
 	level    Level
 	appender Appender
 }
 
-func (w unbufferedEntryWriter) WriteEntry(_ context.Context, entry Entry) {
+func (w *syncWriter) WriteEntry(_ context.Context, entry Entry) {
+	w.mu.Lock()
 	_ = w.appender.Append(entry)
+	w.mu.Unlock()
 }
 
-func (w unbufferedEntryWriter) Enabled(_ context.Context, lvl Level) bool {
+func (w *syncWriter) Enabled(_ context.Context, lvl Level) bool {
 	return w.level.Enabled(lvl)
 }
 
