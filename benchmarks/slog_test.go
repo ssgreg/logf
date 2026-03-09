@@ -28,6 +28,18 @@ func slogFields() []any {
 	}
 }
 
+func fakeSlogFields() []any {
+	return []any{
+		slog.Int("int", tenInts[0]),
+		slog.Any("ints", tenInts),
+		slog.String("string", tenStrings[0]),
+		slog.Any("strings", tenStrings),
+		slog.Time("tm", tenTimes[0]),
+		slog.Any("user1", oneUser),
+		slog.Any("error", errExample),
+	}
+}
+
 // --- Disabled path ---
 
 func BenchmarkSlogDisabledLog(b *testing.B) {

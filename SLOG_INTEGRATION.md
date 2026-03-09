@@ -166,6 +166,20 @@ level override via context, LevelEnabler as separate optional interface
 Added `sync.Mutex` — now safe for concurrent use. `NewUnbufferedEntryWriter`
 kept as deprecated alias for backward compatibility.
 
+**TODO:** Revisit ErrorEncoder design. `DefaultErrorEncoder` called
+`NewErrorEncoder.Default()` on every error field encode — allocated a closure
+each time. Quick fix: cached the result in a package-level `defaultErrorEncoder`
+variable (global mutable state, not ideal). Deeper issues:
+- `errorEncoderGetter` / `Default()` pattern is over-engineered for a simple
+  config → function mapping. Consider replacing with a plain `init()` or
+  direct variable initialization.
+- `encodeError` calls `c.WithDefaults()` on every invocation (copies struct,
+  checks VerboseFieldSuffix) — unnecessary if config is immutable after init.
+- `fmt.Sprintf("%+v", err)` in verbose path allocates; consider lazy or
+  opt-out by default.
+- Entire ErrorEncoder indirection may be unnecessary in v2 Handler/Encoder
+  architecture — error encoding could be a method on Encoder directly.
+
 Logger has no level field. Level check is delegated to Writer via optional
 `LevelEnabler` interface with context:
 

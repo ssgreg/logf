@@ -98,17 +98,7 @@ func String(k string, v string) Field {
 
 // Strings returns a new Field with the given key and slice of strings.
 func Strings(k string, v []string) Field {
-	return Field{Key: k, Type: FieldTypeArray, Any: stringArray(v)}
-}
-
-type stringArray []string
-
-func (o stringArray) EncodeLogfArray(e TypeEncoder) error {
-	for i := range o {
-		e.EncodeTypeString(o[i])
-	}
-
-	return nil
+	return Field{Key: k, Type: FieldTypeBytesToStrings, Bytes: *(*[]byte)(unsafe.Pointer(&v))}
 }
 
 // Bools returns a new Field with the given key and slice of bools.
@@ -550,6 +540,7 @@ const (
 	FieldTypeBytesToFloats64
 	FieldTypeBytesToFloats32
 	FieldTypeBytesToDurations
+	FieldTypeBytesToStrings
 
 	FieldTypeArray
 	FieldTypeObject
@@ -674,6 +665,8 @@ func (fd Field) Accept(v FieldEncoder) {
 		v.EncodeFieldFloats32(fd.Key, *(*[]float32)(unsafe.Pointer(&fd.Bytes)))
 	case FieldTypeBytesToDurations:
 		v.EncodeFieldDurations(fd.Key, *(*[]time.Duration)(unsafe.Pointer(&fd.Bytes)))
+	case FieldTypeBytesToStrings:
+		v.EncodeFieldStrings(fd.Key, *(*[]string)(unsafe.Pointer(&fd.Bytes)))
 	}
 }
 

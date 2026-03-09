@@ -35,6 +35,12 @@ func newLogger(l logf.Level) (*logf.Logger, logf.ChannelWriterCloseFunc) {
 	return logf.NewLogger(w), close
 }
 
+func newSyncLogger(l logf.Level) *logf.Logger {
+	encoder := logf.NewJSONEncoder.Default()
+	w := logf.NewSyncWriter(l, logf.NewWriteAppender(io.Discard, encoder))
+	return logf.NewLogger(w)
+}
+
 var benchCtx = context.Background()
 
 // --- File I/O (async via ChannelWriter) ---
@@ -124,6 +130,42 @@ func BenchmarkLogfBufferedParallelFileIO(b *testing.B) {
 }
 
 // --- File I/O (sync via SyncWriter) ---
+
+func BenchmarkLogfFileIOWithFields(b *testing.B) {
+	f, err := os.CreateTemp("", "logf-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()))
+	logger := logf.NewLogger(w).WithCaller(false)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(benchCtx, "request handled", fakeFields()...)
+	}
+}
+
+func BenchmarkLogfParallelFileIOWithFields(b *testing.B) {
+	f, err := os.CreateTemp("", "logf-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()))
+	logger := logf.NewLogger(w).WithCaller(false)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info(benchCtx, "request handled", fakeFields()...)
+		}
+	})
+}
 
 func BenchmarkLogfFileIO(b *testing.B) {
 	f, err := os.CreateTemp("", "logf-bench-*.log")

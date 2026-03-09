@@ -41,8 +41,13 @@ var NewErrorEncoder = errorEncoderGetter(
 
 type errorEncoderGetter func(c ErrorEncoderConfig) ErrorEncoder
 
+var defaultErrorEncoder ErrorEncoder
+
 func (c errorEncoderGetter) Default() ErrorEncoder {
-	return c(ErrorEncoderConfig{})
+	if defaultErrorEncoder == nil {
+		defaultErrorEncoder = c(ErrorEncoderConfig{})
+	}
+	return defaultErrorEncoder
 }
 
 // encodeError encodes the given error as a set of fields.
