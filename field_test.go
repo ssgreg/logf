@@ -859,6 +859,16 @@ func TestFieldAccept(t *testing.T) {
 			original: Any("k", customStruct{42}),
 			expected: customStruct{42},
 		},
+		{
+			name:     "Group",
+			original: Group("k", String("a", "hello"), Int("b", 42)),
+			expected: []Field{String("a", "hello"), Int("b", 42)},
+		},
+		{
+			name:     "Group/empty",
+			original: Group("k"),
+			expected: []Field(nil),
+		},
 	}
 
 	for _, c := range cases {

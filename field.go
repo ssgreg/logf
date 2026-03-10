@@ -358,6 +358,19 @@ func Object(k string, v ObjectEncoder) Field {
 	return Field{Key: k, Type: FieldTypeObject, Any: v}
 }
 
+// Group returns a new Field that encodes the given fields as a nested
+// object under the given key.
+//
+// Example:
+//
+//	logger.Info(ctx, "done",
+//	    logf.Group("request", logf.String("id", "abc"), logf.Int("status", 200)),
+//	)
+//	// → {"msg":"done", "request":{"id":"abc", "status":200}}
+func Group(k string, fs ...Field) Field {
+	return Field{Key: k, Type: FieldTypeGroup, Any: fs}
+}
+
 // ConstStringer returns a new Field with the given key and Stringer.
 // Call ConstStringer if your object is const. It has significantly less
 // impact on the calling goroutine.
@@ -544,6 +557,7 @@ const (
 
 	FieldTypeArray
 	FieldTypeObject
+	FieldTypeGroup
 	FieldTypeStringer
 	FieldTypeFormatter
 )
@@ -636,6 +650,10 @@ func (fd Field) Accept(v FieldEncoder) {
 			v.EncodeFieldObject(fd.Key, fd.Any.(ObjectEncoder))
 		} else {
 			v.EncodeFieldString(fd.Key, "nil")
+		}
+	case FieldTypeGroup:
+		if fd.Any != nil {
+			v.EncodeFieldGroup(fd.Key, fd.Any.([]Field))
 		}
 	case FieldTypeStringer:
 		if fd.Any != nil {

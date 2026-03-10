@@ -123,6 +123,7 @@ type FieldEncoder interface {
 	EncodeFieldDurations(string, []time.Duration)
 	EncodeFieldArray(string, ArrayEncoder)
 	EncodeFieldObject(string, ObjectEncoder)
+	EncodeFieldGroup(string, []Field)
 }
 
 // TypeEncoderFactory defines the interface that allows to reuse Encoder

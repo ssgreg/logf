@@ -342,6 +342,10 @@ func (e *testFieldEncoder) EncodeFieldObject(k string, v ObjectEncoder) {
 	e.result[k] = v
 }
 
+func (e *testFieldEncoder) EncodeFieldGroup(k string, fs []Field) {
+	e.result[k] = fs
+}
+
 type testObjectEncoder struct{}
 
 func (o testObjectEncoder) EncodeLogfObject(e FieldEncoder) error {
