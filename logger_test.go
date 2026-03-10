@@ -259,3 +259,15 @@ func TestUnbufferedWriter(t *testing.T) {
 	assert.Equal(t, LevelError, a.Entries[3].Level)
 	assert.Equal(t, LevelError, a.Entries[4].Level)
 }
+
+func TestContext(t *testing.T) {
+	// Check if no logger is associated with the Context — returns DisabledLogger.
+	assert.Equal(t, DisabledLogger(), FromContext(context.Background()))
+
+	logger := NewDisabledLogger()
+	ctx := NewContext(context.Background(), logger)
+	// First try.
+	assert.Equal(t, logger, FromContext(ctx))
+	// Second try.
+	assert.Equal(t, logger, FromContext(ctx))
+}
