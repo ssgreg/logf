@@ -176,7 +176,7 @@ func (l *Logger) write(ctx context.Context, extraSkip int, lv Level, text string
 		e.CallerPC = CallerPC(1 + l.callerSkip + extraSkip)
 	}
 
-	l.w.WriteEntry(ctx, e)
+	_ = l.w.WriteEntry(ctx, e)
 }
 
 func (l *Logger) clone() *Logger {

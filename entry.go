@@ -39,7 +39,7 @@ type Entry struct {
 
 // EntryWriter is the interface that should do real logging stuff.
 type EntryWriter interface {
-	WriteEntry(context.Context, Entry)
+	WriteEntry(context.Context, Entry) error
 	Enabled(context.Context, Level) bool
 }
 
@@ -60,10 +60,11 @@ type syncWriter struct {
 	appender Appender
 }
 
-func (w *syncWriter) WriteEntry(_ context.Context, entry Entry) {
+func (w *syncWriter) WriteEntry(_ context.Context, entry Entry) error {
 	w.mu.Lock()
-	_ = w.appender.Append(entry)
+	err := w.appender.Append(entry)
 	w.mu.Unlock()
+	return err
 }
 
 func (w *syncWriter) Enabled(_ context.Context, lvl Level) bool {
@@ -74,6 +75,6 @@ func (w *syncWriter) Enabled(_ context.Context, lvl Level) bool {
 // Used by NewDisabledLogger.
 type nopWriter struct{}
 
-func (nopWriter) WriteEntry(context.Context, Entry) {}
+func (nopWriter) WriteEntry(context.Context, Entry) error { return nil }
 
 func (nopWriter) Enabled(context.Context, Level) bool { return false }

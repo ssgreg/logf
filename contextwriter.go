@@ -45,7 +45,7 @@ func (w *ContextWriter) Enabled(ctx context.Context, lvl Level) bool {
 	return w.next.Enabled(ctx, lvl)
 }
 
-func (w *ContextWriter) WriteEntry(ctx context.Context, e Entry) {
+func (w *ContextWriter) WriteEntry(ctx context.Context, e Entry) error {
 	if bag := BagFromContext(ctx); bag != nil {
 		e.Bag = bag
 	}
@@ -60,5 +60,5 @@ func (w *ContextWriter) WriteEntry(ctx context.Context, e Entry) {
 		}
 	}
 
-	w.next.WriteEntry(ctx, e)
+	return w.next.WriteEntry(ctx, e)
 }

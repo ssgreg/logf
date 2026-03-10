@@ -32,7 +32,7 @@ func TestContextWriter(t *testing.T) {
 	cw := NewContextWriter(sink)
 
 	ctx := With(context.Background(), String("request_id", "abc"))
-	cw.WriteEntry(ctx, Entry{Level: LevelInfo, Text: "hello"})
+	_ = cw.WriteEntry(ctx, Entry{Level: LevelInfo, Text: "hello"})
 
 	assert.NotNil(t, sink.Entry.Bag)
 	assert.True(t, sink.Entry.Bag.HasField("request_id"))
@@ -43,7 +43,7 @@ func TestContextWriterNoBag(t *testing.T) {
 	sink := &testEntryWriter{}
 	cw := NewContextWriter(sink)
 
-	cw.WriteEntry(context.Background(), Entry{Level: LevelInfo, Text: "no bag"})
+	_ = cw.WriteEntry(context.Background(), Entry{Level: LevelInfo, Text: "no bag"})
 
 	assert.Nil(t, sink.Entry.Bag)
 	assert.Equal(t, "no bag", sink.Entry.Text)
@@ -57,7 +57,7 @@ func TestContextWriterPreservesLoggerBag(t *testing.T) {
 	ctx := With(context.Background(), String("request_id", "abc"))
 
 	e := Entry{LoggerBag: loggerBag, Level: LevelInfo, Text: "both bags"}
-	cw.WriteEntry(ctx, e)
+	_ = cw.WriteEntry(ctx, e)
 
 	assert.NotNil(t, sink.Entry.LoggerBag)
 	assert.NotNil(t, sink.Entry.Bag)
@@ -128,7 +128,7 @@ func TestContextWriterFieldSource(t *testing.T) {
 	ctx := context.WithValue(context.Background(), traceKey{}, "abc-123")
 	ctx = With(ctx, String("rid", "r1"))
 
-	cw.WriteEntry(ctx, Entry{Level: LevelInfo, Text: "ext", Fields: []Field{Int("x", 1)}})
+	_ = cw.WriteEntry(ctx, Entry{Level: LevelInfo, Text: "ext", Fields: []Field{Int("x", 1)}})
 
 	// Bag is set from context.
 	assert.NotNil(t, sink.Entry.Bag)
@@ -148,7 +148,7 @@ func TestContextWriterFieldSourceNoFields(t *testing.T) {
 	})
 
 	cw := NewContextWriter(sink, emptySource)
-	cw.WriteEntry(context.Background(), Entry{Level: LevelInfo, Text: "noop", Fields: []Field{Int("x", 1)}})
+	_ = cw.WriteEntry(context.Background(), Entry{Level: LevelInfo, Text: "noop", Fields: []Field{Int("x", 1)}})
 
 	assert.Equal(t, 1, len(sink.Entry.Fields))
 	assert.Equal(t, "x", sink.Entry.Fields[0].Key)
@@ -165,7 +165,7 @@ func TestContextWriterMultipleSources(t *testing.T) {
 	})
 
 	cw := NewContextWriter(sink, src1, src2)
-	cw.WriteEntry(context.Background(), Entry{Level: LevelInfo, Text: "multi", Fields: []Field{String("c", "3")}})
+	_ = cw.WriteEntry(context.Background(), Entry{Level: LevelInfo, Text: "multi", Fields: []Field{String("c", "3")}})
 
 	// Order: src1 fields, src2 fields, original fields.
 	assert.Equal(t, 3, len(sink.Entry.Fields))

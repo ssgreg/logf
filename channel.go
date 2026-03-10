@@ -78,8 +78,9 @@ type channelWriter struct {
 	closed bool
 }
 
-func (l *channelWriter) WriteEntry(_ context.Context, e Entry) {
+func (l *channelWriter) WriteEntry(_ context.Context, e Entry) error {
 	l.ch <- e
+	return nil
 }
 
 func (l *channelWriter) Enabled(_ context.Context, lvl Level) bool {

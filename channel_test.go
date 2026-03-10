@@ -48,7 +48,7 @@ func TestChannelWriterPanicOnWriteWhenClosed(t *testing.T) {
 
 	// Panic is expected calling WriteEnter after close.
 	assert.Panics(t, func() {
-		w.WriteEntry(context.Background(), Entry{})
+		_ = w.WriteEntry(context.Background(), Entry{})
 	})
 }
 
@@ -65,7 +65,7 @@ func TestChannelWriterWrite(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
+	_ = w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 }
 
 func TestChannelWriterFlushOnEmptyChannel(t *testing.T) {
@@ -81,7 +81,7 @@ func TestChannelWriterFlushOnEmptyChannel(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
+	_ = w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 	runtime.Gosched()
 	time.Sleep(time.Second)
 }
@@ -102,7 +102,7 @@ func TestChannelWriterTestAppendError(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
+	_ = w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 }
 
 func TestChannelWriterTestFlushError(t *testing.T) {
@@ -125,7 +125,7 @@ func TestChannelWriterTestFlushError(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
+	_ = w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 }
 
 func TestChannelWriterTestSyncError(t *testing.T) {
@@ -148,7 +148,7 @@ func TestChannelWriterTestSyncError(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
+	_ = w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 }
 
 func TestChannelWriterTestAppendErrorAndErrorAppenderError(t *testing.T) {
@@ -164,7 +164,7 @@ func TestChannelWriterTestAppendErrorAndErrorAppenderError(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
+	_ = w.WriteEntry(context.Background(), Entry{Level: LevelInfo})
 }
 
 func TestChannelWriterSyncOnErrorWhenEnabled(t *testing.T) {
@@ -180,5 +180,5 @@ func TestChannelWriterSyncOnErrorWhenEnabled(t *testing.T) {
 	}()
 	defer close()
 
-	w.WriteEntry(context.Background(), Entry{Level: LevelError})
+	_ = w.WriteEntry(context.Background(), Entry{Level: LevelError})
 }
