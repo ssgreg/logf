@@ -107,44 +107,40 @@ func TestSlogHandlerJSON(t *testing.T) {
 			`{"level":"info","msg":"login","component":"auth","user":"alice"}`,
 		},
 		{
-			"group/dot-prefix",
+			"group",
 			nil,
 			func(l *slog.Logger) { l.WithGroup("http").Info("req", "method", "GET", "path", "/api") },
-			`{"level":"info","msg":"req","http.method":"GET","http.path":"/api"}`,
+			`{"level":"info","msg":"req","http":{"method":"GET","path":"/api"}}`,
 		},
 		{
-			"group/dot-prefix-multiple",
+			"group-multiple",
 			nil,
-			func(l *slog.Logger) { l.WithGroup("http").WithGroup("request").Info("got", "method", "GET") },
-			`{"level":"info","msg":"got","http.request.method":"GET"}`,
-		},
-		{
-			"group/nested",
-			&SlogHandlerOptions{NestedGroups: true},
-			func(l *slog.Logger) { l.WithGroup("http").Info("req", "method", "GET") },
-			`{"level":"info","msg":"req","http":{"method":"GET"}}`,
-		},
-		{
-			"group/nested-multiple",
-			&SlogHandlerOptions{NestedGroups: true},
 			func(l *slog.Logger) { l.WithGroup("http").WithGroup("request").Info("got", "method", "GET") },
 			`{"level":"info","msg":"got","http":{"request":{"method":"GET"}}}`,
 		},
 		{
-			"group/dot-prefix+attrs",
+			"group+attrs",
 			nil,
-			func(l *slog.Logger) {
-				l.With("app", "myapp").WithGroup("http").With("host", "localhost").Info("req", "method", "GET")
-			},
-			`{"level":"info","msg":"req","app":"myapp","http.host":"localhost","http.method":"GET"}`,
-		},
-		{
-			"group/nested+attrs",
-			&SlogHandlerOptions{NestedGroups: true},
 			func(l *slog.Logger) {
 				l.WithGroup("http").With("host", "localhost").Info("req", "method", "GET")
 			},
 			`{"level":"info","msg":"req","http":{"host":"localhost","method":"GET"}}`,
+		},
+		{
+			"group+attrs-before-group",
+			nil,
+			func(l *slog.Logger) {
+				l.With("app", "myapp").WithGroup("http").Info("req", "method", "GET")
+			},
+			`{"level":"info","msg":"req","app":"myapp","http":{"method":"GET"}}`,
+		},
+		{
+			"group-deep",
+			nil,
+			func(l *slog.Logger) {
+				l.WithGroup("http").With("host", "localhost").WithGroup("request").Info("got", "path", "/api")
+			},
+			`{"level":"info","msg":"got","http":{"host":"localhost","request":{"path":"/api"}}}`,
 		},
 		{
 			"types",

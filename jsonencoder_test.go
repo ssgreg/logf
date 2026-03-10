@@ -270,6 +270,38 @@ func TestEncoder(t *testing.T) {
 			},
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","int":42,"string":"42"}` + "\n",
 		},
+		{
+			"WithGroup",
+			Entry{
+				LoggerBag: NewBag(String("a", "1")).WithGroup("http").With(String("method", "GET")),
+				Fields:    []Field{Int("status", 200)},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","a":"1","http":{"method":"GET","status":200}}` + "\n",
+		},
+		{
+			"WithGroupNested",
+			Entry{
+				LoggerBag: NewBag().WithGroup("http").WithGroup("request").With(String("path", "/api")),
+				Fields:    []Field{Int("status", 200)},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","http":{"request":{"path":"/api","status":200}}}` + "\n",
+		},
+		{
+			"WithGroupNoFields",
+			Entry{
+				LoggerBag: NewBag().WithGroup("http"),
+				Fields:    []Field{Int("status", 200)},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","http":{"status":200}}` + "\n",
+		},
+		{
+			"WithGroupAndWith",
+			Entry{
+				LoggerBag: NewBag().WithGroup("http").With(String("method", "GET")).With(String("path", "/api")),
+				Fields:    []Field{Int("status", 200)},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","http":{"method":"GET","path":"/api","status":200}}` + "\n",
+		},
 	}
 
 	enc := NewJSONEncoder.Default()

@@ -260,6 +260,46 @@ func TestUnbufferedWriter(t *testing.T) {
 	assert.Equal(t, LevelError, a.Entries[4].Level)
 }
 
+func TestLoggerWithGroup(t *testing.T) {
+	w := &testEntryWriter{}
+	logger := NewLogger(w).WithGroup("http")
+
+	logger.Error(ctx, "done", Int("status", 200))
+	require.NotNil(t, w.Entry.LoggerBag)
+	assert.Equal(t, "http", w.Entry.LoggerBag.Group())
+}
+
+func TestLoggerWithGroupEmpty(t *testing.T) {
+	w := &testEntryWriter{}
+	logger := NewLogger(w)
+	same := logger.WithGroup("")
+
+	// Empty group name returns the same logger.
+	assert.Equal(t, logger, same)
+}
+
+func TestLoggerWithGroupChain(t *testing.T) {
+	w := &testEntryWriter{}
+	logger := NewLogger(w).
+		With(String("service", "api")).
+		WithGroup("http").
+		With(String("method", "GET"))
+
+	logger.Error(ctx, "done")
+	bag := w.Entry.LoggerBag
+
+	// Child node has method field.
+	assert.Equal(t, 1, len(bag.OwnFields()))
+	assert.Equal(t, "method", bag.OwnFields()[0].Key)
+
+	// Parent is group node.
+	assert.Equal(t, "http", bag.Parent().Group())
+
+	// Grandparent has service field.
+	assert.Equal(t, 1, len(bag.Parent().Parent().OwnFields()))
+	assert.Equal(t, "service", bag.Parent().Parent().OwnFields()[0].Key)
+}
+
 func TestContext(t *testing.T) {
 	// Check if no logger is associated with the Context — returns DisabledLogger.
 	assert.Equal(t, DisabledLogger(), FromContext(context.Background()))

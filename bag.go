@@ -41,6 +41,7 @@ func AllocEncoderSlot() int {
 type Bag struct {
 	fields []Field
 	parent *Bag
+	group  string // group name; empty = no group
 	cache  atomic.Pointer[bagCache]
 }
 
@@ -54,6 +55,21 @@ func NewBag(fs ...Field) *Bag {
 // O(1): no field copy, new node points to parent.
 func (b *Bag) With(fs ...Field) *Bag {
 	return &Bag{fields: fs, parent: b}
+}
+
+// WithGroup returns a new Bag that opens a named group.
+// All fields added to descendant nodes (via With) will be logically
+// nested under this group when encoded. The original Bag is not modified.
+func (b *Bag) WithGroup(name string) *Bag {
+	return &Bag{group: name, parent: b}
+}
+
+// Group returns the group name for this Bag node, or empty string.
+func (b *Bag) Group() string {
+	if b == nil {
+		return ""
+	}
+	return b.group
 }
 
 // Fields returns all fields in the Bag chain, parent-first order.

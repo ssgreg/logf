@@ -165,10 +165,26 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 		field.Accept(f)
 	}
 
+	// Close open groups (from WithGroup in Bag chains).
+	for n := countGroups(e.Bag) + countGroups(e.LoggerBag); n > 0; n-- {
+		buf.AppendByte('}')
+	}
+
 	buf.AppendByte('}')
 	buf.AppendByte('\n')
 
 	return nil
+}
+
+// countGroups counts group nodes in a Bag chain.
+func countGroups(bag *Bag) int {
+	n := 0
+	for b := bag; b != nil; b = b.parent {
+		if b.group != "" {
+			n++
+		}
+	}
+	return n
 }
 
 func (f *jsonEncoder) encodeBag(bag *Bag) {
@@ -176,7 +192,15 @@ func (f *jsonEncoder) encodeBag(bag *Bag) {
 		return
 	}
 
-	// Cache hit: encoded bytes for this node + all parents.
+	// Group node: just open a nested JSON object, no caching needed.
+	if bag.group != "" {
+		f.encodeBag(bag.parent)
+		f.addKey(bag.group)
+		f.buf.AppendByte('{')
+		return
+	}
+
+	// Field node: use cache.
 	if data := bag.LoadCache(f.slot); data != nil {
 		f.buf.AppendBytes(data)
 		return
@@ -185,14 +209,13 @@ func (f *jsonEncoder) encodeBag(bag *Bag) {
 	start := f.buf.Len()
 
 	// Walk parent first to preserve field order (parent before child).
-	if bag.parent != nil {
-		f.encodeBag(bag.parent)
-	}
+	f.encodeBag(bag.parent)
+
 	for _, field := range bag.fields {
 		field.Accept(f)
 	}
 
-	// Cache the encoded bytes (this node + all parents).
+	// Cache the encoded bytes (includes parent content).
 	if f.slot != 0 {
 		encoded := make([]byte, f.buf.Len()-start)
 		copy(encoded, f.buf.Data[start:])
