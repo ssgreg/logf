@@ -91,6 +91,15 @@ func BenchmarkSlogTextWithFields(b *testing.B) {
 	}
 }
 
+func BenchmarkSlogTextWithGroupAndFields(b *testing.B) {
+	logger := newSlogLogger().WithGroup("http").With(slogFields()...)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled", "status", 200)
+	}
+}
+
 func BenchmarkSlogTextWithAccumulatedFields(b *testing.B) {
 	logger := newSlogLogger().With(slogFields()...)
 
@@ -166,7 +175,7 @@ func BenchmarkSlogViaLogfDiscard(b *testing.B) {
 		Appender: logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()),
 	})
 	defer close()
-	logger := slog.New(logf.NewSlogHandler(w, nil))
+	logger := slog.New(logf.NewSlogHandler(w))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -186,7 +195,7 @@ func BenchmarkSlogViaLogfFileIO(b *testing.B) {
 		Appender: logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()),
 	})
 	defer close()
-	logger := slog.New(logf.NewSlogHandler(w, nil))
+	logger := slog.New(logf.NewSlogHandler(w))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -206,7 +215,181 @@ func BenchmarkSlogViaLogfParallelFileIO(b *testing.B) {
 		Appender: logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()),
 	})
 	defer close()
-	logger := slog.New(logf.NewSlogHandler(w, nil))
+	logger := slog.New(logf.NewSlogHandler(w))
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled")
+		}
+	})
+}
+
+// --- Logger.Slog() bridge ---
+
+func BenchmarkLogfSlogDiscard(b *testing.B) {
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
+		Appender: logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()),
+	})
+	defer close()
+	logger := logf.NewLogger(w).WithCaller(false).Slog()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled")
+	}
+}
+
+func BenchmarkLogfSlogTextWithFields(b *testing.B) {
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
+		Appender: logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()),
+	})
+	defer close()
+	logger := logf.NewLogger(w).WithCaller(false).Slog()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled", slogFields()...)
+	}
+}
+
+func BenchmarkLogfSlogTextWithAccumulatedFields(b *testing.B) {
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
+		Appender: logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()),
+	})
+	defer close()
+	logger := logf.NewLogger(w).WithCaller(false).Slog().With(slogFields()...)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled")
+	}
+}
+
+func BenchmarkLogfSlogTextWithGroupAndFields(b *testing.B) {
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
+		Appender: logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()),
+	})
+	defer close()
+	logger := logf.NewLogger(w).WithCaller(false).Slog().
+		WithGroup("http").With(slogFields()...)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled", "status", 200)
+	}
+}
+
+func BenchmarkLogfSlogSyncPlainText(b *testing.B) {
+	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()))
+	logger := logf.NewLogger(w).WithCaller(false).Slog()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled")
+	}
+}
+
+func BenchmarkLogfSlogSyncTextWithFields(b *testing.B) {
+	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()))
+	logger := logf.NewLogger(w).WithCaller(false).Slog()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled", slogFields()...)
+	}
+}
+
+func BenchmarkLogfSlogSyncTextWithAccumulatedFields(b *testing.B) {
+	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()))
+	logger := logf.NewLogger(w).WithCaller(false).Slog().With(slogFields()...)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled")
+	}
+}
+
+func BenchmarkLogfSlogSyncTextWithGroupAndFields(b *testing.B) {
+	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()))
+	logger := logf.NewLogger(w).WithCaller(false).Slog().
+		WithGroup("http").With(slogFields()...)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled", "status", 200)
+	}
+}
+
+func BenchmarkLogfSlogBufferedFileIO(b *testing.B) {
+	f, err := os.CreateTemp("", "logfslog-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
+		Appender: logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()),
+	})
+	defer close()
+	logger := logf.NewLogger(w).WithCaller(false).Slog()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled")
+	}
+}
+
+func BenchmarkLogfSlogBufferedParallelFileIO(b *testing.B) {
+	f, err := os.CreateTemp("", "logfslog-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
+		Appender: logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()),
+	})
+	defer close()
+	logger := logf.NewLogger(w).WithCaller(false).Slog()
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled")
+		}
+	})
+}
+
+func BenchmarkLogfSlogFileIO(b *testing.B) {
+	f, err := os.CreateTemp("", "logfslog-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()))
+	logger := logf.NewLogger(w).WithCaller(false).Slog()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled")
+	}
+}
+
+func BenchmarkLogfSlogParallelFileIO(b *testing.B) {
+	f, err := os.CreateTemp("", "logfslog-bench-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(f, logf.NewJSONEncoder.Default()))
+	logger := logf.NewLogger(w).WithCaller(false).Slog()
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {

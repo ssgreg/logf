@@ -2,6 +2,7 @@ package logf
 
 import (
 	"context"
+	"log/slog"
 	"time"
 )
 
@@ -13,14 +14,6 @@ func NewLogger(w EntryWriter) *Logger {
 		addCaller: true,
 	}
 }
-
-// NewDisabledLogger return a new Logger that logs nothing as fast as
-// possible.
-func NewDisabledLogger() *Logger {
-	return NewLogger(nopWriter{})
-}
-
-var defaultDisabledLogger = NewDisabledLogger()
 
 // DisabledLogger returns a default instance of a Logger that logs nothing
 // as fast as possible.
@@ -41,13 +34,13 @@ type Logger struct {
 	callerSkip int
 }
 
-// LogFunc allows to log a message with a bound level.
-type LogFunc func(context.Context, string, ...Field)
-
 // Enabled reports whether logging at the given level is enabled.
 func (l *Logger) Enabled(ctx context.Context, lvl Level) bool {
 	return l.w.Enabled(ctx, lvl)
 }
+
+// LogFunc allows to log a message with a bound level.
+type LogFunc func(context.Context, string, ...Field)
 
 // AtLevel calls the given fn if logging a message at the specified level
 // is enabled, passing a LogFunc with the bound level.
@@ -103,6 +96,17 @@ func (l *Logger) With(fs ...Field) *Logger {
 	cc.bag = l.bag.With(fs...)
 
 	return cc
+}
+
+// Slog returns a *slog.Logger that shares this Logger's writer, bag,
+// and name. Level filtering is delegated to the same EntryWriter.
+func (l *Logger) Slog() *slog.Logger {
+	return slog.New(&slogHandler{
+		w:         l.w,
+		bag:       l.bag,
+		name:      l.name,
+		addCaller: l.addCaller,
+	})
 }
 
 // WithGroup returns a new Logger that nests all subsequent fields
@@ -223,3 +227,5 @@ func FromContext(ctx context.Context) *Logger {
 }
 
 type contextKeyLogger struct{}
+
+var defaultDisabledLogger = NewLogger(nopWriter{})

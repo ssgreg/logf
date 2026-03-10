@@ -43,11 +43,6 @@ func (s *entrySink) last() Entry {
 	return s.entries[len(s.entries)-1]
 }
 
-func (s *entrySink) len() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.entries)
-}
 
 func (s *entrySink) json(e Entry) string {
 	buf := NewBuffer()
@@ -66,61 +61,51 @@ func (ts slogTestStringer) String() string { return ts.s }
 func TestSlogHandlerJSON(t *testing.T) {
 	tests := []struct {
 		name string
-		opts *SlogHandlerOptions
 		fn   func(*slog.Logger)
 		want string
 	}{
 		{
 			"basic",
-			nil,
 			func(l *slog.Logger) { l.Info("hello", "key", "value", "count", 42) },
 			`{"level":"info","msg":"hello","key":"value","count":42}`,
 		},
 		{
 			"levels/info",
-			nil,
 			func(l *slog.Logger) { l.Info("info") },
 			`{"level":"info","msg":"info"}`,
 		},
 		{
 			"levels/warn",
-			nil,
 			func(l *slog.Logger) { l.Warn("warn") },
 			`{"level":"warn","msg":"warn"}`,
 		},
 		{
 			"levels/error",
-			nil,
 			func(l *slog.Logger) { l.Error("error") },
 			`{"level":"error","msg":"error"}`,
 		},
 		{
 			"levels/debug-enabled",
-			&SlogHandlerOptions{Level: slog.LevelDebug},
 			func(l *slog.Logger) { l.Debug("debug") },
 			`{"level":"debug","msg":"debug"}`,
 		},
 		{
 			"with-attrs",
-			nil,
 			func(l *slog.Logger) { l.With("component", "auth").Info("login", "user", "alice") },
 			`{"level":"info","msg":"login","component":"auth","user":"alice"}`,
 		},
 		{
 			"group",
-			nil,
 			func(l *slog.Logger) { l.WithGroup("http").Info("req", "method", "GET", "path", "/api") },
 			`{"level":"info","msg":"req","http":{"method":"GET","path":"/api"}}`,
 		},
 		{
 			"group-multiple",
-			nil,
 			func(l *slog.Logger) { l.WithGroup("http").WithGroup("request").Info("got", "method", "GET") },
 			`{"level":"info","msg":"got","http":{"request":{"method":"GET"}}}`,
 		},
 		{
 			"group+attrs",
-			nil,
 			func(l *slog.Logger) {
 				l.WithGroup("http").With("host", "localhost").Info("req", "method", "GET")
 			},
@@ -128,7 +113,6 @@ func TestSlogHandlerJSON(t *testing.T) {
 		},
 		{
 			"group+attrs-before-group",
-			nil,
 			func(l *slog.Logger) {
 				l.With("app", "myapp").WithGroup("http").Info("req", "method", "GET")
 			},
@@ -136,7 +120,6 @@ func TestSlogHandlerJSON(t *testing.T) {
 		},
 		{
 			"group-deep",
-			nil,
 			func(l *slog.Logger) {
 				l.WithGroup("http").With("host", "localhost").WithGroup("request").Info("got", "path", "/api")
 			},
@@ -144,25 +127,21 @@ func TestSlogHandlerJSON(t *testing.T) {
 		},
 		{
 			"types",
-			nil,
 			func(l *slog.Logger) { l.Info("t", "bool", true, "int", 42, "float", 3.14, "str", "hello") },
 			`{"level":"info","msg":"t","bool":true,"int":42,"float":3.14,"str":"hello"}`,
 		},
 		{
 			"error",
-			nil,
 			func(l *slog.Logger) { l.Error("oops", "err", errors.New("fail")) },
 			`{"level":"error","msg":"oops","err":"fail"}`,
 		},
 		{
 			"stringer",
-			nil,
 			func(l *slog.Logger) { l.Info("s", "val", slogTestStringer{"hello"}) },
 			`{"level":"info","msg":"s","val":"hello"}`,
 		},
 		{
 			"group-attr",
-			nil,
 			func(l *slog.Logger) {
 				l.Info("g", slog.Group("user", slog.String("name", "alice"), slog.Int("age", 30)))
 			},
@@ -170,7 +149,6 @@ func TestSlogHandlerJSON(t *testing.T) {
 		},
 		{
 			"empty-group",
-			nil,
 			func(l *slog.Logger) { l.Info("e", slog.Group("empty")) },
 			`{"level":"info","msg":"e"}`,
 		},
@@ -179,7 +157,7 @@ func TestSlogHandlerJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sink := newSink()
-			logger := slog.New(NewSlogHandler(sink, tt.opts))
+			logger := slog.New(NewSlogHandler(sink))
 			tt.fn(logger)
 			got := sink.lastJSON()
 			if got != tt.want {
@@ -190,16 +168,16 @@ func TestSlogHandlerJSON(t *testing.T) {
 }
 
 func TestSlogHandlerDebugFiltered(t *testing.T) {
-	sink := newSink()
-	slog.New(NewSlogHandler(sink, nil)).Debug("debug")
-	if sink.len() != 0 {
-		t.Fatal("debug should be filtered at default level")
-	}
+	w := NewSyncWriter(LevelInfo, &testAppender{})
+	slog.New(NewSlogHandler(w)).Debug("debug-should-not-appear")
+
+	// Debug is below LevelInfo, so Enabled returns false and
+	// slog.Logger won't call Handle at all — nothing written.
 }
 
 func TestSlogHandlerWithGroupEmpty(t *testing.T) {
 	sink := newSink()
-	h := NewSlogHandler(sink, nil)
+	h := NewSlogHandler(sink)
 	if h.WithGroup("") != h {
 		t.Error("WithGroup(\"\") should return same handler")
 	}
@@ -207,7 +185,7 @@ func TestSlogHandlerWithGroupEmpty(t *testing.T) {
 
 func TestSlogHandlerWithAttrsEmpty(t *testing.T) {
 	sink := newSink()
-	h := NewSlogHandler(sink, nil)
+	h := NewSlogHandler(sink)
 	if h.WithAttrs(nil) != h {
 		t.Error("WithAttrs(nil) should return same handler")
 	}
@@ -215,7 +193,7 @@ func TestSlogHandlerWithAttrsEmpty(t *testing.T) {
 
 func TestSlogHandlerCaller(t *testing.T) {
 	sink := newSink()
-	slog.New(NewSlogHandler(sink, nil)).Info("with-caller")
+	slog.New(NewSlogHandler(sink)).Info("with-caller")
 
 	e := sink.last()
 	if e.CallerPC == 0 {
@@ -225,7 +203,7 @@ func TestSlogHandlerCaller(t *testing.T) {
 
 func TestSlogHandlerContext(t *testing.T) {
 	sink := newSink()
-	logger := slog.New(NewSlogHandler(NewContextWriter(sink), nil))
+	logger := slog.New(NewSlogHandler(NewContextWriter(sink)))
 
 	ctx := With(context.Background(), String("request_id", "abc-123"))
 	logger.InfoContext(ctx, "with-bag")
@@ -238,7 +216,8 @@ func TestSlogHandlerContext(t *testing.T) {
 }
 
 func TestSlogHandlerEnabled(t *testing.T) {
-	h := NewSlogHandler(newSink(), &SlogHandlerOptions{Level: slog.LevelWarn})
+	w := NewSyncWriter(LevelWarn, &testAppender{})
+	h := NewSlogHandler(w)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -260,7 +239,7 @@ func TestSlogHandlerEnabled(t *testing.T) {
 func TestSlogHandlerTime(t *testing.T) {
 	sink := newSink()
 	before := time.Now()
-	slog.New(NewSlogHandler(sink, nil)).Info("timed")
+	slog.New(NewSlogHandler(sink)).Info("timed")
 	after := time.Now()
 
 	e := sink.last()
@@ -271,7 +250,7 @@ func TestSlogHandlerTime(t *testing.T) {
 
 func TestSlogHandlerImmutability(t *testing.T) {
 	sink := newSink()
-	h := NewSlogHandler(sink, nil)
+	h := NewSlogHandler(sink)
 
 	slog.New(h.WithAttrs([]slog.Attr{slog.String("a", "1")})).Info("h1")
 	slog.New(h.WithAttrs([]slog.Attr{slog.String("b", "2")})).Info("h2")

@@ -3,14 +3,9 @@ package logf
 import (
 	"context"
 	"log/slog"
+	"math"
+	"unsafe"
 )
-
-// SlogHandlerOptions configures the slog→logf bridge handler.
-type SlogHandlerOptions struct {
-	// Level is the minimum enabled severity.
-	// If nil, defaults to slog.LevelInfo.
-	Level slog.Leveler
-}
 
 // NewSlogHandler returns a [slog.Handler] that writes log records
 // to the given [EntryWriter].
@@ -21,35 +16,26 @@ type SlogHandlerOptions struct {
 //
 // The handler propagates context to [EntryWriter.WriteEntry],
 // so field bags attached via [With] are resolved by [NewContextWriter].
-func NewSlogHandler(w EntryWriter, opts *SlogHandlerOptions) slog.Handler {
-	if opts == nil {
-		opts = &SlogHandlerOptions{}
-	}
-
-	return &slogHandler{
-		w:    w,
-		opts: *opts,
-	}
+func NewSlogHandler(w EntryWriter) slog.Handler {
+	return &slogHandler{w: w, addCaller: true}
 }
 
 type slogHandler struct {
-	w    EntryWriter
-	opts SlogHandlerOptions
+	w EntryWriter
 
-	// bag holds pre-resolved logf fields from WithAttrs calls
-	// and group nodes from WithGroup calls (via Bag.WithGroup).
-	bag *Bag
+	bag       *Bag
+	name      string
+	addCaller bool
 }
 
 // Enabled reports whether the handler is enabled for the given level.
-func (h *slogHandler) Enabled(_ context.Context, level slog.Level) bool {
-	return level >= h.minLevel()
+func (h *slogHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return h.w.Enabled(ctx, slogLevelToLogf(level))
 }
 
 // Handle converts a slog.Record to a logf.Entry and writes it.
 func (h *slogHandler) Handle(ctx context.Context, r slog.Record) error {
-	e := h.buildEntry(r)
-	return h.w.WriteEntry(ctx, e)
+	return h.w.WriteEntry(ctx, h.buildEntry(r))
 }
 
 // WithAttrs returns a new handler whose pre-resolved fields include
@@ -60,9 +46,10 @@ func (h *slogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 
 	return &slogHandler{
-		w:    h.w,
-		opts: h.opts,
-		bag:  h.bag.With(convertAttrs(attrs)...),
+		w:         h.w,
+		bag:       h.bag.With(convertAttrs(attrs)...),
+		name:      h.name,
+		addCaller: h.addCaller,
 	}
 }
 
@@ -74,25 +61,30 @@ func (h *slogHandler) WithGroup(name string) slog.Handler {
 	}
 
 	return &slogHandler{
-		w:    h.w,
-		opts: h.opts,
-		bag:  h.bag.WithGroup(name),
+		w:         h.w,
+		bag:       h.bag.WithGroup(name),
+		name:      h.name,
+		addCaller: h.addCaller,
 	}
 }
 
 // buildEntry assembles a logf.Entry from a slog.Record.
 func (h *slogHandler) buildEntry(r slog.Record) Entry {
-	return Entry{
-		LoggerBag: h.bag,
-		Fields:    h.collectRecordFields(r),
-		Level:     slogLevelToLogf(r.Level),
-		Text:      r.Message,
-		Time:      r.Time,
-		CallerPC:  r.PC,
+	e := Entry{
+		LoggerBag:  h.bag,
+		Fields:     h.collectRecordFields(r),
+		Level:      slogLevelToLogf(r.Level),
+		LoggerName: h.name,
+		Text:       r.Message,
+		Time:       r.Time,
 	}
+	if h.addCaller {
+		e.CallerPC = r.PC
+	}
+
+	return e
 }
 
-// collectRecordFields extracts fields from a slog.Record.
 func (h *slogHandler) collectRecordFields(r slog.Record) []Field {
 	if r.NumAttrs() == 0 {
 		return nil
@@ -110,18 +102,6 @@ func (h *slogHandler) collectRecordFields(r slog.Record) []Field {
 	return fields
 }
 
-// minLevel returns the configured minimum level, defaulting to LevelInfo.
-func (h *slogHandler) minLevel() slog.Level {
-	if h.opts.Level != nil {
-		return h.opts.Level.Level()
-	}
-
-	return slog.LevelInfo
-}
-
-// slogLevelToLogf maps a slog severity to the nearest logf level.
-// Intermediate slog levels (e.g. slog.LevelInfo+2) map down to the
-// logf level at or below.
 func slogLevelToLogf(l slog.Level) Level {
 	switch {
 	case l >= slog.LevelError:
@@ -135,7 +115,6 @@ func slogLevelToLogf(l slog.Level) Level {
 	}
 }
 
-// attrToField converts a single slog.Attr to a logf.Field.
 func attrToField(a slog.Attr) Field {
 	a.Value = a.Value.Resolve()
 
@@ -143,30 +122,37 @@ func attrToField(a slog.Attr) Field {
 		return Field{}
 	}
 
-	switch a.Value.Kind() {
+	key := a.Key
+	v := a.Value
+
+	switch v.Kind() {
 	case slog.KindBool:
-		return Bool(a.Key, a.Value.Bool())
+		var val int64
+		if v.Bool() {
+			val = 1
+		}
+		return Field{Key: key, Type: FieldTypeBool, Val: val}
 	case slog.KindInt64:
-		return Int64(a.Key, a.Value.Int64())
+		return Field{Key: key, Type: FieldTypeInt64, Val: v.Int64()}
 	case slog.KindUint64:
-		return Uint64(a.Key, a.Value.Uint64())
+		return Field{Key: key, Type: FieldTypeUint64, Val: int64(v.Uint64())}
 	case slog.KindFloat64:
-		return Float64(a.Key, a.Value.Float64())
+		return Field{Key: key, Type: FieldTypeFloat64, Val: int64(math.Float64bits(v.Float64()))}
 	case slog.KindString:
-		return String(a.Key, a.Value.String())
+		s := v.String()
+		return Field{Key: key, Type: FieldTypeBytesToString, Ptr: unsafe.Pointer(unsafe.StringData(s)), Val: int64(len(s))}
 	case slog.KindTime:
-		return Time(a.Key, a.Value.Time())
+		t := v.Time()
+		return Field{Key: key, Type: FieldTypeTime, Val: t.UnixNano(), Any: t.Location()}
 	case slog.KindDuration:
-		return Duration(a.Key, a.Value.Duration())
+		return Field{Key: key, Type: FieldTypeDuration, Val: int64(v.Duration())}
 	case slog.KindGroup:
-		return groupAttrToField(a.Key, a.Value.Group())
+		return groupAttrToField(key, v.Group())
 	default:
-		return Any(a.Key, a.Value.Any())
+		return Any(key, v.Any())
 	}
 }
 
-// groupAttrToField converts a slog group attribute to a logf.Group field.
-// Returns a zero Field if the group is empty.
 func groupAttrToField(key string, attrs []slog.Attr) Field {
 	if len(attrs) == 0 {
 		return Field{}
@@ -175,7 +161,6 @@ func groupAttrToField(key string, attrs []slog.Attr) Field {
 	return Group(key, convertAttrs(attrs)...)
 }
 
-// convertAttrs converts slog attributes to logf fields.
 func convertAttrs(attrs []slog.Attr) []Field {
 	fields := make([]Field, 0, len(attrs))
 	for _, a := range attrs {

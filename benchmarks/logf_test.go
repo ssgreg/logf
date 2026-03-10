@@ -56,7 +56,7 @@ var benchCtx = context.Background()
 // --- Disabled path ---
 
 func BenchmarkLogfDisabledLog(b *testing.B) {
-	logger := logf.NewDisabledLogger()
+	logger := logf.DisabledLogger()
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -66,7 +66,7 @@ func BenchmarkLogfDisabledLog(b *testing.B) {
 }
 
 func BenchmarkLogfDisabledLogWithFields(b *testing.B) {
-	logger := logf.NewDisabledLogger()
+	logger := logf.DisabledLogger()
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -107,6 +107,26 @@ func BenchmarkLogfLoggerWithGroup(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = logger.WithGroup("http")
+	}
+}
+
+func BenchmarkLogfSyncPlainText(b *testing.B) {
+	logger := newSyncLogger(logf.LevelDebug).WithCaller(false)
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(ctx, getMessage(0))
+	}
+}
+
+func BenchmarkLogfSyncTextWithFields(b *testing.B) {
+	logger := newSyncLogger(logf.LevelDebug).WithCaller(false)
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(ctx, getMessage(0), logfFields()...)
 	}
 }
 

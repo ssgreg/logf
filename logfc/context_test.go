@@ -13,7 +13,7 @@ import (
 
 func TestNewAndGet(t *testing.T) {
 	ctx := context.Background()
-	logger := logf.NewDisabledLogger()
+	logger := logf.DisabledLogger()
 
 	assert.Equal(t, logf.DisabledLogger(), Get(ctx))
 	assert.Equal(t, logger, Get(New(ctx, logger)))
@@ -31,6 +31,20 @@ func TestWithName(t *testing.T) {
 	ctx := New(context.Background(), logger)
 
 	assert.NotEqual(t, logger, Get(WithName(ctx, "n")))
+}
+
+func TestWithGroup(t *testing.T) {
+	appender := mockAppender{}
+	logger := logf.NewLogger(logf.NewSyncWriter(logf.LevelDebug, &appender))
+	ctx := New(context.Background(), logger)
+
+	ctx = WithGroup(ctx, "http")
+	Info(ctx, "req", logf.Int("status", 200))
+
+	assert.Equal(t, 1, len(appender.entries))
+	bag := appender.entries[0].LoggerBag
+	assert.NotNil(t, bag)
+	assert.Equal(t, "http", bag.Group())
 }
 
 func TestCaller(t *testing.T) {

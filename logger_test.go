@@ -194,7 +194,7 @@ func TestLoggerLeveledLog(t *testing.T) {
 }
 
 func TestLoggerChecker(t *testing.T) {
-	logger := NewDisabledLogger()
+	logger := DisabledLogger()
 
 	logger.Error(ctx, "")
 	logger.Warn(ctx, "")
@@ -300,11 +300,52 @@ func TestLoggerWithGroupChain(t *testing.T) {
 	assert.Equal(t, "service", bag.Parent().Parent().OwnFields()[0].Key)
 }
 
+func TestLoggerSlog(t *testing.T) {
+	sink := &testEntryWriter{}
+	logger := NewLogger(sink).WithName("fb").WithName("agent")
+	slogger := logger.Slog()
+
+	slogger.Info("request")
+
+	require.NotNil(t, sink.Entry)
+	assert.Equal(t, "request", sink.Entry.Text)
+	assert.Equal(t, LevelInfo, sink.Entry.Level)
+	assert.Equal(t, "fb.agent", sink.Entry.LoggerName)
+}
+
+func TestLoggerSlogWithFields(t *testing.T) {
+	sink := &testEntryWriter{}
+	logger := NewLogger(sink).With(String("env", "prod"))
+	slogger := logger.Slog()
+
+	slogger.Info("hello", "key", "value")
+
+	require.NotNil(t, sink.Entry)
+	assert.Equal(t, "hello", sink.Entry.Text)
+	// Logger's bag is transferred.
+	assert.NotNil(t, sink.Entry.LoggerBag)
+	assert.Equal(t, "env", sink.Entry.LoggerBag.OwnFields()[0].Key)
+	// Per-call fields from slog.
+	require.Equal(t, 1, len(sink.Entry.Fields))
+	assert.Equal(t, "key", sink.Entry.Fields[0].Key)
+}
+
+func TestLoggerSlogNoName(t *testing.T) {
+	sink := &testEntryWriter{}
+	logger := NewLogger(sink)
+	slogger := logger.Slog()
+
+	slogger.Info("hello")
+
+	require.NotNil(t, sink.Entry)
+	assert.Equal(t, "", sink.Entry.LoggerName)
+}
+
 func TestContext(t *testing.T) {
 	// Check if no logger is associated with the Context — returns DisabledLogger.
 	assert.Equal(t, DisabledLogger(), FromContext(context.Background()))
 
-	logger := NewDisabledLogger()
+	logger := DisabledLogger()
 	ctx := NewContext(context.Background(), logger)
 	// First try.
 	assert.Equal(t, logger, FromContext(ctx))

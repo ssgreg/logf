@@ -554,24 +554,30 @@ WithName = "where am I?" (metadata). WithGroup = "nest my fields" (structure).
 
 #### slog adapter
 
-slogHandler is a thin bridge — no prefix, no clone, just Bag:
+slogHandler is a thin bridge — just writer + Bag, no options:
 
 ```go
+func NewSlogHandler(w EntryWriter) slog.Handler
+
 func (h *slogHandler) WithGroup(name string) slog.Handler {
-    return &slogHandler{w: h.w, opts: h.opts, bag: h.bag.WithGroup(name)}
+    return &slogHandler{w: h.w, bag: h.bag.WithGroup(name)}
 }
 
 func (h *slogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-    return &slogHandler{w: h.w, opts: h.opts, bag: h.bag.With(convertAttrs(attrs)...)}
+    return &slogHandler{w: h.w, bag: h.bag.With(convertAttrs(attrs)...)}
+}
+
+func (h *slogHandler) Enabled(ctx context.Context, level slog.Level) bool {
+    return h.w.Enabled(ctx, slogLevelToLogf(level))
 }
 ```
 
-Groups are always nested (matching slog.JSONHandler). No NestedGroups
-option — if flat keys are needed, configure the encoder.
+Level filtering delegated to EntryWriter (same as Logger). Groups are
+always nested (matching slog.JSONHandler).
 
-**TODO:** Add ReplaceAttr support to SlogHandlerOptions. The empty-attr
-check in `attrToField` (`a.Equal(slog.Attr{})`) exists for this —
-ReplaceAttr can return zero Attr to suppress a field.
+**TODO:** Add ReplaceAttr support. The empty-attr check in `attrToField`
+(`a.Equal(slog.Attr{})`) exists for this — ReplaceAttr can return zero
+Attr to suppress a field. Will require reintroducing an options struct.
 
 Bag linked list preserves WithGroup/WithAttrs ordering naturally.
 Multiple WithAttrs after WithGroup all land inside the group — no
