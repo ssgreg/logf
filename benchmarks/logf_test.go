@@ -98,6 +98,31 @@ func BenchmarkLogfLoggerWithOnTop(b *testing.B) {
 	}
 }
 
+// --- Logger.WithGroup ---
+
+func BenchmarkLogfLoggerWithGroup(b *testing.B) {
+	logger, close := newLogger(logf.LevelDebug)
+	defer close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.WithGroup("http")
+	}
+}
+
+func BenchmarkLogfSyncTextWithGroupAndFields(b *testing.B) {
+	logger := newSyncLogger(logf.LevelDebug).
+		WithCaller(false).
+		WithGroup("http").
+		With(logfFields()...)
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(ctx, getMessage(0), logf.Int("status", 200))
+	}
+}
+
 // --- Accumulated fields (pre-attached via With) ---
 
 func BenchmarkLogfTextWithAccumulatedFields(b *testing.B) {

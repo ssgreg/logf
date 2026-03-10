@@ -117,6 +117,60 @@ func BenchmarkLightTextWithFields(b *testing.B) {
 	})
 }
 
+func BenchmarkWithGroup(b *testing.B) {
+	b.Run("logf", func(b *testing.B) {
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = logger.WithGroup("http")
+		}
+	})
+	b.Run("log/slog", func(b *testing.B) {
+		logger := newSlogLogger()
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = logger.WithGroup("http")
+		}
+	})
+}
+
+func BenchmarkWithGroupAccumulated(b *testing.B) {
+	b.Run("logf.sync", func(b *testing.B) {
+		logger := newSyncLogger(logf.LevelDebug).
+			WithCaller(false).
+			WithGroup("http").
+			With(logf.String("method", "GET"), logf.String("path", "/api/v1/users"))
+		ctx := context.Background()
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info(ctx, getMessage(0), logf.Int("status", 200))
+		}
+	})
+	b.Run("uber/zap", func(b *testing.B) {
+		logger := newZapLogger(zap.DebugLevel).
+			WithOptions(zap.WithCaller(false)).
+			With(zap.Namespace("http"),
+				zap.String("method", "GET"), zap.String("path", "/api/v1/users"))
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info(getMessage(0), zap.Int("status", 200))
+		}
+	})
+	b.Run("log/slog", func(b *testing.B) {
+		logger := newSlogLogger().WithGroup("http").With("method", "GET", "path", "/api/v1/users")
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info(getMessage(0), "status", 200)
+		}
+	})
+}
+
 func BenchmarkGroupField(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger, close := newLogger(logf.LevelDebug)

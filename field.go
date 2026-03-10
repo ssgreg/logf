@@ -512,6 +512,9 @@ func Any(k string, v interface{}) Field {
 		if s, ok := rv.(Snapshotter); ok {
 			return Field{Key: k, Type: FieldTypeAny, Any: s.TakeSnapshot()}
 		}
+		if s, ok := rv.(fmt.Stringer); ok {
+			return String(k, s.String())
+		}
 	}
 
 	return Field{Key: k, Type: FieldTypeAny, Any: v}

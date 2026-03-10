@@ -501,34 +501,45 @@ type Bag struct {
     fields []Field
     parent *Bag
     group  string     // empty = no group
-    cache  [][]byte
+    cache  atomic.Pointer[bagCache]
 }
 ```
 
-Encoder tracks open groups, closes them after all fields:
+Encoder splits group nodes and field nodes:
+
+- **Group node** (`bag.group != ""`): writes `"name":{` directly, no caching.
+  Trivially cheap — one `addKey` + one byte.
+- **Field node**: uses per-encoder slot cache. Cached bytes include all
+  parent content (including group openings from parent group nodes).
+- **Closing braces**: `countGroups(bag)` walks the Bag chain to count
+  open groups, appends `}` after entry fields.
 
 ```go
 func (f *jsonEncoder) encodeBag(bag *Bag) {
     if bag == nil { return }
-    if bag.cache != nil {
-        if data := bag.cache[f.slot]; data != nil {
-            f.buf.AppendBytes(data.bytes)
-            f.openGroups += data.groups
-            return
-        }
-    }
-    start := f.buf.Len()
-    startGroups := f.openGroups
-    f.encodeBag(bag.parent)
+
+    // Group node: just open nested object, no caching.
     if bag.group != "" {
+        f.encodeBag(bag.parent)
         f.addKey(bag.group)
         f.buf.AppendByte('{')
-        f.openGroups++
+        return
     }
+
+    // Field node: use cache.
+    if data := bag.LoadCache(f.slot); data != nil {
+        f.buf.AppendBytes(data)
+        return
+    }
+    start := f.buf.Len()
+    f.encodeBag(bag.parent)
     for _, field := range bag.fields { field.Accept(f) }
-    // cache stores bytes + open group count
+    bag.StoreCache(f.slot, f.buf.Data[start:])
 }
 ```
+
+Cache stays a plain `[]byte` — no encoder-specific metadata (like group
+count) leaks into Bag. Group counting is O(depth), depth is typically 1-3.
 
 #### WithGroup vs WithName
 
@@ -543,20 +554,24 @@ WithName = "where am I?" (metadata). WithGroup = "nest my fields" (structure).
 
 #### slog adapter
 
+slogHandler is a thin bridge — no prefix, no clone, just Bag:
+
 ```go
 func (h *slogHandler) WithGroup(name string) slog.Handler {
-    h2 := h.clone()
-    h2.bag = &Bag{group: name, parent: h.bag,
-        cache: make([][]byte, h.slotCount)}
-    return h2
+    return &slogHandler{w: h.w, opts: h.opts, bag: h.bag.WithGroup(name)}
 }
 
 func (h *slogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-    h2 := h.clone()
-    h2.bag = h.bag.With(h.slotCount, convertAttrs(attrs)...)
-    return h2
+    return &slogHandler{w: h.w, opts: h.opts, bag: h.bag.With(convertAttrs(attrs)...)}
 }
 ```
+
+Groups are always nested (matching slog.JSONHandler). No NestedGroups
+option — if flat keys are needed, configure the encoder.
+
+**TODO:** Add ReplaceAttr support to SlogHandlerOptions. The empty-attr
+check in `attrToField` (`a.Equal(slog.Attr{})`) exists for this —
+ReplaceAttr can return zero Attr to suppress a field.
 
 Bag linked list preserves WithGroup/WithAttrs ordering naturally.
 Multiple WithAttrs after WithGroup all land inside the group — no

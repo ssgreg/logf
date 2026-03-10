@@ -2,6 +2,7 @@ package logf
 
 import (
 	"errors"
+	"net"
 	"testing"
 	"time"
 
@@ -443,6 +444,13 @@ func TestFieldNilError(t *testing.T) {
 	e := newTestFieldEncoder()
 	f.Accept(e)
 	assert.Equal(t, nil, e.result["error"])
+}
+
+func TestFieldAnyStringer(t *testing.T) {
+	f := Any("k", net.IPv4(192, 168, 1, 1))
+	e := newTestFieldEncoder()
+	f.Accept(e)
+	assert.Equal(t, "192.168.1.1", e.result["k"])
 }
 
 func TestFieldAnyWithCustomType(t *testing.T) {

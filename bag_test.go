@@ -108,3 +108,29 @@ func TestBagFromContextNil(t *testing.T) {
 	got := BagFromContext(context.Background())
 	assert.Nil(t, got)
 }
+
+func TestBagWithGroup(t *testing.T) {
+	bag := NewBag(String("a", "1")).WithGroup("http").With(String("method", "GET"))
+
+	assert.Equal(t, "", bag.Group())
+	assert.Equal(t, "http", bag.Parent().Group())
+	assert.Equal(t, "", bag.Parent().Parent().Group())
+
+	// OwnFields: only the child node has fields.
+	assert.Equal(t, 1, len(bag.OwnFields()))
+	assert.Equal(t, "method", bag.OwnFields()[0].Key)
+}
+
+func TestBagWithGroupNil(t *testing.T) {
+	var bag *Bag
+	bag2 := bag.WithGroup("g")
+
+	require.NotNil(t, bag2)
+	assert.Equal(t, "g", bag2.Group())
+	assert.Nil(t, bag2.Parent())
+}
+
+func TestBagGroupNil(t *testing.T) {
+	var bag *Bag
+	assert.Equal(t, "", bag.Group())
+}

@@ -105,6 +105,21 @@ func (l *Logger) With(fs ...Field) *Logger {
 	return cc
 }
 
+// WithGroup returns a new Logger that nests all subsequent fields
+// (from With and per-call) under the given group name.
+// Produces nested JSON objects: WithGroup("http") + Int("status", 200)
+// → {"http":{"status":200}}.
+func (l *Logger) WithGroup(name string) *Logger {
+	if name == "" {
+		return l
+	}
+
+	cc := l.clone()
+	cc.bag = l.bag.WithGroup(name)
+
+	return cc
+}
+
 // Debug logs a debug message with the given text, optional fields and
 // fields passed to the Logger using With function.
 func (l *Logger) Debug(ctx context.Context, text string, fs ...Field) {
