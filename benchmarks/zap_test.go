@@ -186,6 +186,15 @@ func BenchmarkZapLoggerWith(b *testing.B) {
 	}
 }
 
+func BenchmarkZapLoggerWithOnTop(b *testing.B) {
+	logger := newZapLogger(zap.DebugLevel).With(zapFields()...)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With(zapFields()...)
+	}
+}
+
 // --- Parallel ---
 
 func BenchmarkZapParallelPlainText(b *testing.B) {

@@ -94,6 +94,46 @@ func BenchmarkZerologTextWithFields(b *testing.B) {
 	}
 }
 
+// --- Logger.With ---
+
+func BenchmarkZerologLoggerWith(b *testing.B) {
+	logger := newZerolog()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With().
+			Int("int", 42).
+			Str("string", "hello").
+			Str("path", "/api/v1/users").
+			Int64("latency_us", 1234).
+			Bool("ok", true).
+			Logger()
+	}
+}
+
+func BenchmarkZerologLoggerWithOnTop(b *testing.B) {
+	logger := newZerolog().With().
+		Int("int", 42).
+		Str("string", "hello").
+		Str("path", "/api/v1/users").
+		Int64("latency_us", 1234).
+		Bool("ok", true).
+		Logger()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With().
+			Int("int", 42).
+			Str("string", "hello").
+			Str("path", "/api/v1/users").
+			Int64("latency_us", 1234).
+			Bool("ok", true).
+			Logger()
+	}
+}
+
+// --- Accumulated fields (pre-attached via With) ---
+
 func BenchmarkZerologTextWithAccumulatedFields(b *testing.B) {
 	logger := newZerolog().With().
 		Int("int", 42).

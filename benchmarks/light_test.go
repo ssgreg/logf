@@ -8,6 +8,63 @@ import (
 	"go.uber.org/zap"
 )
 
+func BenchmarkLightTextWithAccumulatedFields(b *testing.B) {
+	b.Run("logf", func(b *testing.B) {
+		logger, close := newLogger(logf.LevelDebug)
+		defer close()
+		logger = logger.WithCaller(false).With(logfFields()...)
+		ctx := context.Background()
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info(ctx, getMessage(0))
+		}
+	})
+	b.Run("logf.sync", func(b *testing.B) {
+		logger := newSyncLogger(logf.LevelDebug).WithCaller(false).With(logfFields()...)
+		ctx := context.Background()
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info(ctx, getMessage(0))
+		}
+	})
+	b.Run("uber/zap", func(b *testing.B) {
+		logger := newZapLogger(zap.DebugLevel).With(zapFields()...)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info(getMessage(0))
+		}
+	})
+	b.Run("log/slog", func(b *testing.B) {
+		logger := newSlogLogger().With(slogFields()...)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info(getMessage(0))
+		}
+	})
+	b.Run("rs/zerolog", func(b *testing.B) {
+		logger := newZerolog().With().
+			Int("int", 42).
+			Str("string", "hello").
+			Str("path", "/api/v1/users").
+			Int64("latency_us", 1234).
+			Bool("ok", true).
+			Logger()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info().Msg(getMessage(0))
+		}
+	})
+	b.Run("sirupsen/logrus", func(b *testing.B) {
+		logger := newLogrus().WithFields(logrusFields())
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			logger.Info(getMessage(0))
+		}
+	})
+}
+
 func BenchmarkLightTextWithFields(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
 		logger, close := newLogger(logf.LevelDebug)

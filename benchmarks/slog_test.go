@@ -137,6 +137,15 @@ func BenchmarkSlogLoggerWith(b *testing.B) {
 	}
 }
 
+func BenchmarkSlogLoggerWithOnTop(b *testing.B) {
+	logger := newSlogLogger().With(slogFields()...)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With(slogFields()...)
+	}
+}
+
 // --- Parallel ---
 
 func BenchmarkSlogParallelPlainText(b *testing.B) {

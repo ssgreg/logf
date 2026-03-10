@@ -75,6 +75,53 @@ func BenchmarkLogfDisabledLogWithFields(b *testing.B) {
 	}
 }
 
+// --- Logger.With ---
+
+func BenchmarkLogfLoggerWith(b *testing.B) {
+	logger, close := newLogger(logf.LevelDebug)
+	defer close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With(logfFields()...)
+	}
+}
+
+func BenchmarkLogfLoggerWithOnTop(b *testing.B) {
+	logger, close := newLogger(logf.LevelDebug)
+	defer close()
+	logger = logger.With(logfFields()...)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With(logfFields()...)
+	}
+}
+
+// --- Accumulated fields (pre-attached via With) ---
+
+func BenchmarkLogfTextWithAccumulatedFields(b *testing.B) {
+	logger, close := newLogger(logf.LevelDebug)
+	defer close()
+	logger = logger.WithCaller(false).With(logfFields()...)
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(ctx, getMessage(0))
+	}
+}
+
+func BenchmarkLogfSyncTextWithAccumulatedFields(b *testing.B) {
+	logger := newSyncLogger(logf.LevelDebug).WithCaller(false).With(logfFields()...)
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info(ctx, getMessage(0))
+	}
+}
+
 // --- File I/O (async via ChannelWriter) ---
 
 func BenchmarkLogfBufferedFileIOWithFields(b *testing.B) {
