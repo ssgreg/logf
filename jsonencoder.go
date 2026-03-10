@@ -296,6 +296,16 @@ func (f *jsonEncoder) EncodeFieldObject(k string, v ObjectEncoder) {
 	f.EncodeTypeObject(v)
 }
 
+func (f *jsonEncoder) EncodeFieldGroup(k string, fs []Field) {
+	f.addKey(k)
+	f.appendSeparator()
+	f.buf.AppendByte('{')
+	for _, field := range fs {
+		field.Accept(f)
+	}
+	f.buf.AppendByte('}')
+}
+
 func (f *jsonEncoder) EncodeFieldBytes(k string, v []byte) {
 	f.addKey(k)
 	f.EncodeTypeBytes(v)

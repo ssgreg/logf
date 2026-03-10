@@ -223,6 +223,33 @@ func TestEncoder(t *testing.T) {
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","any":{"Field":"42"}}` + "\n",
 		},
 		{
+			"FieldsGroup",
+			Entry{
+				Fields: []Field{
+					Group("request", String("id", "abc"), Int("status", 200)),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","request":{"id":"abc","status":200}}` + "\n",
+		},
+		{
+			"FieldsGroupEmpty",
+			Entry{
+				Fields: []Field{
+					Group("empty"),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","empty":{}}` + "\n",
+		},
+		{
+			"FieldsGroupNested",
+			Entry{
+				Fields: []Field{
+					Group("outer", String("a", "1"), Group("inner", Int("b", 2))),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","outer":{"a":"1","inner":{"b":2}}}` + "\n",
+		},
+		{
 			"FieldsLoggerBag",
 			Entry{
 				LoggerBag: NewBag(
