@@ -26,10 +26,11 @@ func newSink() *entrySink {
 	}
 }
 
-func (s *entrySink) WriteEntry(_ context.Context, e Entry) {
+func (s *entrySink) WriteEntry(_ context.Context, e Entry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.entries = append(s.entries, e)
+	return nil
 }
 
 func (s *entrySink) Enabled(_ context.Context, _ Level) bool {

@@ -71,9 +71,7 @@ func (h *slogHandler) Enabled(_ context.Context, level slog.Level) bool {
 // Handle converts a slog.Record to a logf.Entry and writes it.
 func (h *slogHandler) Handle(ctx context.Context, r slog.Record) error {
 	e := h.buildEntry(r)
-	h.w.WriteEntry(ctx, e)
-
-	return nil
+	return h.w.WriteEntry(ctx, e)
 }
 
 // WithAttrs returns a new handler whose pre-resolved fields include

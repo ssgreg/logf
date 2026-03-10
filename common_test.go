@@ -50,8 +50,9 @@ type testEntryWriter struct {
 	Entry *Entry
 }
 
-func (w *testEntryWriter) WriteEntry(_ context.Context, e Entry) {
+func (w *testEntryWriter) WriteEntry(_ context.Context, e Entry) error {
 	w.Entry = &e
+	return nil
 }
 
 func (w *testEntryWriter) Enabled(_ context.Context, _ Level) bool {
