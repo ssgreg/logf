@@ -562,24 +562,6 @@ const (
 	FieldTypeFormatter
 )
 
-// Special cases that are processed during snapshoting phase.
-const (
-	FieldTypeRawMask FieldType = 1<<7 + iota
-	FieldTypeRawBytes
-	FieldTypeRawBytesToBools
-	FieldTypeRawBytesToInts64
-	FieldTypeRawBytesToInts32
-	FieldTypeRawBytesToInts16
-	FieldTypeRawBytesToInts8
-	FieldTypeRawBytesToUints64
-	FieldTypeRawBytesToUints32
-	FieldTypeRawBytesToUints16
-	FieldTypeRawBytesToUints8
-	FieldTypeRawBytesToFloats64
-	FieldTypeRawBytesToFloats32
-	FieldTypeRawBytesToDurations
-)
-
 // Field hold data of a specific field.
 //
 // Layout (56 bytes):
