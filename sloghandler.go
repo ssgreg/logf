@@ -51,7 +51,6 @@ type slogHandler struct {
 	opts SlogHandlerOptions
 
 	// bag holds pre-resolved logf fields from WithAttrs calls.
-	// Bag.Version() serves as the cache key for the JSON encoder.
 	bag *Bag
 
 	// prefix accumulates dot-separated group names: "http.request."

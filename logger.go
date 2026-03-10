@@ -99,17 +99,8 @@ func (l *Logger) WithCallerSkip(skip int) *Logger {
 
 // With returns a new Logger with the given additional fields.
 func (l *Logger) With(fs ...Field) *Logger {
-	var fields []Field
-	if l.bag == nil {
-		fields = fs
-	} else {
-		fields = make([]Field, 0, len(l.bag.Fields())+len(fs))
-		fields = append(fields, l.bag.Fields()...)
-		fields = append(fields, fs...)
-	}
-
 	cc := l.clone()
-	cc.bag = NewBag(fields...)
+	cc.bag = l.bag.With(fs...)
 
 	return cc
 }

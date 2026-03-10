@@ -9,11 +9,9 @@ import (
 // Entry holds a single log message and fields.
 type Entry struct {
 	// LoggerBag holds logger-scoped fields (from Logger.With).
-	// Bag.Version() is used as a cache key by encoders.
 	LoggerBag *Bag
 
 	// Bag holds request-scoped fields (from context via ContextWriter).
-	// Bag.Version() is used as a cache key by encoders.
 	Bag *Bag
 
 	// Fields specifies data fields of a log message.

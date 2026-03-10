@@ -82,7 +82,7 @@ func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
 // given JSONEncoderConfig.
 var NewJSONEncoder = jsonEncoderGetter(
 	func(cfg JSONEncoderConfig) Encoder {
-		return &jsonEncoder{cfg.WithDefaults(), NewCache(100), nil, 0}
+		return &jsonEncoder{cfg.WithDefaults(), nil, 0}
 	},
 )
 
@@ -90,7 +90,7 @@ var NewJSONEncoder = jsonEncoderGetter(
 // TypeEncoderFactory with the given JSONEncoderConfig.
 var NewJSONTypeEncoderFactory = jsonTypeEncoderFactoryGetter(
 	func(c JSONEncoderConfig) TypeEncoderFactory {
-		return &jsonEncoder{c.WithDefaults(), nil, nil, 0}
+		return &jsonEncoder{c.WithDefaults(), nil, 0}
 	},
 )
 
@@ -108,7 +108,6 @@ func (c jsonTypeEncoderFactoryGetter) Default() TypeEncoderFactory {
 
 type jsonEncoder struct {
 	JSONEncoderConfig
-	cache *Cache
 
 	buf         *Buffer
 	startBufLen int
@@ -154,11 +153,11 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 		f.EncodeCaller(e.CallerPC, f)
 	}
 
-	// Context fields (request-scoped, cached).
-	f.encodeBagCached(buf, e.Bag)
+	// Context fields (request-scoped).
+	f.encodeBag(e.Bag)
 
-	// Logger's fields (service-scoped, cached).
-	f.encodeBagCached(buf, e.LoggerBag)
+	// Logger's fields (service-scoped).
+	f.encodeBag(e.LoggerBag)
 
 	// Entry's fields.
 	for _, field := range e.Fields {
@@ -171,23 +170,16 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 	return nil
 }
 
-func (f *jsonEncoder) encodeBagCached(buf *Buffer, bag *Bag) {
-	v := bag.Version()
-	if v == 0 {
+func (f *jsonEncoder) encodeBag(bag *Bag) {
+	if bag == nil {
 		return
 	}
-
-	if bytes, ok := f.cache.Get(v); ok {
-		buf.AppendBytes(bytes)
-	} else {
-		le := buf.Len()
-		for _, field := range bag.Fields() {
-			field.Accept(f)
-		}
-
-		bf := make([]byte, buf.Len()-le)
-		copy(bf, buf.Data[le:])
-		f.cache.Set(v, bf)
+	// Walk parent first to preserve field order (parent before child).
+	if bag.parent != nil {
+		f.encodeBag(bag.parent)
+	}
+	for _, field := range bag.fields {
+		field.Accept(f)
 	}
 }
 
