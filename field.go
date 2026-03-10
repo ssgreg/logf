@@ -345,6 +345,9 @@ func Error(v error) Field {
 
 // Time returns a new Field with the given key and time.Time.
 func Time(k string, v time.Time) Field {
+	if v.IsZero() {
+		return Field{Key: k, Type: FieldTypeTime}
+	}
 	return Field{Key: k, Type: FieldTypeTime, Val: v.UnixNano(), Any: v.Location()}
 }
 
@@ -621,8 +624,10 @@ func (fd Field) Accept(v FieldEncoder) {
 	case FieldTypeTime:
 		if fd.Any != nil {
 			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Val).In(fd.Any.(*time.Location)))
-		} else {
+		} else if fd.Val != 0 {
 			v.EncodeFieldTime(fd.Key, time.Unix(0, fd.Val))
+		} else {
+			v.EncodeFieldTime(fd.Key, time.Time{})
 		}
 	case FieldTypeArray:
 		if fd.Any != nil {

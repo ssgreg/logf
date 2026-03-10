@@ -79,7 +79,7 @@ func BenchmarkDisabledPlainText(b *testing.B) {
 
 func BenchmarkDisabledPlainTextWithAccumulatedFields(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
-		logger := logf.NewDisabledLogger().With(fakeFields()...)
+		logger := logf.DisabledLogger().With(fakeFields()...)
 		ctx := context.Background()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -87,7 +87,7 @@ func BenchmarkDisabledPlainTextWithAccumulatedFields(b *testing.B) {
 		}
 	})
 	b.Run("logf.check", func(b *testing.B) {
-		logger := logf.NewDisabledLogger().With(fakeFields()...)
+		logger := logf.DisabledLogger().With(fakeFields()...)
 		ctx := context.Background()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -143,7 +143,7 @@ func BenchmarkDisabledPlainTextWithAccumulatedFields(b *testing.B) {
 
 func BenchmarkDisabledTextWithFields(b *testing.B) {
 	b.Run("logf", func(b *testing.B) {
-		logger := logf.NewDisabledLogger()
+		logger := logf.DisabledLogger()
 		ctx := context.Background()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -151,7 +151,7 @@ func BenchmarkDisabledTextWithFields(b *testing.B) {
 		}
 	})
 	b.Run("logf.check", func(b *testing.B) {
-		logger := logf.NewDisabledLogger()
+		logger := logf.DisabledLogger()
 		ctx := context.Background()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {

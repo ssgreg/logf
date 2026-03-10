@@ -47,11 +47,6 @@ func NewSyncWriter(level Level, appender Appender) EntryWriter {
 	return &syncWriter{level: level, appender: appender}
 }
 
-// NewUnbufferedEntryWriter is a deprecated alias for NewSyncWriter.
-//
-// Deprecated: Use NewSyncWriter instead.
-var NewUnbufferedEntryWriter = NewSyncWriter
-
 type syncWriter struct {
 	mu       sync.Mutex
 	level    Level
@@ -60,9 +55,9 @@ type syncWriter struct {
 
 func (w *syncWriter) WriteEntry(_ context.Context, entry Entry) error {
 	w.mu.Lock()
-	err := w.appender.Append(entry)
-	w.mu.Unlock()
-	return err
+	defer w.mu.Unlock()
+
+	return w.appender.Append(entry)
 }
 
 func (w *syncWriter) Enabled(_ context.Context, lvl Level) bool {
@@ -70,7 +65,7 @@ func (w *syncWriter) Enabled(_ context.Context, lvl Level) bool {
 }
 
 // nopWriter is an EntryWriter that discards everything.
-// Used by NewDisabledLogger.
+// Used by DisabledLogger.
 type nopWriter struct{}
 
 func (nopWriter) WriteEntry(context.Context, Entry) error { return nil }

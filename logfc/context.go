@@ -29,6 +29,12 @@ func WithName(ctx context.Context, name string) context.Context {
 	return New(ctx, Get(ctx).WithName(name))
 }
 
+// WithGroup returns a new context with the logger derived from ctx
+// that nests all subsequent fields under the given group name.
+func WithGroup(ctx context.Context, name string) context.Context {
+	return New(ctx, Get(ctx).WithGroup(name))
+}
+
 // WithCaller returns a new context with the logger derived from ctx
 // with caller reporting enabled.
 func WithCaller(ctx context.Context) context.Context {
