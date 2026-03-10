@@ -14,14 +14,12 @@ func TestNewBag(t *testing.T) {
 	assert.Equal(t, 2, len(bag.Fields()))
 	assert.Equal(t, "k1", bag.Fields()[0].Key)
 	assert.Equal(t, "k2", bag.Fields()[1].Key)
-	assert.NotZero(t, bag.Version())
 }
 
 func TestNewBagEmpty(t *testing.T) {
 	bag := NewBag()
 
 	assert.Equal(t, 0, len(bag.Fields()))
-	assert.NotZero(t, bag.Version())
 }
 
 func TestBagWith(t *testing.T) {
@@ -36,8 +34,6 @@ func TestBagWith(t *testing.T) {
 	assert.Equal(t, "k1", bag2.Fields()[0].Key)
 	assert.Equal(t, "k2", bag2.Fields()[1].Key)
 
-	// Different versions.
-	assert.NotEqual(t, bag1.Version(), bag2.Version())
 }
 
 func TestBagWithNil(t *testing.T) {
@@ -52,11 +48,6 @@ func TestBagWithNil(t *testing.T) {
 func TestBagFieldsNil(t *testing.T) {
 	var bag *Bag
 	assert.Nil(t, bag.Fields())
-}
-
-func TestBagVersionNil(t *testing.T) {
-	var bag *Bag
-	assert.Equal(t, int32(0), bag.Version())
 }
 
 func TestBagHasField(t *testing.T) {
@@ -80,14 +71,29 @@ func TestBagImmutable(t *testing.T) {
 	assert.Equal(t, 1, len(bag1.Fields()))
 }
 
-func TestBagVersionUnique(t *testing.T) {
+func TestBagLinkedList(t *testing.T) {
 	bag1 := NewBag(String("a", "1"))
-	bag2 := NewBag(String("b", "2"))
-	bag3 := bag1.With(String("c", "3"))
+	bag2 := bag1.With(String("b", "2"))
+	bag3 := bag2.With(String("c", "3"))
 
-	assert.NotEqual(t, bag1.Version(), bag2.Version())
-	assert.NotEqual(t, bag1.Version(), bag3.Version())
-	assert.NotEqual(t, bag2.Version(), bag3.Version())
+	// Each node only has its own fields.
+	assert.Equal(t, 1, len(bag1.Fields()))
+	assert.Equal(t, 2, len(bag2.Fields()))
+	assert.Equal(t, 3, len(bag3.Fields()))
+
+	// Parent-first order.
+	assert.Equal(t, "a", bag3.Fields()[0].Key)
+	assert.Equal(t, "b", bag3.Fields()[1].Key)
+	assert.Equal(t, "c", bag3.Fields()[2].Key)
+}
+
+func TestBagHasFieldLinkedList(t *testing.T) {
+	bag := NewBag(String("a", "1")).With(String("b", "2")).With(String("c", "3"))
+
+	assert.True(t, bag.HasField("a"))
+	assert.True(t, bag.HasField("b"))
+	assert.True(t, bag.HasField("c"))
+	assert.False(t, bag.HasField("d"))
 }
 
 func TestContextWithBag(t *testing.T) {

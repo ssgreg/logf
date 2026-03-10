@@ -1,71 +1,60 @@
 package logf
 
-import (
-	"context"
-	"sync/atomic"
-)
+import "context"
 
-var nextVersion int32
-
-// Bag is an immutable collection of Fields with a version for cache keying.
+// Bag is an immutable linked list of Fields.
+// Each With creates a new node pointing to the parent — O(1), no copies.
 // Bag is safe to share across goroutines.
 type Bag struct {
-	fields  []Field
-	version int32
+	fields []Field
+	parent *Bag
 }
 
 // NewBag creates a new Bag with the given fields.
 func NewBag(fs ...Field) *Bag {
-	return &Bag{
-		fields:  fs,
-		version: atomic.AddInt32(&nextVersion, 1),
-	}
+	return &Bag{fields: fs}
 }
 
 // With returns a new Bag that contains both the existing fields and the
 // given additional fields. The original Bag is not modified.
+// O(1): no field copy, new node points to parent.
 func (b *Bag) With(fs ...Field) *Bag {
-	if b == nil {
-		return NewBag(fs...)
-	}
-
-	merged := make([]Field, len(b.fields)+len(fs))
-	copy(merged, b.fields)
-	copy(merged[len(b.fields):], fs)
-
-	return &Bag{
-		fields:  merged,
-		version: atomic.AddInt32(&nextVersion, 1),
-	}
+	return &Bag{fields: fs, parent: b}
 }
 
-// Fields returns the fields stored in the Bag.
+// Fields returns all fields in the Bag chain, parent-first order.
 func (b *Bag) Fields() []Field {
 	if b == nil {
 		return nil
 	}
-
-	return b.fields
-}
-
-// Version returns the Bag's version, usable as a cache key.
-func (b *Bag) Version() int32 {
-	if b == nil {
-		return 0
+	if b.parent == nil {
+		return b.fields
 	}
 
-	return b.version
+	// Count total fields.
+	n := 0
+	for node := b; node != nil; node = node.parent {
+		n += len(node.fields)
+	}
+
+	// Collect in reverse (child→parent), then reverse to get parent-first.
+	all := make([]Field, n)
+	i := n
+	for node := b; node != nil; node = node.parent {
+		i -= len(node.fields)
+		copy(all[i:], node.fields)
+	}
+
+	return all
 }
 
-// HasField reports whether the Bag contains a field with the given key.
+// HasField reports whether the Bag chain contains a field with the given key.
 func (b *Bag) HasField(key string) bool {
-	if b == nil {
-		return false
-	}
-
-	for i := range b.fields {
-		if b.fields[i].Key == key {
-			return true
+	for node := b; node != nil; node = node.parent {
+		for i := range node.fields {
+			if node.fields[i].Key == key {
+				return true
+			}
 		}
 	}
 
