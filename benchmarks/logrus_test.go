@@ -87,6 +87,37 @@ func BenchmarkLogrusTextWithFields(b *testing.B) {
 	}
 }
 
+// --- Logger.With ---
+
+func BenchmarkLogrusLoggerWith(b *testing.B) {
+	logger := newLogrus()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.WithFields(logrusFields())
+	}
+}
+
+func BenchmarkLogrusLoggerWithOnTop(b *testing.B) {
+	logger := newLogrus().WithFields(logrusFields())
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.WithFields(logrusFields())
+	}
+}
+
+// --- Accumulated fields (pre-attached via WithFields) ---
+
+func BenchmarkLogrusTextWithAccumulatedFields(b *testing.B) {
+	logger := newLogrus().WithFields(logrusFields())
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled")
+	}
+}
+
 // --- Parallel ---
 
 func BenchmarkLogrusParallelPlainText(b *testing.B) {
