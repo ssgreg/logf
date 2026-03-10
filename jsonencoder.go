@@ -82,7 +82,7 @@ func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
 // given JSONEncoderConfig.
 var NewJSONEncoder = jsonEncoderGetter(
 	func(cfg JSONEncoderConfig) Encoder {
-		return &jsonEncoder{cfg.WithDefaults(), nil, 0}
+		return &jsonEncoder{JSONEncoderConfig: cfg.WithDefaults(), slot: AllocEncoderSlot()}
 	},
 )
 
@@ -90,7 +90,7 @@ var NewJSONEncoder = jsonEncoderGetter(
 // TypeEncoderFactory with the given JSONEncoderConfig.
 var NewJSONTypeEncoderFactory = jsonTypeEncoderFactoryGetter(
 	func(c JSONEncoderConfig) TypeEncoderFactory {
-		return &jsonEncoder{c.WithDefaults(), nil, 0}
+		return &jsonEncoder{JSONEncoderConfig: c.WithDefaults()}
 	},
 )
 
@@ -109,6 +109,7 @@ func (c jsonTypeEncoderFactoryGetter) Default() TypeEncoderFactory {
 type jsonEncoder struct {
 	JSONEncoderConfig
 
+	slot        int // 1-based encoder slot for Bag cache; 0 = no caching
 	buf         *Buffer
 	startBufLen int
 }
@@ -174,12 +175,28 @@ func (f *jsonEncoder) encodeBag(bag *Bag) {
 	if bag == nil {
 		return
 	}
+
+	// Cache hit: encoded bytes for this node + all parents.
+	if data := bag.LoadCache(f.slot); data != nil {
+		f.buf.AppendBytes(data)
+		return
+	}
+
+	start := f.buf.Len()
+
 	// Walk parent first to preserve field order (parent before child).
 	if bag.parent != nil {
 		f.encodeBag(bag.parent)
 	}
 	for _, field := range bag.fields {
 		field.Accept(f)
+	}
+
+	// Cache the encoded bytes (this node + all parents).
+	if f.slot != 0 {
+		encoded := make([]byte, f.buf.Len()-start)
+		copy(encoded, f.buf.Data[start:])
+		bag.StoreCache(f.slot, encoded)
 	}
 }
 
