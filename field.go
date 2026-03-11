@@ -97,7 +97,19 @@ func String(k string, v string) Field {
 }
 
 // Strings returns a new Field with the given key and slice of strings.
+//
+// Call ConstStrings if your slice is const. It has significantly less impact
+// on the calling goroutine.
 func Strings(k string, v []string) Field {
+	cc := make([]string, len(v))
+	copy(cc, v)
+
+	return ConstStrings(k, cc)
+}
+
+// ConstStrings returns a new Field with the given key and slice of strings.
+// The caller MUST NOT mutate the slice after the call.
+func ConstStrings(k string, v []string) Field {
 	return Field{Key: k, Type: FieldTypeBytesToStrings, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 

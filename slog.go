@@ -124,7 +124,6 @@ func attrToField(a slog.Attr) Field {
 
 	key := a.Key
 	v := a.Value
-
 	switch v.Kind() {
 	case slog.KindBool:
 		var val int64
