@@ -1,289 +1,182 @@
 package benchmarks
 
 import (
-	"bufio"
 	"io"
-	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 )
 
-func newZerolog() zerolog.Logger {
-	return zerolog.New(io.Discard).With().Timestamp().Logger()
+func newZerologDiscard() zerolog.Logger {
+	return zerolog.New(io.Discard).With().Timestamp().Logger().Level(zerolog.DebugLevel)
 }
 
-func newDisabledZerolog() zerolog.Logger {
-	return newZerolog().Level(zerolog.Disabled)
+func newZerologDiscardInfo() zerolog.Logger {
+	return zerolog.New(io.Discard).With().Timestamp().Logger().Level(zerolog.InfoLevel)
 }
 
-func zerologFields(e *zerolog.Event) *zerolog.Event {
-	return e.
-		Int("int", 42).
-		Str("string", "hello").
+func newZerologDiscardWithCaller() zerolog.Logger {
+	return zerolog.New(io.Discard).With().Timestamp().Caller().Logger().Level(zerolog.DebugLevel)
+}
+
+func zerologTwoScalars(e *zerolog.Event) *zerolog.Event {
+	return e.Str("method", "GET").Int("status", 200)
+}
+
+func zerologSixScalars(e *zerolog.Event) *zerolog.Event {
+	return e.Str("method", "GET").
+		Int("status", 200).
 		Str("path", "/api/v1/users").
-		Int64("latency_us", 1234).
-		Bool("ok", true)
+		Str("user_agent", "Mozilla/5.0").
+		Str("request_id", "abc-def-123").
+		Int("size", 1024)
 }
 
-func fakeZerologFields(e *zerolog.Event) *zerolog.Event {
-	return e.
-		Int("int", tenInts[0]).
-		Interface("ints", tenInts).
-		Str("string", tenStrings[0]).
-		Interface("strings", tenStrings).
-		Time("fm", tenTimes[0]).
-		// Interface("times", tenTimes).
-		Interface("user1", oneUser).
-		// Interface("user2", oneUser).
-		// Interface("users", tenUsers).
-		Err(errExample)
+func zerologSixHeavy(e *zerolog.Event) *zerolog.Event {
+	return e.Bytes("body", heavyBytes).
+		Time("timestamp", heavyTime).
+		Ints64("ids", heavyInts64).
+		Strs("tags", heavyStrings).
+		Dur("latency", heavyDuration).
+		Dict("user", zerolog.Dict().Int("id", 123).Str("name", "alice"))
 }
 
-func fakeZerologContext(c zerolog.Context) zerolog.Context {
-	return c.
-		Int("int", tenInts[0]).
-		Interface("ints", tenInts).
-		Str("string", tenStrings[0]).
-		Interface("strings", tenStrings).
-		Time("tm", tenTimes[0]).
-		// Interface("times", tenTimes).
-		Interface("user1", oneUser).
-		// Interface("user2", oneUser).
-		// Interface("users", tenUsers).
-		Err(errExample)
+func zerologTwoScalarsCtx(c zerolog.Context) zerolog.Context {
+	return c.Str("method", "GET").Int("status", 200)
 }
 
-// --- Disabled path ---
+// B0: DisabledLevel
+func BenchmarkZerolog_DisabledLevel(b *testing.B) {
+	logger := newZerologDiscardInfo()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Debug().Msg("request handled")
+	}
+}
 
-func BenchmarkZerologDisabledLog(b *testing.B) {
-	logger := newDisabledZerolog()
-
+// B1: NoFields
+func BenchmarkZerolog_NoFields(b *testing.B) {
+	logger := newZerologDiscard()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		logger.Info().Msg("request handled")
 	}
 }
 
-func BenchmarkZerologDisabledLogWithFields(b *testing.B) {
-	logger := newDisabledZerolog()
-
+// B2: TwoScalars
+func BenchmarkZerolog_TwoScalars(b *testing.B) {
+	logger := newZerologDiscard()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		zerologFields(logger.Info()).Msg("request handled")
+		zerologTwoScalars(logger.Info()).Msg("request handled")
 	}
 }
 
-// --- Enabled path ---
-
-func BenchmarkZerologPlainText(b *testing.B) {
-	logger := newZerolog()
-
+// B3: TwoScalarsInGroup
+func BenchmarkZerolog_TwoScalarsInGroup(b *testing.B) {
+	logger := newZerologDiscard()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info().Msg("request handled")
+		logger.Info().
+			Dict("request", zerolog.Dict().Str("method", "GET").Int("status", 200)).
+			Msg("request handled")
 	}
 }
 
-func BenchmarkZerologTextWithFields(b *testing.B) {
-	logger := newZerolog()
-
+// B4: SixScalars
+func BenchmarkZerolog_SixScalars(b *testing.B) {
+	logger := newZerologDiscard()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		zerologFields(logger.Info()).Msg("request handled")
+		zerologSixScalars(logger.Info()).Msg("request handled")
 	}
 }
 
-// --- Logger.With ---
-
-func BenchmarkZerologLoggerWith(b *testing.B) {
-	logger := newZerolog()
-
+// B5: SixHeavy
+func BenchmarkZerolog_SixHeavy(b *testing.B) {
+	logger := newZerologDiscard()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = logger.With().
-			Int("int", 42).
-			Str("string", "hello").
-			Str("path", "/api/v1/users").
-			Int64("latency_us", 1234).
-			Bool("ok", true).
-			Logger()
+		zerologSixHeavy(logger.Info()).Msg("request handled")
 	}
 }
 
-func BenchmarkZerologLoggerWithOnTop(b *testing.B) {
-	logger := newZerolog().With().
-		Int("int", 42).
-		Str("string", "hello").
-		Str("path", "/api/v1/users").
-		Int64("latency_us", 1234).
-		Bool("ok", true).
-		Logger()
-
+// B6: ErrorField
+func BenchmarkZerolog_ErrorField(b *testing.B) {
+	logger := newZerologDiscard()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = logger.With().
-			Int("int", 42).
-			Str("string", "hello").
-			Str("path", "/api/v1/users").
-			Int64("latency_us", 1234).
-			Bool("ok", true).
-			Logger()
+		logger.Info().Err(errExample).Msg("request handled")
 	}
 }
 
-// --- Accumulated fields (pre-attached via With) ---
+// B7: WithPerCall+NoFields
+func BenchmarkZerolog_WithPerCall_NoFields(b *testing.B) {
+	logger := newZerologDiscard()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l := zerologTwoScalarsCtx(logger.With()).Logger()
+		l.Info().Msg("request handled")
+	}
+}
 
-func BenchmarkZerologTextWithAccumulatedFields(b *testing.B) {
-	logger := newZerolog().With().
-		Int("int", 42).
-		Str("string", "hello").
-		Str("path", "/api/v1/users").
-		Int64("latency_us", 1234).
-		Bool("ok", true).
-		Logger()
+// B8: WithPerCall+TwoScalars
+func BenchmarkZerolog_WithPerCall_TwoScalars(b *testing.B) {
+	logger := newZerologDiscard()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l := zerologTwoScalarsCtx(logger.With()).Logger()
+		zerologTwoScalars(l.Info()).Msg("request handled")
+	}
+}
 
+// B9: WithCached+NoFields
+func BenchmarkZerolog_WithCached_NoFields(b *testing.B) {
+	logger := zerologTwoScalarsCtx(newZerologDiscard().With()).Logger()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		logger.Info().Msg("request handled")
 	}
 }
 
-// --- Parallel ---
-
-func BenchmarkZerologParallelPlainText(b *testing.B) {
-	logger := newZerolog()
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info().Msg("request handled")
-		}
-	})
-}
-
-// --- Buffered File I/O ---
-
-func BenchmarkZerologBufferedFileIOWithFields(b *testing.B) {
-	f, err := os.CreateTemp("", "zerolog-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	lbw := &lockedBufWriter{bw: bufio.NewWriterSize(f, 4096)}
-	defer lbw.Flush()
-	logger := zerolog.New(lbw).With().Timestamp().
-		Int("int", 42).
-		Str("string", "hello").
-		Str("path", "/api/v1/users").
-		Int64("latency_us", 1234).
-		Bool("ok", true).
-		Logger()
-
+// B10: WithCached+TwoScalars
+func BenchmarkZerolog_WithCached_TwoScalars(b *testing.B) {
+	logger := zerologTwoScalarsCtx(newZerologDiscard().With()).Logger()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info().Msg("request handled")
+		zerologTwoScalars(logger.Info()).Msg("request handled")
 	}
 }
 
-func BenchmarkZerologBufferedParallelFileIOWithFields(b *testing.B) {
-	f, err := os.CreateTemp("", "zerolog-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	lbw := &lockedBufWriter{bw: bufio.NewWriterSize(f, 4096)}
-	defer lbw.Flush()
-	logger := zerolog.New(lbw).With().Timestamp().
-		Int("int", 42).
-		Str("string", "hello").
-		Str("path", "/api/v1/users").
-		Int64("latency_us", 1234).
-		Bool("ok", true).
-		Logger()
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info().Msg("request handled")
-		}
-	})
-}
-
-func BenchmarkZerologBufferedFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "zerolog-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	lbw := &lockedBufWriter{bw: bufio.NewWriterSize(f, 4096)}
-	defer lbw.Flush()
-	logger := zerolog.New(lbw).With().Timestamp().Logger()
-
+// B11: WithBoth+TwoScalars
+func BenchmarkZerolog_WithBoth_TwoScalars(b *testing.B) {
+	logger := zerologTwoScalarsCtx(newZerologDiscard().With()).Logger()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info().Msg("request handled")
+		l := zerologTwoScalarsCtx(logger.With()).Logger()
+		zerologTwoScalars(l.Info()).Msg("request handled")
 	}
 }
 
-func BenchmarkZerologBufferedParallelFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "zerolog-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	lbw := &lockedBufWriter{bw: bufio.NewWriterSize(f, 4096)}
-	defer lbw.Flush()
-	logger := zerolog.New(lbw).With().Timestamp().Logger()
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info().Msg("request handled")
-		}
-	})
-}
-
-// --- File I/O ---
-
-func BenchmarkZerologFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "zerolog-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	logger := zerolog.New(f).With().Timestamp().Logger()
-
+// B12: WithGroupCached+TwoScalars
+func BenchmarkZerolog_WithGroupCached_TwoScalars(b *testing.B) {
+	// zerolog has no WithGroup. Closest: nested Dict on each call with cached context.
+	logger := zerologTwoScalarsCtx(newZerologDiscard().With()).Logger()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info().Msg("request handled")
+		zerologTwoScalars(logger.Info()).Msg("request handled")
 	}
 }
 
-func BenchmarkZerologParallelFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "zerolog-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	logger := zerolog.New(f).With().Timestamp().Logger()
-
+// B13: Caller+TwoScalars
+func BenchmarkZerolog_Caller_TwoScalars(b *testing.B) {
+	logger := newZerologDiscardWithCaller()
 	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info().Msg("request handled")
-		}
-	})
+	for i := 0; i < b.N; i++ {
+		zerologTwoScalars(logger.Info()).Msg("request handled")
+	}
 }
+
+// Suppress unused import warning.
+var _ = time.Now

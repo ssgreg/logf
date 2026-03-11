@@ -1,286 +1,160 @@
 package benchmarks
 
 import (
-	"bufio"
 	"io"
-	"os"
 	"testing"
 
 	"github.com/ssgreg/logrus"
 )
 
-func newDisabledLogrus() *logrus.Logger {
-	logger := newLogrus()
-	logger.Level = logrus.ErrorLevel
-	return logger
+func newLogrusDiscard() *logrus.Logger {
+	l := logrus.New()
+	l.Out = io.Discard
+	l.Formatter = &logrus.JSONFormatter{}
+	l.Level = logrus.DebugLevel
+	return l
 }
 
-func newLogrus() *logrus.Logger {
-	return &logrus.Logger{
-		Out:       io.Discard,
-		Formatter: new(logrus.JSONFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.DebugLevel,
-	}
+func newLogrusDiscardInfo() *logrus.Logger {
+	l := logrus.New()
+	l.Out = io.Discard
+	l.Formatter = &logrus.JSONFormatter{}
+	l.Level = logrus.InfoLevel
+	return l
 }
 
-func logrusFields() logrus.Fields {
+// logrus (ssgreg fork) has no ReportCaller — B13 Caller skipped below
+
+func logrusTwoScalars() logrus.Fields {
 	return logrus.Fields{
-		"int":        42,
-		"string":     "hello",
-		"path":       "/api/v1/users",
-		"latency_us": int64(1234),
-		"ok":         true,
+		"method": "GET",
+		"status": 200,
 	}
 }
 
-func fakeLogrusFields() logrus.Fields {
+func logrusSixScalars() logrus.Fields {
 	return logrus.Fields{
-		"int":     tenInts[0],
-		"ints":    tenInts,
-		"string":  tenStrings[0],
-		"strings": tenStrings,
-		"tm":      tenTimes[0],
-		// "times":   tenTimes,
-		"user1": oneUser,
-		// "user2":   oneUser,
-		// "users":   tenUsers,
-		"error": errExample,
-	}
-}
-
-// --- Disabled path ---
-
-func BenchmarkLogrusDisabledLog(b *testing.B) {
-	logger := newDisabledLogrus()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
-	}
-}
-
-// --- Enabled path ---
-
-func BenchmarkLogrusPlainText(b *testing.B) {
-	logger := newLogrus()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
-	}
-}
-
-func BenchmarkLogrusTextWithFields(b *testing.B) {
-	logger := newLogrus()
-	fields := logrus.Fields{
-		"int":        42,
-		"string":     "hello",
+		"method":     "GET",
+		"status":     200,
 		"path":       "/api/v1/users",
-		"latency_us": int64(1234),
-		"ok":         true,
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.WithFields(fields).Info("request handled")
+		"user_agent": "Mozilla/5.0",
+		"request_id": "abc-def-123",
+		"size":       1024,
 	}
 }
 
-// --- Logger.With ---
-
-func BenchmarkLogrusLoggerWith(b *testing.B) {
-	logger := newLogrus()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = logger.WithFields(logrusFields())
+func logrusSixHeavy() logrus.Fields {
+	return logrus.Fields{
+		"body":      heavyBytes,
+		"timestamp": heavyTime,
+		"ids":       heavyInts64,
+		"tags":      heavyStrings,
+		"latency":   heavyDuration,
+		"user":      map[string]any{"id": 123, "name": "alice"},
 	}
 }
 
-func BenchmarkLogrusLoggerWithOnTop(b *testing.B) {
-	logger := newLogrus().WithFields(logrusFields())
-
+// B0: DisabledLevel
+func BenchmarkLogrus_DisabledLevel(b *testing.B) {
+	logger := newLogrusDiscardInfo()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = logger.WithFields(logrusFields())
+		logger.Debug("request handled")
 	}
 }
 
-// --- Accumulated fields (pre-attached via WithFields) ---
-
-func BenchmarkLogrusTextWithAccumulatedFields(b *testing.B) {
-	logger := newLogrus().WithFields(logrusFields())
-
+// B1: NoFields
+func BenchmarkLogrus_NoFields(b *testing.B) {
+	logger := newLogrusDiscard()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		logger.Info("request handled")
 	}
 }
 
-// --- Parallel ---
-
-func BenchmarkLogrusParallelPlainText(b *testing.B) {
-	logger := newLogrus()
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info("request handled")
-		}
-	})
-}
-
-// --- Buffered File I/O ---
-
-func BenchmarkLogrusBufferedFileIOWithFields(b *testing.B) {
-	f, err := os.CreateTemp("", "logrus-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	bw := bufio.NewWriterSize(f, 4096)
-	defer bw.Flush()
-	logger := logrus.New()
-	logger.Out = bw
-	logger.Formatter = new(logrus.JSONFormatter)
-	logger.Level = logrus.DebugLevel
-	entry := logger.WithFields(logrus.Fields{
-		"int":        42,
-		"string":     "hello",
-		"path":       "/api/v1/users",
-		"latency_us": int64(1234),
-		"ok":         true,
-	})
-
+// B2: TwoScalars
+func BenchmarkLogrus_TwoScalars(b *testing.B) {
+	logger := newLogrusDiscard()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		entry.Info("request handled")
+		logger.WithFields(logrusTwoScalars()).Info("request handled")
 	}
 }
 
-func BenchmarkLogrusBufferedParallelFileIOWithFields(b *testing.B) {
-	f, err := os.CreateTemp("", "logrus-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
+// B3: TwoScalarsInGroup — skipped, logrus has no native group support
 
-	bw := bufio.NewWriterSize(f, 4096)
-	defer bw.Flush()
-	logger := logrus.New()
-	logger.Out = bw
-	logger.Formatter = new(logrus.JSONFormatter)
-	logger.Level = logrus.DebugLevel
-	entry := logger.WithFields(logrus.Fields{
-		"int":        42,
-		"string":     "hello",
-		"path":       "/api/v1/users",
-		"latency_us": int64(1234),
-		"ok":         true,
-	})
-
+// B4: SixScalars
+func BenchmarkLogrus_SixScalars(b *testing.B) {
+	logger := newLogrusDiscard()
 	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			entry.Info("request handled")
-		}
-	})
+	for i := 0; i < b.N; i++ {
+		logger.WithFields(logrusSixScalars()).Info("request handled")
+	}
 }
 
-func BenchmarkLogrusBufferedFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "logrus-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
+// B5: SixHeavy
+func BenchmarkLogrus_SixHeavy(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.WithFields(logrusSixHeavy()).Info("request handled")
 	}
-	defer os.Remove(f.Name())
-	defer f.Close()
+}
 
-	bw := bufio.NewWriterSize(f, 4096)
-	defer bw.Flush()
-	logger := &logrus.Logger{
-		Out:       bw,
-		Formatter: new(logrus.JSONFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.DebugLevel,
+// B6: ErrorField
+func BenchmarkLogrus_ErrorField(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.WithError(errExample).Info("request handled")
 	}
+}
 
+// B7: WithPerCall+NoFields
+func BenchmarkLogrus_WithPerCall_NoFields(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.WithFields(logrusTwoScalars()).Info("request handled")
+	}
+}
+
+// B8: WithPerCall+TwoScalars
+func BenchmarkLogrus_WithPerCall_TwoScalars(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.WithFields(logrusTwoScalars()).WithFields(logrusTwoScalars()).Info("request handled")
+	}
+}
+
+// B9: WithCached+NoFields
+func BenchmarkLogrus_WithCached_NoFields(b *testing.B) {
+	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		logger.Info("request handled")
 	}
 }
 
-func BenchmarkLogrusBufferedParallelFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "logrus-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	bw := bufio.NewWriterSize(f, 4096)
-	defer bw.Flush()
-	logger := &logrus.Logger{
-		Out:       bw,
-		Formatter: new(logrus.JSONFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.DebugLevel,
-	}
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info("request handled")
-		}
-	})
-}
-
-// --- File I/O ---
-
-func BenchmarkLogrusFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "logrus-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	logger := &logrus.Logger{
-		Out:       f,
-		Formatter: new(logrus.JSONFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.DebugLevel,
-	}
-
+// B10: WithCached+TwoScalars
+func BenchmarkLogrus_WithCached_TwoScalars(b *testing.B) {
+	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
+		logger.WithFields(logrusTwoScalars()).Info("request handled")
 	}
 }
 
-func BenchmarkLogrusParallelFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "logrus-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	logger := &logrus.Logger{
-		Out:       f,
-		Formatter: new(logrus.JSONFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.DebugLevel,
-	}
-
+// B11: WithBoth+TwoScalars
+func BenchmarkLogrus_WithBoth_TwoScalars(b *testing.B) {
+	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
 	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info("request handled")
-		}
-	})
+	for i := 0; i < b.N; i++ {
+		logger.WithFields(logrusTwoScalars()).WithFields(logrusTwoScalars()).Info("request handled")
+	}
 }
+
+// B12: WithGroupCached+TwoScalars — skipped, logrus has no native group support
+
+// B13: Caller+TwoScalars — skipped, ssgreg/logrus fork has no ReportCaller

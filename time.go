@@ -62,10 +62,114 @@ func FloatSecondsDurationEncoder(d time.Duration, e TypeEncoder) {
 	e.EncodeTypeFloat64(float64(d) / float64(time.Second))
 }
 
-// StringDurationEncoder encodes the given Duration as a string using
-// Stringer interface.
+// StringDurationEncoder encodes the given Duration as a human-readable
+// string (e.g. "4.5s", "300ms", "1h2m3s") without allocating.
 func StringDurationEncoder(d time.Duration, m TypeEncoder) {
-	m.EncodeTypeString(d.String())
+	var buf [32]byte
+	var b []byte
+	b = buf[:0]
+	b = appendDuration(b, d)
+	m.EncodeTypeUnsafeBytes(noescape(unsafe.Pointer(&b)))
+	runtime.KeepAlive(&b)
+}
+
+// appendDuration formats d identically to time.Duration.String but
+// appends into the provided buffer instead of allocating a new string.
+func appendDuration(b []byte, d time.Duration) []byte {
+	if d == 0 {
+		return append(b, '0', 's')
+	}
+
+	neg := d < 0
+	if neg {
+		b = append(b, '-')
+		d = -d
+	}
+
+	u := uint64(d)
+
+	// Hours.
+	hasHours := u >= uint64(time.Hour)
+	if hasHours {
+		h := u / uint64(time.Hour)
+		u -= h * uint64(time.Hour)
+		b = appendUint(b, h)
+		b = append(b, 'h')
+	}
+	// Minutes — always printed if hours were printed.
+	hasMinutes := u >= uint64(time.Minute)
+	if hasHours || hasMinutes {
+		m := u / uint64(time.Minute)
+		u -= m * uint64(time.Minute)
+		b = appendUint(b, m)
+		b = append(b, 'm')
+	}
+	// Seconds — always printed if hours or minutes were printed.
+	if hasHours || hasMinutes {
+		b = appendFrac(b, u, 1_000_000_000, 9)
+		b = append(b, 's')
+		return b
+	}
+	// Sub-second only (no hours/minutes prefix).
+	if u >= uint64(time.Second) {
+		b = appendFrac(b, u, 1_000_000_000, 9)
+		b = append(b, 's')
+		return b
+	}
+	if u >= uint64(time.Millisecond) {
+		b = appendFrac(b, u, 1_000_000, 6)
+		b = append(b, 'm', 's')
+		return b
+	}
+	if u >= uint64(time.Microsecond) {
+		b = appendFrac(b, u, 1_000, 3)
+		b = append(b, '\xc2', '\xb5', 's') // µs UTF-8
+		return b
+	}
+	b = appendUint(b, u)
+	b = append(b, 'n', 's')
+	return b
+}
+
+// appendFrac appends ns/unit as "whole.frac" with trailing zeros trimmed.
+// fracDigits is the number of fractional digits (e.g. 9 for seconds).
+func appendFrac(b []byte, ns, unit uint64, fracDigits int) []byte {
+	whole := ns / unit
+	frac := ns % unit
+
+	b = appendUint(b, whole)
+	if frac == 0 {
+		return b
+	}
+	b = append(b, '.')
+
+	// Write fractional digits, then trim trailing zeros.
+	var tmp [9]byte
+	for i := fracDigits - 1; i >= 0; i-- {
+		tmp[i] = byte('0' + frac%10)
+		frac /= 10
+	}
+	end := fracDigits
+	for end > 0 && tmp[end-1] == '0' {
+		end--
+	}
+	b = append(b, tmp[:end]...)
+	return b
+}
+
+// appendUint appends the decimal representation of v.
+func appendUint(b []byte, v uint64) []byte {
+	if v == 0 {
+		return append(b, '0')
+	}
+	var tmp [20]byte
+	i := len(tmp)
+	for v > 0 {
+		i--
+		tmp[i] = byte('0' + v%10)
+		v /= 10
+	}
+	return append(b, tmp[i:]...)
 }
 
 // noescape hides a pointer from escape analysis.  noescape is

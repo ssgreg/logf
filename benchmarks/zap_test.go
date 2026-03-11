@@ -2,318 +2,187 @@ package benchmarks
 
 import (
 	"io"
-	"os"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func fakeZapFields() []zapcore.Field {
+func newZapDiscard(lvl zapcore.Level) *zap.Logger {
+	enc := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+	core := zapcore.NewCore(enc, zapcore.AddSync(io.Discard), lvl)
+	return zap.New(core)
+}
+
+func zapTwoScalars() []zap.Field {
 	return []zap.Field{
-		zap.Int("int", tenInts[0]),
-		zap.Ints("ints", tenInts),
-		zap.String("string", tenStrings[0]),
-		zap.Strings("strings", tenStrings),
-		zap.Time("fm", tenTimes[0]),
-		// zap.Times("times", tenTimes),
-		zap.Object("user1", oneUser),
-		// zap.Any("user2", oneUser),
-		// zap.Any("users", tenUsers),
-		zap.Error(errExample),
+		zap.String("method", "GET"),
+		zap.Int("status", 200),
 	}
 }
 
-func zapFields() []zap.Field {
+func zapSixScalars() []zap.Field {
 	return []zap.Field{
-		zap.Int("int", 42),
-		zap.String("string", "hello"),
+		zap.String("method", "GET"),
+		zap.Int("status", 200),
 		zap.String("path", "/api/v1/users"),
-		zap.Int64("latency_us", 1234),
-		zap.Bool("ok", true),
+		zap.String("user_agent", "Mozilla/5.0"),
+		zap.String("request_id", "abc-def-123"),
+		zap.Int("size", 1024),
 	}
 }
 
-// A Syncer is a spy for the Sync portion of zapcore.WriteSyncer.
-type Syncer struct {
-	err    error
-	called bool
+// zapUser implements zapcore.ObjectMarshaler for Object benchmarks.
+type zapUser struct {
+	ID   int
+	Name string
 }
 
-// SetError sets the error that the Sync method will return.
-func (s *Syncer) SetError(err error) {
-	s.err = err
+func (u *zapUser) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddInt("id", u.ID)
+	enc.AddString("name", u.Name)
+	return nil
 }
 
-// Sync records that it was called, then returns the user-supplied error (if
-// any).
-func (s *Syncer) Sync() error {
-	s.called = true
-	return s.err
+func zapSixHeavy() []zap.Field {
+	return []zap.Field{
+		zap.Binary("body", heavyBytes),
+		zap.Time("timestamp", heavyTime),
+		zap.Int64s("ids", heavyInts64),
+		zap.Strings("tags", heavyStrings),
+		zap.Duration("latency", heavyDuration),
+		zap.Object("user", &zapUser{ID: 123, Name: "alice"}),
+	}
 }
 
-// Called reports whether the Sync method was called.
-func (s *Syncer) Called() bool {
-	return s.called
+// B0: DisabledLevel
+func BenchmarkZap_DisabledLevel(b *testing.B) {
+	logger := newZapDiscard(zapcore.InfoLevel)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Debug("request handled")
+	}
 }
 
-// A Discarder sends all writes to io.Discard.
-type Discarder struct{ Syncer }
-
-// Write implements io.Writer.
-func (d *Discarder) Write(b []byte) (int, error) {
-	return io.Discard.Write(b)
-}
-
-func newZapLogger(lvl zapcore.Level) *zap.Logger {
-	ec := zap.NewProductionEncoderConfig()
-	ec.EncodeDuration = zapcore.NanosDurationEncoder
-	ec.EncodeTime = zapcore.ISO8601TimeEncoder
-	enc := zapcore.NewJSONEncoder(ec)
-	return zap.New(zapcore.NewCore(
-		enc,
-		&Discarder{},
-		lvl,
-	))
-}
-
-func newZapFileLogger(f *os.File) *zap.Logger {
-	ec := zap.NewProductionEncoderConfig()
-	ec.EncodeDuration = zapcore.NanosDurationEncoder
-	ec.EncodeTime = zapcore.ISO8601TimeEncoder
-	enc := zapcore.NewJSONEncoder(ec)
-	return zap.New(zapcore.NewCore(enc, zapcore.AddSync(f), zap.DebugLevel))
-}
-
-func newZapBufferedFileLogger(f *os.File) (*zap.Logger, func()) {
-	ec := zap.NewProductionEncoderConfig()
-	ec.EncodeDuration = zapcore.NanosDurationEncoder
-	ec.EncodeTime = zapcore.ISO8601TimeEncoder
-	enc := zapcore.NewJSONEncoder(ec)
-	bws := &zapcore.BufferedWriteSyncer{WS: zapcore.AddSync(f)}
-	logger := zap.New(zapcore.NewCore(enc, bws, zap.DebugLevel))
-	return logger, func() { bws.Stop() }
-}
-
-// --- Disabled path ---
-
-func BenchmarkZapDisabledLog(b *testing.B) {
-	logger := newZapLogger(zap.ErrorLevel)
-
+// B1: NoFields
+func BenchmarkZap_NoFields(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		logger.Info("request handled")
 	}
 }
 
-func BenchmarkZapDisabledLogWithFields(b *testing.B) {
-	logger := newZapLogger(zap.ErrorLevel)
-
+// B2: TwoScalars
+func BenchmarkZap_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info("request handled", zapFields()...)
+		logger.Info("request handled", zapTwoScalars()...)
 	}
 }
 
-func BenchmarkZapDisabledCheck(b *testing.B) {
-	logger := newZapLogger(zap.ErrorLevel)
-
+// B3: TwoScalarsInGroup
+func BenchmarkZap_TwoScalarsInGroup(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if m := logger.Check(zap.InfoLevel, "request handled"); m != nil {
-			m.Write()
-		}
+		logger.Info("request handled",
+			zap.Dict("request", zap.String("method", "GET"), zap.Int("status", 200)),
+		)
 	}
 }
 
-// --- Enabled path ---
-
-func BenchmarkZapPlainText(b *testing.B) {
-	logger := newZapLogger(zap.DebugLevel)
-
+// B4: SixScalars
+func BenchmarkZap_SixScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
+		logger.Info("request handled", zapSixScalars()...)
 	}
 }
 
-func BenchmarkZapTextWithFields(b *testing.B) {
-	logger := newZapLogger(zap.DebugLevel)
-
+// B5: SixHeavy
+func BenchmarkZap_SixHeavy(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info("request handled", zapFields()...)
+		logger.Info("request handled", zapSixHeavy()...)
 	}
 }
 
-func BenchmarkZapTextWithAccumulatedFields(b *testing.B) {
-	logger := newZapLogger(zap.DebugLevel).With(zapFields()...)
-
+// B6: ErrorField
+func BenchmarkZap_ErrorField(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
+		logger.Info("request handled", zap.Error(errExample))
 	}
 }
 
-// --- Caller ---
-
-func BenchmarkZapPlainTextWithCaller(b *testing.B) {
-	logger := newZapLogger(zap.DebugLevel).WithOptions(zap.AddCaller())
-
+// B7: WithPerCall+NoFields
+func BenchmarkZap_WithPerCall_NoFields(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
+		logger.With(zapTwoScalars()...).Info("request handled")
 	}
 }
 
-func BenchmarkZapTextWithFieldsAndCaller(b *testing.B) {
-	logger := newZapLogger(zap.DebugLevel).WithOptions(zap.AddCaller())
-
+// B8: WithPerCall+TwoScalars
+func BenchmarkZap_WithPerCall_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info("request handled", zapFields()...)
+		logger.With(zapTwoScalars()...).Info("request handled", zapTwoScalars()...)
 	}
 }
 
-// --- Logger.With ---
-
-func BenchmarkZapLoggerWith(b *testing.B) {
-	logger := newZapLogger(zap.DebugLevel)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = logger.With(zapFields()...)
-	}
-}
-
-func BenchmarkZapLoggerWithOnTop(b *testing.B) {
-	logger := newZapLogger(zap.DebugLevel).With(zapFields()...)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = logger.With(zapFields()...)
-	}
-}
-
-// --- Parallel ---
-
-func BenchmarkZapParallelPlainText(b *testing.B) {
-	logger := newZapLogger(zap.DebugLevel)
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info("request handled")
-		}
-	})
-}
-
-// --- File I/O ---
-
-func BenchmarkZapBufferedFileIOWithFields(b *testing.B) {
-	f, err := os.CreateTemp("", "zap-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	logger, stop := newZapBufferedFileLogger(f)
-	defer stop()
-	logger = logger.With(zapFields()...)
-
+// B9: WithCached+NoFields
+func BenchmarkZap_WithCached_NoFields(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		logger.Info("request handled")
 	}
 }
 
-func BenchmarkZapBufferedParallelFileIOWithFields(b *testing.B) {
-	f, err := os.CreateTemp("", "zap-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	logger, stop := newZapBufferedFileLogger(f)
-	defer stop()
-	logger = logger.With(zapFields()...)
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info("request handled")
-		}
-	})
-}
-
-func BenchmarkZapBufferedFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "zap-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	logger, stop := newZapBufferedFileLogger(f)
-	defer stop()
-
+// B10: WithCached+TwoScalars
+func BenchmarkZap_WithCached_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
+		logger.Info("request handled", zapTwoScalars()...)
 	}
 }
 
-func BenchmarkZapBufferedParallelFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "zap-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	logger, stop := newZapBufferedFileLogger(f)
-	defer stop()
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info("request handled")
-		}
-	})
-}
-
-func BenchmarkZapFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "zap-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	logger := newZapFileLogger(f)
-
+// B11: WithBoth+TwoScalars
+func BenchmarkZap_WithBoth_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
+		logger.With(zapTwoScalars()...).Info("request handled", zapTwoScalars()...)
 	}
 }
 
-func BenchmarkZapParallelFileIO(b *testing.B) {
-	f, err := os.CreateTemp("", "zap-bench-*.log")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	logger := newZapFileLogger(f)
-
+// B12: WithGroupCached+TwoScalars
+func BenchmarkZap_WithGroupCached_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).With(zap.Namespace("request")).With(zapTwoScalars()...)
 	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			logger.Info("request handled")
-		}
-	})
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled", zapTwoScalars()...)
+	}
 }
+
+// B13: Caller+TwoScalars
+func BenchmarkZap_Caller_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).WithOptions(zap.AddCaller())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Info("request handled", zapTwoScalars()...)
+	}
+}
+
+// Suppress unused import warning.
+var _ = time.Now
