@@ -3,6 +3,8 @@ package logf
 import (
 	"encoding/base64"
 	"encoding/json"
+	"math"
+	"sync"
 	"time"
 	"unicode/utf8"
 	"unsafe"
@@ -36,6 +38,13 @@ type JSONEncoderConfig struct {
 	EncodeError    ErrorEncoder
 	EncodeLevel    LevelEncoder
 	EncodeCaller   CallerEncoder
+
+	// Precomputed escaped key fragments: `"key":` — avoids EscapeString on every call.
+	keyLevel  []byte
+	keyTime   []byte
+	keyName   []byte
+	keyMsg    []byte
+	keyCaller []byte
 }
 
 // WithDefaults returns the new config in which all uninitialized fields are
@@ -75,41 +84,39 @@ func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
 		c.EncodeCaller = ShortCallerEncoder
 	}
 
+	c.keyLevel = precomputeKey(c.FieldKeyLevel)
+	c.keyTime = precomputeKey(c.FieldKeyTime)
+	c.keyName = precomputeKey(c.FieldKeyName)
+	c.keyMsg = precomputeKey(c.FieldKeyMsg)
+	c.keyCaller = precomputeKey(c.FieldKeyCaller)
+
 	return c
 }
 
-// NewJSONEncoder creates the new instance of the JSON Encoder with the
-// given JSONEncoderConfig.
-var NewJSONEncoder = jsonEncoderGetter(
-	func(cfg JSONEncoderConfig) Encoder {
-		return &jsonEncoder{JSONEncoderConfig: cfg.WithDefaults(), slot: AllocEncoderSlot()}
-	},
-)
-
-// NewJSONTypeEncoderFactory creates the new instance of the JSON
-// TypeEncoderFactory with the given JSONEncoderConfig.
-var NewJSONTypeEncoderFactory = jsonTypeEncoderFactoryGetter(
-	func(c JSONEncoderConfig) TypeEncoderFactory {
-		return &jsonEncoder{JSONEncoderConfig: c.WithDefaults()}
-	},
-)
-
-type jsonEncoderGetter func(cfg JSONEncoderConfig) Encoder
-
-func (c jsonEncoderGetter) Default() Encoder {
-	return c(JSONEncoderConfig{})
-}
-
-type jsonTypeEncoderFactoryGetter func(cfg JSONEncoderConfig) TypeEncoderFactory
-
-func (c jsonTypeEncoderFactoryGetter) Default() TypeEncoderFactory {
-	return c(JSONEncoderConfig{})
+// NewJSONEncoder creates a new JSON Encoder with the given config.
+//
+// Each encoder owns a dedicated sync.Pool whose New func pre-fills
+// JSONEncoderConfig and slot. This avoids copying ~200 bytes of config
+// on every Encode call (as a global pool would require) and eliminates
+// pointer indirection that a *JSONEncoderConfig approach would add to
+// every field access in the hot path.
+func NewJSONEncoder(cfg JSONEncoderConfig) Encoder {
+	enc := &jsonEncoder{JSONEncoderConfig: cfg.WithDefaults(), slot: AllocEncoderSlot()}
+	enc.pool = &sync.Pool{New: func() any {
+		return &jsonEncoder{
+			JSONEncoderConfig: enc.JSONEncoderConfig,
+			slot:              enc.slot,
+		}
+	}}
+	return enc
 }
 
 type jsonEncoder struct {
 	JSONEncoderConfig
+	pool        *sync.Pool
+	slot        int
 
-	slot        int // 1-based encoder slot for Bag cache; 0 = no caching
+	// Internal state.
 	buf         *Buffer
 	startBufLen int
 }
@@ -121,37 +128,77 @@ func (f *jsonEncoder) TypeEncoder(buf *Buffer) TypeEncoder {
 	return f
 }
 
-func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
-	f.buf = buf
-	f.startBufLen = f.buf.Len()
+func (f *jsonEncoder) Clone() Encoder {
+	return &jsonEncoder{
+		JSONEncoderConfig: f.JSONEncoderConfig,
+		slot:              f.slot,
+		pool:              f.pool,
+	}
+}
 
-	buf.AppendByte('{')
+
+func (f *jsonEncoder) Encode(e Entry) (*Buffer, error) {
+	clone := f.pool.Get().(*jsonEncoder)
+
+	buf := GetBuffer()
+	err := clone.encode(buf, e)
+
+	clone.buf = nil
+	f.pool.Put(clone)
+
+	if err != nil {
+		buf.Free()
+		return nil, err
+	}
+	return buf, nil
+}
+
+func (f *jsonEncoder) encode(buf *Buffer, e Entry) error {
+	f.buf = buf
+	f.startBufLen = buf.Len()
+
+	f.buf.AppendByte('{')
 
 	// Level.
 	if !f.DisableFieldLevel {
-		f.addKey(f.FieldKeyLevel)
+		f.addPrecomputedKey(f.keyLevel)
+		cur := f.buf.Len()
 		f.EncodeLevel(e.Level, f)
+		if f.buf.Len() == cur {
+			f.EncodeTypeString(e.Level.String())
+		}
 	}
 
 	// Time.
 	if !f.DisableFieldTime {
-		f.EncodeFieldTime(f.FieldKeyTime, e.Time)
+		f.addPrecomputedKey(f.keyTime)
+		cur := f.buf.Len()
+		f.EncodeTime(e.Time, f)
+		if f.buf.Len() == cur {
+			f.EncodeTypeInt64(e.Time.UnixNano())
+		}
 	}
 
 	// Logger name.
 	if !f.DisableFieldName && e.LoggerName != "" {
-		f.EncodeFieldString(f.FieldKeyName, e.LoggerName)
+		f.addPrecomputedKey(f.keyName)
+		f.EncodeTypeString(e.LoggerName)
 	}
 
 	// Message.
 	if !f.DisableFieldMsg {
-		f.EncodeFieldString(f.FieldKeyMsg, e.Text)
+		f.addPrecomputedKey(f.keyMsg)
+		f.EncodeTypeString(e.Text)
 	}
 
 	// Caller.
 	if !f.DisableFieldCaller && e.CallerPC != 0 {
-		f.addKey(f.FieldKeyCaller)
+		f.addPrecomputedKey(f.keyCaller)
+		cur := f.buf.Len()
 		f.EncodeCaller(e.CallerPC, f)
+		if f.buf.Len() == cur {
+			f.EncodeTypeString("unknown")
+		}
 	}
 
 	// Context fields (request-scoped).
@@ -161,17 +208,17 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 	f.encodeBag(e.LoggerBag)
 
 	// Entry's fields.
-	for _, field := range e.Fields {
-		field.Accept(f)
+	for i := range e.Fields {
+		e.Fields[i].Accept(f)
 	}
 
 	// Close open groups (from WithGroup in Bag chains).
 	for n := countGroups(e.Bag) + countGroups(e.LoggerBag); n > 0; n-- {
-		buf.AppendByte('}')
+		f.buf.AppendByte('}')
 	}
 
-	buf.AppendByte('}')
-	buf.AppendByte('\n')
+	f.buf.AppendByte('}')
+	f.buf.AppendByte('\n')
 
 	return nil
 }
@@ -406,7 +453,7 @@ func (f *jsonEncoder) EncodeTypeAny(v interface{}) {
 func (f *jsonEncoder) EncodeTypeUnsafeBytes(v unsafe.Pointer) {
 	f.appendSeparator()
 	f.buf.AppendByte('"')
-	_ = EscapeByteString(f.buf, *(*[]byte)(v))
+	_ = EscapeString(f.buf, *(*[]byte)(v))
 	f.buf.AppendByte('"')
 }
 
@@ -464,12 +511,30 @@ func (f *jsonEncoder) EncodeTypeUint8(v uint8) {
 
 func (f *jsonEncoder) EncodeTypeFloat64(v float64) {
 	f.appendSeparator()
-	f.buf.AppendFloat64(v)
+	switch {
+	case math.IsNaN(v):
+		f.buf.AppendString(`"NaN"`)
+	case math.IsInf(v, 1):
+		f.buf.AppendString(`"+Inf"`)
+	case math.IsInf(v, -1):
+		f.buf.AppendString(`"-Inf"`)
+	default:
+		f.buf.AppendFloat64(v)
+	}
 }
 
 func (f *jsonEncoder) EncodeTypeFloat32(v float32) {
 	f.appendSeparator()
-	f.buf.AppendFloat32(v)
+	switch {
+	case math.IsNaN(float64(v)):
+		f.buf.AppendString(`"NaN"`)
+	case math.IsInf(float64(v), 1):
+		f.buf.AppendString(`"+Inf"`)
+	case math.IsInf(float64(v), -1):
+		f.buf.AppendString(`"-Inf"`)
+	default:
+		f.buf.AppendFloat32(v)
+	}
 }
 
 func (f *jsonEncoder) EncodeTypeDuration(v time.Duration) {
@@ -636,6 +701,11 @@ func (f *jsonEncoder) empty() bool {
 	return f.buf.Len() == f.startBufLen
 }
 
+func (f *jsonEncoder) addPrecomputedKey(key []byte) {
+	f.appendSeparator()
+	f.buf.AppendBytes(key)
+}
+
 func (f *jsonEncoder) addKey(k string) {
 	f.appendSeparator()
 	f.buf.AppendByte('"')
@@ -646,19 +716,20 @@ func (f *jsonEncoder) addKey(k string) {
 
 const hex = "0123456789abcdef"
 
-// EscapeString processes a single escape sequence to the given Buffer.
-func EscapeString(buf *Buffer, s string) error {
+// EscapeString JSON-escapes s and appends the result to buf.
+// s can be a string or []byte.
+func EscapeString[S []byte | string](buf *Buffer, s S) error {
 	p := 0
 	for i := 0; i < len(s); {
 		c := s[i]
 		switch {
-		case c < utf8.RuneSelf && c >= 0x20 && c != '\\' && c != '"':
+		case c >= 0x20 && c < utf8.RuneSelf && c != '\\' && c != '"':
 			i++
 
 			continue
 
 		case c < utf8.RuneSelf:
-			buf.AppendString(s[p:i])
+			appendBuf(buf, s[p:i])
 			switch c {
 			case '\t':
 				buf.AppendString(`\t`)
@@ -680,59 +751,61 @@ func EscapeString(buf *Buffer, s string) error {
 
 			continue
 		}
-		v, wd := utf8.DecodeRuneInString(s[i:])
-		if v == utf8.RuneError && wd == 1 {
-			buf.AppendString(s[p:i])
+
+		// Multi-byte UTF-8.
+		r, size := decodeRuneIn(s[i:])
+		if r == utf8.RuneError && size == 1 {
+			appendBuf(buf, s[p:i])
 			buf.AppendString(`\ufffd`)
 			i++
 			p = i
-
-			continue
 		} else {
-			i += wd
+			i += size
 		}
 	}
-	buf.AppendString(s[p:])
+	appendBuf(buf, s[p:])
 
 	return nil
 }
 
-// EscapeByteString processes a single escape sequence to the given Buffer.
-func EscapeByteString(buf *Buffer, s []byte) error {
-	p := 0
-	for i := 0; i < len(s); {
-		c := s[i]
-		switch {
-		case c >= 0x20 && c != '\\' && c != '"':
-			i++
+func appendBuf[S []byte | string](buf *Buffer, s S) {
+	switch v := any(s).(type) {
+	case string:
+		buf.AppendString(v)
+	case []byte:
+		buf.AppendBytes(v)
+	}
+}
 
-			continue
+func decodeRuneIn[S []byte | string](s S) (rune, int) {
+	switch v := any(s).(type) {
+	case string:
+		return utf8.DecodeRuneInString(v)
+	case []byte:
+		return utf8.DecodeRune(v)
+	}
+	return utf8.RuneError, 0
+}
 
-		default:
-			buf.AppendBytes(s[p:i])
-			switch c {
-			case '\t':
-				buf.AppendString(`\t`)
-			case '\r':
-				buf.AppendString(`\r`)
-			case '\n':
-				buf.AppendString(`\n`)
-			case '\\':
-				buf.AppendString(`\\`)
-			case '"':
-				buf.AppendString(`\"`)
-			default:
-				buf.AppendString(`\u00`)
-				buf.AppendByte(hex[c>>4])
-				buf.AppendByte(hex[c&0xf])
-			}
-			i++
-			p = i
-
-			continue
+// precomputeKey builds the escaped JSON key fragment `"key":` once.
+func precomputeKey(k string) []byte {
+	out := make([]byte, 0, len(k)+3)
+	out = append(out, '"')
+	needsEscape := false
+	for i := 0; i < len(k); i++ {
+		if k[i] < 0x20 || k[i] == '\\' || k[i] == '"' || k[i] >= utf8.RuneSelf {
+			needsEscape = true
+			break
 		}
 	}
-	buf.AppendBytes(s[p:])
-
-	return nil
+	if !needsEscape {
+		out = append(out, k...)
+	} else {
+		b := GetBuffer()
+		_ = EscapeString(b, k)
+		out = append(out, b.Data[:b.Len()]...)
+		b.Free()
+	}
+	out = append(out, '"', ':')
+	return out
 }

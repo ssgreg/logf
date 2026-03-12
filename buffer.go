@@ -2,12 +2,31 @@ package logf
 
 import (
 	"strconv"
+	"sync"
 )
 
 // PageSize is the recommended buffer size.
 const (
 	PageSize = 4 * 1024
 )
+
+var _bufferPool = sync.Pool{New: func() any {
+	return NewBufferWithCapacity(PageSize)
+}}
+
+// GetBuffer returns a *Buffer from the pool. The caller must call
+// Buffer.Free when done to return it to the pool.
+func GetBuffer() *Buffer {
+	buf := _bufferPool.Get().(*Buffer)
+	buf.Reset()
+	return buf
+}
+
+// Free returns the Buffer to the pool. The Buffer must not be used after
+// calling Free.
+func (b *Buffer) Free() {
+	_bufferPool.Put(b)
+}
 
 // NewBuffer creates the new instance of Buffer with default capacity.
 func NewBuffer() *Buffer {

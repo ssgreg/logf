@@ -46,7 +46,7 @@ func (c ChannelWriterConfig) WithDefaults() ChannelWriterConfig {
 	}
 	// Default appender writes JSON-formatter messages to stdout.
 	if c.Appender == nil {
-		c.Appender = NewWriteAppender(os.Stdout, NewJSONEncoder.Default())
+		c.Appender = NewWriteAppender(os.Stdout, NewJSONEncoder(JSONEncoderConfig{}))
 	}
 
 	return c

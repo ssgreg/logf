@@ -7,10 +7,17 @@ import (
 
 // Encoder defines the interface to create your own log format.
 //
-// In case of error, Encoder must remove bytes related to the given Entry
-// from the Buffer.
+// Encode serializes the Entry and returns a *Buffer obtained from the
+// pool. The caller must call Buffer.Free when done with the returned
+// buffer. Encode is safe for concurrent use — implementations must
+// handle internal cloning/pooling as needed.
+//
+// Clone returns an independent copy of the Encoder suitable for use in
+// another goroutine. The copy shares immutable configuration but has its
+// own mutable state (buffer pointers, counters, etc.).
 type Encoder interface {
-	Encode(*Buffer, Entry) error
+	Encode(Entry) (*Buffer, error)
+	Clone() Encoder
 }
 
 // ArrayEncoder defines the interface to create your own array logger.

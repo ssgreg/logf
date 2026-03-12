@@ -7,7 +7,7 @@ import (
 )
 
 func benchLogger(lvl Level, addCaller bool) (*Logger, ChannelWriterCloseFunc) {
-	enc := NewJSONEncoder.Default()
+	enc := NewJSONEncoder(JSONEncoderConfig{})
 	w, close := NewChannelWriter(lvl, ChannelWriterConfig{
 		Appender: NewWriteAppender(io.Discard, enc),
 	})
@@ -39,7 +39,7 @@ var benchCtx = context.Background()
 // --- Context bag ---
 
 func BenchmarkContextBag(b *testing.B) {
-	enc := NewJSONEncoder.Default()
+	enc := NewJSONEncoder(JSONEncoderConfig{})
 	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
 		Appender: NewWriteAppender(io.Discard, enc),
 	})
@@ -60,7 +60,7 @@ func BenchmarkContextBag(b *testing.B) {
 type traceKeyBench struct{}
 
 func BenchmarkFieldSource(b *testing.B) {
-	enc := NewJSONEncoder.Default()
+	enc := NewJSONEncoder(JSONEncoderConfig{})
 	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
 		Appender: NewWriteAppender(io.Discard, enc),
 	})
@@ -121,7 +121,7 @@ func BenchmarkLogDepth(b *testing.B) {
 // --- Realistic pipeline ---
 
 func BenchmarkRealisticPipeline(b *testing.B) {
-	enc := NewJSONEncoder.Default()
+	enc := NewJSONEncoder(JSONEncoderConfig{})
 	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
 		Appender: NewWriteAppender(io.Discard, enc),
 	})

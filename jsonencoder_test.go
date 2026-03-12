@@ -3,6 +3,7 @@ package logf
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -304,12 +305,11 @@ func TestEncoder(t *testing.T) {
 		},
 	}
 
-	enc := NewJSONEncoder.Default()
+	enc := NewJSONEncoder(JSONEncoderConfig{})
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			b := NewBuffer()
-			_ = enc.Encode(b, tc.entry)
+			b, _ := enc.Encode(tc.entry)
 
 			if tc.golden != "" {
 				require.EqualValues(t, tc.golden, b.String())
@@ -320,6 +320,7 @@ func TestEncoder(t *testing.T) {
 
 			var a map[string]interface{}
 			require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&a))
+			b.Free()
 		})
 	}
 }
@@ -345,7 +346,7 @@ func TestEscapeString(t *testing.T) {
 	}
 }
 
-func TestEscapeByteString(t *testing.T) {
+func TestEscapeStringBytes(t *testing.T) {
 	testCases := []struct {
 		golden string
 		source string
@@ -354,20 +355,82 @@ func TestEscapeByteString(t *testing.T) {
 		{`not<escape>html`, `not<escape>html`},
 		{`测试`, "测试"},
 		{`\u0008\\\r\n\t\"`, "\b\\\r\n\t\""},
+		// Invalid UTF-8 — handled by generic EscapeString[[]byte].
+		{`badtext\ufffd`, "badtext\xc5"},
+		{`ошибка\ufffdошибка`, "ошибка\xc5ошибка"},
+		{`测\ufffd试`, "测\xc5试"},
 	}
 
 	for _, tc := range testCases {
 		b := NewBuffer()
-		assert.NoError(t, EscapeByteString(b, []byte(tc.source)))
+		assert.NoError(t, EscapeString(b, []byte(tc.source)))
 		assert.Equal(t, tc.golden, b.String())
 	}
 }
 
-func TestEncoderFactory(t *testing.T) {
-	b := NewBuffer()
-	ef := NewJSONTypeEncoderFactory.Default()
-	te := ef.TypeEncoder(b)
+func TestEncodeFloatNaNInf(t *testing.T) {
+	enc := NewJSONEncoder(JSONEncoderConfig{})
 
-	te.EncodeTypeString("42")
-	assert.Equal(t, `"42"`, b.String())
+	testCases := []struct {
+		name   string
+		fields []Field
+		want   string
+	}{
+		{"Float64_NaN", []Field{Float64("v", math.NaN())}, `"NaN"`},
+		{"Float64_PosInf", []Field{Float64("v", math.Inf(1))}, `"+Inf"`},
+		{"Float64_NegInf", []Field{Float64("v", math.Inf(-1))}, `"-Inf"`},
+		{"Float32_NaN", []Field{Float32("v", float32(math.NaN()))}, `"NaN"`},
+		{"Float32_PosInf", []Field{Float32("v", float32(math.Inf(1)))}, `"+Inf"`},
+		{"Float32_NegInf", []Field{Float32("v", float32(math.Inf(-1)))}, `"-Inf"`},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			b, err := enc.Encode(Entry{Fields: tc.fields})
+			require.NoError(t, err)
+			assert.Contains(t, b.String(), `"v":`+tc.want)
+			// Must be valid JSON.
+			var m map[string]interface{}
+			require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&m))
+			b.Free()
+		})
+	}
 }
+
+func TestEncodeNoopEncoderFallback(t *testing.T) {
+	// No-op LevelEncoder: writes nothing.
+	noopLevel := func(l Level, m TypeEncoder) {}
+	// No-op TimeEncoder: writes nothing.
+	noopTime := func(t time.Time, m TypeEncoder) {}
+	// No-op CallerEncoder: writes nothing.
+	noopCaller := func(pc uintptr, m TypeEncoder) {}
+
+	enc := NewJSONEncoder(JSONEncoderConfig{
+		EncodeLevel:  LevelEncoder(noopLevel),
+		EncodeTime:   TimeEncoder(noopTime),
+		EncodeCaller: CallerEncoder(noopCaller),
+	})
+
+	e := Entry{
+		Level:    LevelInfo,
+		Time:     time.Unix(1234567890, 123456789),
+		Text:     "hello",
+		CallerPC: CallerPC(0),
+	}
+
+	b, err := enc.Encode(e)
+	require.NoError(t, err)
+	s := b.String()
+
+	// Level fallback: should contain the level string.
+	assert.Contains(t, s, `"level":"info"`)
+	// Time fallback: should contain UnixNano int.
+	assert.Contains(t, s, `"ts":1234567890123456789`)
+	// Caller fallback: should contain "unknown".
+	assert.Contains(t, s, `"caller":"unknown"`)
+	// Must be valid JSON.
+	var m map[string]interface{}
+	require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&m))
+	b.Free()
+}
+

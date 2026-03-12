@@ -75,11 +75,11 @@ func TestContextWriterEncodesContextBag(t *testing.T) {
 		Text:  "test",
 	}
 
-	enc := NewJSONEncoder.Default()
-	buf := NewBuffer()
-	_ = enc.Encode(buf, e)
+	enc := NewJSONEncoder(JSONEncoderConfig{})
+	buf, _ := enc.Encode(e)
 
 	assert.Contains(t, buf.String(), `"rid":"123"`)
+	buf.Free()
 }
 
 func TestContextBagBeforeLoggerBag(t *testing.T) {
@@ -90,11 +90,11 @@ func TestContextBagBeforeLoggerBag(t *testing.T) {
 		Text:      "order",
 	}
 
-	enc := NewJSONEncoder.Default()
-	buf := NewBuffer()
-	_ = enc.Encode(buf, e)
+	enc := NewJSONEncoder(JSONEncoderConfig{})
+	buf, _ := enc.Encode(e)
 
 	s := buf.String()
+	buf.Free()
 	assert.Contains(t, s, `"rid":"123"`)
 	assert.Contains(t, s, `"service":"api"`)
 
@@ -186,15 +186,14 @@ func TestContextBagCaching(t *testing.T) {
 		Text:  "test",
 	}
 
-	enc := NewJSONEncoder.Default()
+	enc := NewJSONEncoder(JSONEncoderConfig{})
 
-	buf1 := NewBuffer()
-	_ = enc.Encode(buf1, e)
-
-	buf2 := NewBuffer()
-	_ = enc.Encode(buf2, e)
+	buf1, _ := enc.Encode(e)
+	buf2, _ := enc.Encode(e)
 
 	// Same bag, same version — second encode should hit cache.
 	assert.Equal(t, buf1.String(), buf2.String())
 	assert.Contains(t, buf1.String(), `"rid":"123"`)
+	buf1.Free()
+	buf2.Free()
 }

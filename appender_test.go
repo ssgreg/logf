@@ -65,8 +65,12 @@ type failingEncoder struct {
 	e error
 }
 
-func (e *failingEncoder) Encode(*Buffer, Entry) error {
-	return e.e
+func (e *failingEncoder) Encode(Entry) (*Buffer, error) {
+	return nil, e.e
+}
+
+func (e *failingEncoder) Clone() Encoder {
+	return &failingEncoder{e: e.e}
 }
 
 type failingWriter struct {
@@ -92,7 +96,7 @@ func TestWriteAppenderErrors(t *testing.T) {
 	assert.EqualError(t, a.Append(Entry{}), goldenErr.Error())
 	checkWriterData(t, &w, "", 0)
 
-	a = NewWriteAppender(&failingWriter{goldenErr}, NewJSONEncoder.Default())
+	a = NewWriteAppender(&failingWriter{goldenErr}, NewJSONEncoder(JSONEncoderConfig{}))
 	assert.NoError(t, a.Append(Entry{}))
 	assert.EqualError(t, a.Flush(), goldenErr.Error())
 	assert.EqualError(t, a.Sync(), goldenErr.Error())
@@ -101,7 +105,7 @@ func TestWriteAppenderErrors(t *testing.T) {
 func TestWriteAppenderNoSync(t *testing.T) {
 	w := testWriterNoSync{}
 
-	a := NewWriteAppender(&w, NewJSONEncoder.Default())
+	a := NewWriteAppender(&w, NewJSONEncoder(JSONEncoderConfig{}))
 	assert.NoError(t, a.Sync())
 }
 
@@ -112,7 +116,7 @@ func TestWriteAppenderInvalidSync(t *testing.T) {
 
 	w := testWriter{e: &os.PathError{Err: syscall.EINVAL}}
 
-	a := NewWriteAppender(&w, NewJSONEncoder.Default())
+	a := NewWriteAppender(&w, NewJSONEncoder(JSONEncoderConfig{}))
 	// Sync should be called once in constructor to check sync possibility.
 	checkWriterData(t, &w, "", 1)
 
@@ -124,7 +128,7 @@ func TestWriteAppenderInvalidSync(t *testing.T) {
 func TestWriteAppender(t *testing.T) {
 	w := testWriter{}
 
-	a := NewWriteAppender(&w, NewJSONEncoder.Default())
+	a := NewWriteAppender(&w, NewJSONEncoder(JSONEncoderConfig{}))
 	// Sync should be called once in constructor to check sync possibility.
 	checkWriterData(t, &w, "", 1)
 

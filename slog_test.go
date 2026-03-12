@@ -45,9 +45,10 @@ func (s *entrySink) last() Entry {
 
 
 func (s *entrySink) json(e Entry) string {
-	buf := NewBuffer()
-	_ = s.enc.Encode(buf, e)
-	return strings.TrimRight(buf.String(), "\n")
+	buf, _ := s.enc.Encode(e)
+	result := strings.TrimRight(buf.String(), "\n")
+	buf.Free()
+	return result
 }
 
 func (s *entrySink) lastJSON() string {
