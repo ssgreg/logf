@@ -66,139 +66,6 @@ func BenchmarkSlog_DisabledLevel(b *testing.B) {
 // B1: NoFields
 func BenchmarkSlog_NoFields(b *testing.B) {
 	logger := newSlogDiscard()
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.InfoContext(ctx, "request handled")
-	}
-}
-
-// B2: TwoScalars
-func BenchmarkSlog_TwoScalars(b *testing.B) {
-	logger := newSlogDiscard()
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
-	}
-}
-
-// B3: TwoScalarsInGroup
-func BenchmarkSlog_TwoScalarsInGroup(b *testing.B) {
-	logger := newSlogDiscard()
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.LogAttrs(ctx, slog.LevelInfo, "request handled",
-			slog.Group("request", slog.String("method", "GET"), slog.Int("status", 200)),
-		)
-	}
-}
-
-// B4: SixScalars
-func BenchmarkSlog_SixScalars(b *testing.B) {
-	logger := newSlogDiscard()
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogSixScalars()...)
-	}
-}
-
-// B5: SixHeavy
-func BenchmarkSlog_SixHeavy(b *testing.B) {
-	logger := newSlogDiscard()
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogSixHeavy()...)
-	}
-}
-
-// B6: ErrorField
-func BenchmarkSlog_ErrorField(b *testing.B) {
-	logger := newSlogDiscard()
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slog.Any("error", errExample))
-	}
-}
-
-// B7: WithPerCall+NoFields
-func BenchmarkSlog_WithPerCall_NoFields(b *testing.B) {
-	logger := newSlogDiscard()
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.With(slogTwoScalarsArgs()...).InfoContext(ctx, "request handled")
-	}
-}
-
-// B8: WithPerCall+TwoScalars
-func BenchmarkSlog_WithPerCall_TwoScalars(b *testing.B) {
-	logger := newSlogDiscard()
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.With(slogTwoScalarsArgs()...).LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
-	}
-}
-
-// B9: WithCached+NoFields
-func BenchmarkSlog_WithCached_NoFields(b *testing.B) {
-	logger := newSlogDiscard().With(slogTwoScalarsArgs()...)
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.InfoContext(ctx, "request handled")
-	}
-}
-
-// B10: WithCached+TwoScalars
-func BenchmarkSlog_WithCached_TwoScalars(b *testing.B) {
-	logger := newSlogDiscard().With(slogTwoScalarsArgs()...)
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
-	}
-}
-
-// B11: WithBoth+TwoScalars
-func BenchmarkSlog_WithBoth_TwoScalars(b *testing.B) {
-	logger := newSlogDiscard().With(slogTwoScalarsArgs()...)
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.With(slogTwoScalarsArgs()...).LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
-	}
-}
-
-// B12: WithGroupCached+TwoScalars
-func BenchmarkSlog_WithGroupCached_TwoScalars(b *testing.B) {
-	logger := newSlogDiscard().WithGroup("request").With(slogTwoScalarsArgs()...)
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
-	}
-}
-
-// B13: Caller+TwoScalars
-func BenchmarkSlog_Caller_TwoScalars(b *testing.B) {
-	logger := newSlogDiscardWithCaller()
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
-	}
-}
-
-// --- Parallel variants ---
-
-func BenchmarkSlog_Parallel_NoFields(b *testing.B) {
-	logger := newSlogDiscard()
 	b.RunParallel(func(pb *testing.PB) {
 		ctx := context.Background()
 		for pb.Next() {
@@ -207,7 +74,8 @@ func BenchmarkSlog_Parallel_NoFields(b *testing.B) {
 	})
 }
 
-func BenchmarkSlog_Parallel_TwoScalars(b *testing.B) {
+// B2: TwoScalars
+func BenchmarkSlog_TwoScalars(b *testing.B) {
 	logger := newSlogDiscard()
 	b.RunParallel(func(pb *testing.PB) {
 		ctx := context.Background()
@@ -217,7 +85,87 @@ func BenchmarkSlog_Parallel_TwoScalars(b *testing.B) {
 	})
 }
 
-func BenchmarkSlog_Parallel_WithCached_TwoScalars(b *testing.B) {
+// B3: TwoScalarsInGroup
+func BenchmarkSlog_TwoScalarsInGroup(b *testing.B) {
+	logger := newSlogDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.LogAttrs(ctx, slog.LevelInfo, "request handled",
+				slog.Group("request", slog.String("method", "GET"), slog.Int("status", 200)),
+			)
+		}
+	})
+}
+
+// B4: SixScalars
+func BenchmarkSlog_SixScalars(b *testing.B) {
+	logger := newSlogDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogSixScalars()...)
+		}
+	})
+}
+
+// B5: SixHeavy
+func BenchmarkSlog_SixHeavy(b *testing.B) {
+	logger := newSlogDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogSixHeavy()...)
+		}
+	})
+}
+
+// B6: ErrorField
+func BenchmarkSlog_ErrorField(b *testing.B) {
+	logger := newSlogDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slog.Any("error", errExample))
+		}
+	})
+}
+
+// B7: WithPerCall+NoFields
+func BenchmarkSlog_WithPerCall_NoFields(b *testing.B) {
+	logger := newSlogDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.With(slogTwoScalarsArgs()...).InfoContext(ctx, "request handled")
+		}
+	})
+}
+
+// B8: WithPerCall+TwoScalars
+func BenchmarkSlog_WithPerCall_TwoScalars(b *testing.B) {
+	logger := newSlogDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.With(slogTwoScalarsArgs()...).LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
+		}
+	})
+}
+
+// B9: WithCached+NoFields
+func BenchmarkSlog_WithCached_NoFields(b *testing.B) {
+	logger := newSlogDiscard().With(slogTwoScalarsArgs()...)
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.InfoContext(ctx, "request handled")
+		}
+	})
+}
+
+// B10: WithCached+TwoScalars
+func BenchmarkSlog_WithCached_TwoScalars(b *testing.B) {
 	logger := newSlogDiscard().With(slogTwoScalarsArgs()...)
 	b.RunParallel(func(pb *testing.PB) {
 		ctx := context.Background()
@@ -225,6 +173,68 @@ func BenchmarkSlog_Parallel_WithCached_TwoScalars(b *testing.B) {
 			logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
 		}
 	})
+}
+
+// B11: WithBoth+TwoScalars
+func BenchmarkSlog_WithBoth_TwoScalars(b *testing.B) {
+	logger := newSlogDiscard().With(slogTwoScalarsArgs()...)
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.With(slogTwoScalarsArgs()...).LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
+		}
+	})
+}
+
+// B12: WithGroupCached+TwoScalars
+func BenchmarkSlog_WithGroupCached_TwoScalars(b *testing.B) {
+	logger := newSlogDiscard().WithGroup("request").With(slogTwoScalarsArgs()...)
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
+		}
+	})
+}
+
+// B13: Caller+TwoScalars
+func BenchmarkSlog_Caller_TwoScalars(b *testing.B) {
+	logger := newSlogDiscardWithCaller()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
+		}
+	})
+}
+
+// --- A: With micro-benchmarks (no log call) ---
+
+// A1: With
+func BenchmarkSlog_With(b *testing.B) {
+	logger := newSlogDiscard()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With(slogTwoScalarsArgs()...)
+	}
+}
+
+// A2: WithOnTop
+func BenchmarkSlog_WithOnTop(b *testing.B) {
+	logger := newSlogDiscard().With(slogTwoScalarsArgs()...)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With(slogTwoScalarsArgs()...)
+	}
+}
+
+// A3: WithGroup
+func BenchmarkSlog_WithGroup(b *testing.B) {
+	logger := newSlogDiscard()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.WithGroup("request")
+	}
 }
 
 // Suppress unused import warning.

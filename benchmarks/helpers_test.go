@@ -113,37 +113,33 @@ func logfSixHeavy() []logf.Field {
 // --- logf logger constructors ---
 
 func newLogfSync() *logf.Logger {
-	w := logf.NewWriter(logf.LevelDebug, io.Discard, logf.NewJSONEncoder.Default())
-	return logf.NewLogger(w).WithCaller(false)
-}
-
-func newLogfSyncNano() *logf.Logger {
 	enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
-		EncodeTime: logf.UnixNanoTimeEncoder,
+		EncodeTime:     logf.RFC3339NanoTimeEncoder,
+		EncodeDuration: logf.NanoDurationEncoder,
 	})
 	w := logf.NewWriter(logf.LevelDebug, io.Discard, enc)
 	return logf.NewLogger(w).WithCaller(false)
 }
 
 func newLogfSyncInfo() *logf.Logger {
-	w := logf.NewWriter(logf.LevelInfo, io.Discard, logf.NewJSONEncoder.Default())
+	w := logf.NewWriter(logf.LevelInfo, io.Discard, logf.NewJSONEncoder(logf.JSONEncoderConfig{}))
 	return logf.NewLogger(w).WithCaller(false)
 }
 
 func newLogfSyncWithCaller() *logf.Logger {
-	w := logf.NewWriter(logf.LevelDebug, io.Discard, logf.NewJSONEncoder.Default())
+	w := logf.NewWriter(logf.LevelDebug, io.Discard, logf.NewJSONEncoder(logf.JSONEncoderConfig{}))
 	return logf.NewLogger(w).WithCaller(true)
 }
 
 func newLogfAsync() (*logf.Logger, logf.ChannelWriterCloseFunc) {
 	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
-		Appender: logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()),
+		Appender: logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder(logf.JSONEncoderConfig{})),
 	})
 	return logf.NewLogger(w).WithCaller(false), close
 }
 
 func newLogfPooledAsync() (*logf.Logger, func()) {
-	w, close := logf.NewAsyncWriter(logf.LevelDebug, io.Discard, logf.NewJSONEncoder.Default())
+	w, close := logf.NewAsyncWriter(logf.LevelDebug, io.Discard, logf.NewJSONEncoder(logf.JSONEncoderConfig{}))
 	return logf.NewLogger(w).WithCaller(false), close
 }
 

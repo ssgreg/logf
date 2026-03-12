@@ -75,7 +75,7 @@ func TestContextWriterEncodesContextBag(t *testing.T) {
 		Text:  "test",
 	}
 
-	enc := NewJSONEncoder.Default()
+	enc := NewJSONEncoder(JSONEncoderConfig{})
 	buf, _ := enc.Encode(e)
 
 	assert.Contains(t, buf.String(), `"rid":"123"`)
@@ -90,7 +90,7 @@ func TestContextBagBeforeLoggerBag(t *testing.T) {
 		Text:      "order",
 	}
 
-	enc := NewJSONEncoder.Default()
+	enc := NewJSONEncoder(JSONEncoderConfig{})
 	buf, _ := enc.Encode(e)
 
 	s := buf.String()
@@ -186,7 +186,7 @@ func TestContextBagCaching(t *testing.T) {
 		Text:  "test",
 	}
 
-	enc := NewJSONEncoder.Default()
+	enc := NewJSONEncoder(JSONEncoderConfig{})
 
 	buf1, _ := enc.Encode(e)
 	buf2, _ := enc.Encode(e)

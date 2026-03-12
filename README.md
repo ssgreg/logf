@@ -59,7 +59,7 @@ logger := slog.New(slog.NewJSONHandler(file, nil))
 
 // slog + logf backend — async, buffered, same API
 w, close := logf.NewChannelWriter(logf.ChannelWriterConfig{
-    Appender: logf.NewWriteAppender(file, logf.NewJSONEncoder.Default()),
+    Appender: logf.NewWriteAppender(file, logf.NewJSONEncoder(logf.JSONEncoderConfig{})),
 })
 defer close()
 logger := slog.New(logf.NewSlogHandler(w, nil))

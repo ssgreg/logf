@@ -10,7 +10,10 @@ import (
 )
 
 func newZapDiscard(lvl zapcore.Level) *zap.Logger {
-	enc := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+	cfg := zap.NewProductionEncoderConfig()
+	cfg.EncodeTime = zapcore.RFC3339NanoTimeEncoder
+	cfg.EncodeDuration = zapcore.NanosDurationEncoder
+	enc := zapcore.NewJSONEncoder(cfg)
 	core := zapcore.NewCore(enc, zapcore.AddSync(io.Discard), lvl)
 	return zap.New(core)
 }
@@ -68,126 +71,6 @@ func BenchmarkZap_DisabledLevel(b *testing.B) {
 // B1: NoFields
 func BenchmarkZap_NoFields(b *testing.B) {
 	logger := newZapDiscard(zapcore.DebugLevel)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
-	}
-}
-
-// B2: TwoScalars
-func BenchmarkZap_TwoScalars(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled", zapTwoScalars()...)
-	}
-}
-
-// B3: TwoScalarsInGroup
-func BenchmarkZap_TwoScalarsInGroup(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled",
-			zap.Dict("request", zap.String("method", "GET"), zap.Int("status", 200)),
-		)
-	}
-}
-
-// B4: SixScalars
-func BenchmarkZap_SixScalars(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled", zapSixScalars()...)
-	}
-}
-
-// B5: SixHeavy
-func BenchmarkZap_SixHeavy(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled", zapSixHeavy()...)
-	}
-}
-
-// B6: ErrorField
-func BenchmarkZap_ErrorField(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled", zap.Error(errExample))
-	}
-}
-
-// B7: WithPerCall+NoFields
-func BenchmarkZap_WithPerCall_NoFields(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.With(zapTwoScalars()...).Info("request handled")
-	}
-}
-
-// B8: WithPerCall+TwoScalars
-func BenchmarkZap_WithPerCall_TwoScalars(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.With(zapTwoScalars()...).Info("request handled", zapTwoScalars()...)
-	}
-}
-
-// B9: WithCached+NoFields
-func BenchmarkZap_WithCached_NoFields(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
-	}
-}
-
-// B10: WithCached+TwoScalars
-func BenchmarkZap_WithCached_TwoScalars(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled", zapTwoScalars()...)
-	}
-}
-
-// B11: WithBoth+TwoScalars
-func BenchmarkZap_WithBoth_TwoScalars(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.With(zapTwoScalars()...).Info("request handled", zapTwoScalars()...)
-	}
-}
-
-// B12: WithGroupCached+TwoScalars
-func BenchmarkZap_WithGroupCached_TwoScalars(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel).With(zap.Namespace("request")).With(zapTwoScalars()...)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled", zapTwoScalars()...)
-	}
-}
-
-// B13: Caller+TwoScalars
-func BenchmarkZap_Caller_TwoScalars(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel).WithOptions(zap.AddCaller())
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled", zapTwoScalars()...)
-	}
-}
-
-// --- Parallel variants ---
-
-func BenchmarkZap_Parallel_NoFields(b *testing.B) {
-	logger := newZapDiscard(zapcore.DebugLevel)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			logger.Info("request handled")
@@ -195,7 +78,8 @@ func BenchmarkZap_Parallel_NoFields(b *testing.B) {
 	})
 }
 
-func BenchmarkZap_Parallel_TwoScalars(b *testing.B) {
+// B2: TwoScalars
+func BenchmarkZap_TwoScalars(b *testing.B) {
 	logger := newZapDiscard(zapcore.DebugLevel)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -204,13 +88,145 @@ func BenchmarkZap_Parallel_TwoScalars(b *testing.B) {
 	})
 }
 
-func BenchmarkZap_Parallel_WithCached_TwoScalars(b *testing.B) {
+// B3: TwoScalarsInGroup
+func BenchmarkZap_TwoScalarsInGroup(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled",
+				zap.Dict("request", zap.String("method", "GET"), zap.Int("status", 200)),
+			)
+		}
+	})
+}
+
+// B4: SixScalars
+func BenchmarkZap_SixScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled", zapSixScalars()...)
+		}
+	})
+}
+
+// B5: SixHeavy
+func BenchmarkZap_SixHeavy(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled", zapSixHeavy()...)
+		}
+	})
+}
+
+// B6: ErrorField
+func BenchmarkZap_ErrorField(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled", zap.Error(errExample))
+		}
+	})
+}
+
+// B7: WithPerCall+NoFields
+func BenchmarkZap_WithPerCall_NoFields(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.With(zapTwoScalars()...).Info("request handled")
+		}
+	})
+}
+
+// B8: WithPerCall+TwoScalars
+func BenchmarkZap_WithPerCall_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.With(zapTwoScalars()...).Info("request handled", zapTwoScalars()...)
+		}
+	})
+}
+
+// B9: WithCached+NoFields
+func BenchmarkZap_WithCached_NoFields(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled")
+		}
+	})
+}
+
+// B10: WithCached+TwoScalars
+func BenchmarkZap_WithCached_TwoScalars(b *testing.B) {
 	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			logger.Info("request handled", zapTwoScalars()...)
 		}
 	})
+}
+
+// B11: WithBoth+TwoScalars
+func BenchmarkZap_WithBoth_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.With(zapTwoScalars()...).Info("request handled", zapTwoScalars()...)
+		}
+	})
+}
+
+// B12: WithGroupCached+TwoScalars
+func BenchmarkZap_WithGroupCached_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).With(zap.Namespace("request")).With(zapTwoScalars()...)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled", zapTwoScalars()...)
+		}
+	})
+}
+
+// B13: Caller+TwoScalars
+func BenchmarkZap_Caller_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).WithOptions(zap.AddCaller())
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled", zapTwoScalars()...)
+		}
+	})
+}
+
+// --- A: With micro-benchmarks (no log call) ---
+
+// A1: With
+func BenchmarkZap_With(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With(zapTwoScalars()...)
+	}
+}
+
+// A2: WithOnTop
+func BenchmarkZap_WithOnTop(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With(zapTwoScalars()...)
+	}
+}
+
+// A3: WithGroup
+func BenchmarkZap_WithGroup(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.With(zap.Namespace("request"))
+	}
 }
 
 // Suppress unused import warning.

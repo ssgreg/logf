@@ -26,7 +26,7 @@ RAW="$RESULTS_DIR/raw-${TIMESTAMP}.txt"
 
 # All known loggers and scenarios.
 ALL_APIS="Logf|Slog|SlogLogf|Zap|Zerolog|Logrus"
-ALL_SCENARIOS='DisabledLevel|NoFields|TwoScalars$|TwoScalarsInGroup|SixScalars|SixHeavy|ErrorField|WithPerCall_NoFields|WithPerCall_TwoScalars|WithCached_NoFields|WithCached_TwoScalars|WithBoth_TwoScalars|WithGroupCached_TwoScalars|Caller_TwoScalars|Parallel_NoFields|Parallel_TwoScalars|Parallel_WithCached_TwoScalars|Async_NoFields|Async_TwoScalars|Async_SixScalars|AsyncParallel_NoFields|AsyncParallel_TwoScalars|AsyncParallel_WithCached_TwoScalars'
+ALL_SCENARIOS='DisabledLevel|NoFields|TwoScalars$|TwoScalarsInGroup|SixScalars|SixHeavy|ErrorField|WithPerCall_NoFields|WithPerCall_TwoScalars|WithCached_NoFields|WithCached_TwoScalars|WithBoth_TwoScalars|WithGroupCached_TwoScalars|Caller_TwoScalars|With$|WithOnTop|WithGroup$|Async_NoFields|Async_TwoScalars|Async_SixScalars|AsyncParallel_NoFields|AsyncParallel_TwoScalars|AsyncParallel_WithCached_TwoScalars'
 
 # Optional filters: $2 = loggers (comma-sep), $3 = scenarios (comma-sep).
 APIS="${2:-}"
@@ -61,9 +61,9 @@ resolve_scenario() {
         withboth_twoscalars|both)          echo WithBoth_TwoScalars ;;
         withgroupcached_twoscalars|groupcached) echo WithGroupCached_TwoScalars ;;
         caller_twoscalars|caller)          echo Caller_TwoScalars ;;
-        parallel_nofields|pnofields)       echo Parallel_NoFields ;;
-        parallel_twoscalars|p2scalars)     echo Parallel_TwoScalars ;;
-        parallel_withcached_twoscalars|pcached) echo Parallel_WithCached_TwoScalars ;;
+        with|a1)                           echo 'With$' ;;
+        withontop|a2)                      echo WithOnTop ;;
+        withgroup|a3)                      echo 'WithGroup$' ;;
         async_nofields)                    echo Async_NoFields ;;
         async_twoscalars)                  echo Async_TwoScalars ;;
         async_sixscalars)                  echo Async_SixScalars ;;
@@ -114,7 +114,7 @@ BEGIN {
     # ── Scenario display order and labels ──
     # key = benchmark suffix, value = table label
     # To rename a scenario in the table, change the value here.
-    split("DisabledLevel,NoFields,TwoScalars,TwoScalarsInGroup,SixScalars,SixHeavy,ErrorField,WithPerCall_NoFields,WithPerCall_TwoScalars,WithCached_NoFields,WithCached_TwoScalars,WithBoth_TwoScalars,WithGroupCached_TwoScalars,Caller_TwoScalars,Parallel_NoFields,Parallel_TwoScalars,Parallel_WithCached_TwoScalars,Async_NoFields,Async_TwoScalars,Async_SixScalars,AsyncParallel_NoFields,AsyncParallel_TwoScalars,AsyncParallel_WithCached_TwoScalars", order, ",")
+    split("DisabledLevel,NoFields,TwoScalars,TwoScalarsInGroup,SixScalars,SixHeavy,ErrorField,WithPerCall_NoFields,WithPerCall_TwoScalars,WithCached_NoFields,WithCached_TwoScalars,WithBoth_TwoScalars,WithGroupCached_TwoScalars,Caller_TwoScalars,With,WithOnTop,WithGroup,Async_NoFields,Async_TwoScalars,Async_SixScalars,AsyncParallel_NoFields,AsyncParallel_TwoScalars,AsyncParallel_WithCached_TwoScalars", order, ",")
     for (i in order) order_idx[order[i]] = i
 
     sc_label["DisabledLevel"]              = "Disabled level (DisabledLevel)"
@@ -132,9 +132,9 @@ BEGIN {
     sc_label["WithGroupCached_TwoScalars"] = "WithGroup + 2s (WithGroupCached_TwoScalars)"
     sc_label["Caller_TwoScalars"]          = "Caller + 2s (Caller_TwoScalars)"
 
-    sc_label["Parallel_NoFields"]                      = "‖ No fields (Parallel_NoFields)"
-    sc_label["Parallel_TwoScalars"]                    = "‖ 2 scalars (Parallel_TwoScalars)"
-    sc_label["Parallel_WithCached_TwoScalars"]         = "‖ With/cached + 2s (Parallel_WithCached_TwoScalars)"
+    sc_label["With"]                                   = "A1: With (With)"
+    sc_label["WithOnTop"]                              = "A2: WithOnTop (WithOnTop)"
+    sc_label["WithGroup"]                              = "A3: WithGroup (WithGroup)"
     sc_label["Async_NoFields"]                         = "⤳ No fields (Async_NoFields)"
     sc_label["Async_TwoScalars"]                       = "⤳ 2 scalars (Async_TwoScalars)"
     sc_label["Async_SixScalars"]                       = "⤳ 6 scalars (Async_SixScalars)"

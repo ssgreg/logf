@@ -66,7 +66,7 @@ func TestLatencyDistribution(t *testing.T) {
 		defer ff.Close()
 
 		w, cl := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
-			Appender: logf.NewWriteAppender(ff, logf.NewJSONEncoder.Default()),
+			Appender: logf.NewWriteAppender(ff, logf.NewJSONEncoder(logf.JSONEncoderConfig{})),
 		})
 		defer cl()
 		logger := logf.NewLogger(w).WithCaller(false)
@@ -88,7 +88,7 @@ func TestLatencyDistribution(t *testing.T) {
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		enc := logf.NewJSONEncoder.Default()
+		enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{})
 		w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(ff, enc))
 		logger := logf.NewLogger(w).WithCaller(false)
 		ctx := context.Background()
@@ -284,7 +284,7 @@ func TestSlowIOLatency(t *testing.T) {
 
 		sw := &slowWriter{w: ff, slowPct: 0.02, delay: 1 * time.Millisecond}
 		w, cl := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
-			Appender: logf.NewWriteAppender(sw, logf.NewJSONEncoder.Default()),
+			Appender: logf.NewWriteAppender(sw, logf.NewJSONEncoder(logf.JSONEncoderConfig{})),
 		})
 		defer cl()
 		logger := logf.NewLogger(w).WithCaller(false)
@@ -421,7 +421,7 @@ func TestGoroutineScalability(t *testing.T) {
 		for gi, numG := range goroutineCounts {
 			ff, _ := os.CreateTemp("", "scale-logf-*.log")
 			w, cl := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
-				Appender: logf.NewWriteAppender(ff, logf.NewJSONEncoder.Default()),
+				Appender: logf.NewWriteAppender(ff, logf.NewJSONEncoder(logf.JSONEncoderConfig{})),
 			})
 			logger := logf.NewLogger(w).WithCaller(false)
 

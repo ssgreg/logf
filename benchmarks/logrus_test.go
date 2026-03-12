@@ -3,6 +3,7 @@ package benchmarks
 import (
 	"io"
 	"testing"
+	"time"
 
 	"github.com/ssgreg/logrus"
 )
@@ -10,7 +11,7 @@ import (
 func newLogrusDiscard() *logrus.Logger {
 	l := logrus.New()
 	l.Out = io.Discard
-	l.Formatter = &logrus.JSONFormatter{}
+	l.Formatter = &logrus.JSONFormatter{TimestampFormat: time.RFC3339Nano}
 	l.Level = logrus.DebugLevel
 	return l
 }
@@ -18,7 +19,7 @@ func newLogrusDiscard() *logrus.Logger {
 func newLogrusDiscardInfo() *logrus.Logger {
 	l := logrus.New()
 	l.Out = io.Discard
-	l.Formatter = &logrus.JSONFormatter{}
+	l.Formatter = &logrus.JSONFormatter{TimestampFormat: time.RFC3339Nano}
 	l.Level = logrus.InfoLevel
 	return l
 }
@@ -66,103 +67,6 @@ func BenchmarkLogrus_DisabledLevel(b *testing.B) {
 // B1: NoFields
 func BenchmarkLogrus_NoFields(b *testing.B) {
 	logger := newLogrusDiscard()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
-	}
-}
-
-// B2: TwoScalars
-func BenchmarkLogrus_TwoScalars(b *testing.B) {
-	logger := newLogrusDiscard()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.WithFields(logrusTwoScalars()).Info("request handled")
-	}
-}
-
-// B3: TwoScalarsInGroup — skipped, logrus has no native group support
-
-// B4: SixScalars
-func BenchmarkLogrus_SixScalars(b *testing.B) {
-	logger := newLogrusDiscard()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.WithFields(logrusSixScalars()).Info("request handled")
-	}
-}
-
-// B5: SixHeavy
-func BenchmarkLogrus_SixHeavy(b *testing.B) {
-	logger := newLogrusDiscard()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.WithFields(logrusSixHeavy()).Info("request handled")
-	}
-}
-
-// B6: ErrorField
-func BenchmarkLogrus_ErrorField(b *testing.B) {
-	logger := newLogrusDiscard()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.WithError(errExample).Info("request handled")
-	}
-}
-
-// B7: WithPerCall+NoFields
-func BenchmarkLogrus_WithPerCall_NoFields(b *testing.B) {
-	logger := newLogrusDiscard()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.WithFields(logrusTwoScalars()).Info("request handled")
-	}
-}
-
-// B8: WithPerCall+TwoScalars
-func BenchmarkLogrus_WithPerCall_TwoScalars(b *testing.B) {
-	logger := newLogrusDiscard()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.WithFields(logrusTwoScalars()).WithFields(logrusTwoScalars()).Info("request handled")
-	}
-}
-
-// B9: WithCached+NoFields
-func BenchmarkLogrus_WithCached_NoFields(b *testing.B) {
-	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("request handled")
-	}
-}
-
-// B10: WithCached+TwoScalars
-func BenchmarkLogrus_WithCached_TwoScalars(b *testing.B) {
-	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.WithFields(logrusTwoScalars()).Info("request handled")
-	}
-}
-
-// B11: WithBoth+TwoScalars
-func BenchmarkLogrus_WithBoth_TwoScalars(b *testing.B) {
-	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.WithFields(logrusTwoScalars()).WithFields(logrusTwoScalars()).Info("request handled")
-	}
-}
-
-// B12: WithGroupCached+TwoScalars — skipped, logrus has no native group support
-
-// B13: Caller+TwoScalars — skipped, ssgreg/logrus fork has no ReportCaller
-
-// --- Parallel variants ---
-
-func BenchmarkLogrus_Parallel_NoFields(b *testing.B) {
-	logger := newLogrusDiscard()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			logger.Info("request handled")
@@ -170,7 +74,8 @@ func BenchmarkLogrus_Parallel_NoFields(b *testing.B) {
 	})
 }
 
-func BenchmarkLogrus_Parallel_TwoScalars(b *testing.B) {
+// B2: TwoScalars
+func BenchmarkLogrus_TwoScalars(b *testing.B) {
 	logger := newLogrusDiscard()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -179,7 +84,70 @@ func BenchmarkLogrus_Parallel_TwoScalars(b *testing.B) {
 	})
 }
 
-func BenchmarkLogrus_Parallel_WithCached_TwoScalars(b *testing.B) {
+// B3: TwoScalarsInGroup — skipped, logrus has no native group support
+
+// B4: SixScalars
+func BenchmarkLogrus_SixScalars(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.WithFields(logrusSixScalars()).Info("request handled")
+		}
+	})
+}
+
+// B5: SixHeavy
+func BenchmarkLogrus_SixHeavy(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.WithFields(logrusSixHeavy()).Info("request handled")
+		}
+	})
+}
+
+// B6: ErrorField
+func BenchmarkLogrus_ErrorField(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.WithError(errExample).Info("request handled")
+		}
+	})
+}
+
+// B7: WithPerCall+NoFields
+func BenchmarkLogrus_WithPerCall_NoFields(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.WithFields(logrusTwoScalars()).Info("request handled")
+		}
+	})
+}
+
+// B8: WithPerCall+TwoScalars
+func BenchmarkLogrus_WithPerCall_TwoScalars(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.WithFields(logrusTwoScalars()).WithFields(logrusTwoScalars()).Info("request handled")
+		}
+	})
+}
+
+// B9: WithCached+NoFields
+func BenchmarkLogrus_WithCached_NoFields(b *testing.B) {
+	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled")
+		}
+	})
+}
+
+// B10: WithCached+TwoScalars
+func BenchmarkLogrus_WithCached_TwoScalars(b *testing.B) {
 	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -187,3 +155,39 @@ func BenchmarkLogrus_Parallel_WithCached_TwoScalars(b *testing.B) {
 		}
 	})
 }
+
+// B11: WithBoth+TwoScalars
+func BenchmarkLogrus_WithBoth_TwoScalars(b *testing.B) {
+	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.WithFields(logrusTwoScalars()).WithFields(logrusTwoScalars()).Info("request handled")
+		}
+	})
+}
+
+// B12: WithGroupCached+TwoScalars — skipped, logrus has no native group support
+
+// B13: Caller+TwoScalars — skipped, ssgreg/logrus fork has no ReportCaller
+
+// --- A: With micro-benchmarks (no log call) ---
+
+// A1: With
+func BenchmarkLogrus_With(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.WithFields(logrusTwoScalars())
+	}
+}
+
+// A2: WithOnTop
+func BenchmarkLogrus_WithOnTop(b *testing.B) {
+	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.WithFields(logrusTwoScalars())
+	}
+}
+
+// A3: WithGroup — skipped, logrus has no native group support

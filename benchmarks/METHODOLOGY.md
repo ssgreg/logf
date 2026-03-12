@@ -2,41 +2,58 @@
 
 ## 1. Categories
 
-### A. logf core (no writer)
+### A. With micro-benchmarks (no log call)
 
-Standalone measurements that don't involve writers:
+Measure the cost of creating derived loggers. No `Info`/`Write` call — pure
+logger construction overhead. Sequential (`b.N` loop), since `.With()` typically
+happens once per request in middleware, not in a hot parallel path.
 
-- **With**: measure `logger.With(fields...)` — Bag creation cost
-- **WithGroup**: measure `logger.WithGroup(name)` — group Bag cost
-- **logfc context**: measure overhead of extracting logger from context
+All loggers that support the operation get the same A-test.
 
-### B. logf scenarios (Discard + Async)
+| #  | Name       | What it measures                                      | Why it matters                                    |
+|----|------------|-------------------------------------------------------|---------------------------------------------------|
+| A1 | With       | `logger.With(twoScalars)` — derive with 2 fields      | Per-request middleware cost. logf: Bag alloc O(1). zap: encoder clone + pre-encode. |
+| A2 | WithOnTop  | `.With()` on an already-derived logger                 | Stacking cost (nested middleware). Shows if second With is cheaper/same. |
+| A3 | WithGroup  | `logger.WithGroup("name")` — derive with namespace    | Group/namespace creation cost. zerolog/logrus skip (no native WithGroup). |
 
-Full log call including encoding. Writer: SyncWriter → `io.Discard` (encodes fully,
-no I/O noise). Async: only 2-3 tests for measuring ChannelWriter overhead,
-not the full matrix.
+Also in this category (logf-only, no competitors):
 
-| #  | Name                    | Description                                          |
-|----|-------------------------|------------------------------------------------------|
-| 0  | DisabledLevel           | `logger.Debug()` when level=Info — fast path cost    |
-| 1  | NoFields                | `logger.Info("msg")` — baseline                      |
-| 2  | TwoScalars              | `Info("msg", String, Int)` — typical case            |
-| 3  | TwoScalarsInGroup       | `Info("msg", Group("g", String, Int))` — inline nested object (logf.Group / zap.Dict / slog.Group / zerolog.Dict) |
-| 4  | SixScalars              | `Info("msg", 6× scalar)` — heavy typical             |
-| 5  | SixHeavy                | `Info("msg", 6× heavy)` — slices, Time, Bytes, etc. |
-| 6  | ErrorField              | `Info("msg", Error(err))` — common pattern           |
-| 7  | WithPerCall+NoFields    | With inside loop + `Info("msg")`                     |
-| 8  | WithPerCall+TwoScalars  | With inside loop + `Info("msg", 2× scalar)`          |
-| 9  | WithCached+NoFields     | With outside loop + `Info("msg")`                    |
-| 10 | WithCached+TwoScalars   | With outside loop + `Info("msg", 2× scalar)`         |
-| 11 | WithBoth+TwoScalars     | With outside + With inside + `Info("msg", 2×)`       |
-| 12 | WithGroupCached+TwoScalars | WithGroup outside + `Info("msg", 2× scalar)`      |
-| 13 | Caller+TwoScalars       | AddCaller + `Info("msg", 2× scalar)`                 |
+- **logfc GetFromContext** — `logf.FromContext(ctx)` — context.Value lookup cost
+- **logfc PutToContext** — `logf.NewContext(ctx, logger)` — context.WithValue cost
 
-### C. Field type regression (encode only, Sync Text)
+### B. Log-call scenarios (Discard, parallel)
+
+Full log call: field construction → encoding → write. Writer: `SyncWriter` →
+`io.Discard` (full encode, no I/O noise).
+
+**Execution mode:**
+- **B0 (DisabledLevel)** — sequential (`b.N` loop). Measures level-check fast path
+  only; parallelism adds no insight since the call returns immediately.
+- **B1–B13** — parallel (`b.RunParallel`). Reflects production reality where
+  multiple goroutines log concurrently. Exposes lock contention, pool scalability,
+  and encoder thread-safety overhead.
+
+| #  | Name                       | What it measures                                      | Why it matters                                    |
+|----|----------------------------|-------------------------------------------------------|---------------------------------------------------|
+| B0 | DisabledLevel              | `logger.Debug()` when level=Info                       | Fast-path cost. Should be ≤5 ns (atomic load).    |
+| B1 | NoFields                   | `logger.Info("msg")` — no fields                       | Baseline: encoder acquire, timestamp, level, msg, write, release. |
+| B2 | TwoScalars                 | `Info("msg", String, Int)`                             | Most common production case — 1-3 fields per log line. |
+| B3 | TwoScalarsInGroup          | `Info("msg", Group("g", String, Int))`                 | Inline nested JSON object cost (logf.Group / zap.Dict / slog.Group / zerolog.Dict). |
+| B4 | SixScalars                 | `Info("msg", 6× scalar)`                               | Heavier typical case — measures per-field encoding scaling. |
+| B5 | SixHeavy                   | `Info("msg", Bytes+Time+Ints64+Strings+Duration+Object)` | Expensive types: base64, RFC3339, slice iteration, object marshaling. |
+| B6 | ErrorField                 | `Info("msg", Error(err))`                              | Common pattern — error string encoding cost.      |
+| B7 | WithPerCall+NoFields       | `logger.With(2s).Info("msg")` per iteration            | Per-request With + log. Simulates middleware adding request fields then logging. |
+| B8 | WithPerCall+TwoScalars     | `logger.With(2s).Info("msg", 2s)` per iteration        | Same + per-call fields. Worst case: With + encode both sets. |
+| B9 | WithCached+NoFields        | Pre-built `.With()` logger, then `Info("msg")`          | Amortized With — measures cached/pre-encoded context field benefit. |
+| B10| WithCached+TwoScalars      | Pre-built `.With()` logger + `Info("msg", 2s)`          | Cached context + per-call fields. Key production pattern. |
+| B11| WithBoth+TwoScalars        | Cached `.With()` + per-call `.With()` + `Info("msg", 2s)` | Full stack: service-level + request-level + call-level fields. |
+| B12| WithGroupCached+TwoScalars | `.WithGroup().With()` cached + `Info("msg", 2s)`        | Namespaced context fields. Tests group encoding overhead. |
+| B13| Caller+TwoScalars          | `AddCaller` + `Info("msg", 2s)`                         | runtime.Callers cost. Typically 100-200 ns extra.  |
+
+### C. Field type regression (logf only, encode only)
 
 One benchmark per unique field type — catches optimization regressions during refactoring.
-Each test: single field of given type, full encode cycle.
+Each test: single field of given type, full encode cycle via SyncWriter → io.Discard.
 
 | Field type                | Constructor example           |
 |---------------------------|-------------------------------|
@@ -63,42 +80,51 @@ Each test: single field of given type, full encode cycle.
 | Any (Stringer fallback)   | `Any("k", &stringerObj)`      |
 | Any (reference type)      | `Any("k", map[...]...)`       |
 
-### D. Competitors (logf scenario numbers, sync only)
+### D. Competitors (all categories, all loggers)
 
-Same scenarios as logf section B, using each competitor's idiomatic API.
+All loggers get the same A + B matrix using each competitor's idiomatic API.
 Same logical field values for fair comparison.
 
-**slog→logf**: benchmarks create a logf Logger first (with the same config as
+**slog→logf (slogf)**: benchmarks create a logf Logger first (with the same config as
 native logf tests — caller OFF, level Debug), then derive `slog.Logger` via
 `Logger.Slog()`. This ensures the slog→logf bridge inherits the same settings
 and measures only the bridge overhead, not accidental caller cost.
 
-| #  | Scenario                   | slog | zap | zerolog | logrus | slog→logf |
-|----|----------------------------|------|-----|---------|--------|-----------|
-| 0  | DisabledLevel              |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 1  | NoFields                   |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 2  | TwoScalars                 |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 3  | TwoScalarsInGroup          |  ✓   |  ✓  |    ✓    |   —    |     ✓     |
-| 4  | SixScalars                 |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 5  | SixHeavy                   |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 6  | ErrorField                 |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 7  | WithPerCall+NoFields       |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 8  | WithPerCall+TwoScalars     |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 9  | WithCached+NoFields        |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 10 | WithCached+TwoScalars      |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 11 | WithBoth+TwoScalars        |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
-| 12 | WithGroupCached+TwoScalars |  ✓   |  ✓  |    ✓    |   —    |     ✓     |
-| 13 | Caller+TwoScalars          |  ✓   |  ✓  |    ✓    |   ✓    |     ✓     |
+#### B matrix coverage
+
+| #  | Scenario                   | logf | slog | slogf | zap | zerolog | logrus |
+|----|----------------------------|------|------|-------|-----|---------|--------|
+| B0 | DisabledLevel              |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B1 | NoFields                   |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B2 | TwoScalars                 |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B3 | TwoScalarsInGroup          |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   —    |
+| B4 | SixScalars                 |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B5 | SixHeavy                   |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B6 | ErrorField                 |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B7 | WithPerCall+NoFields       |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B8 | WithPerCall+TwoScalars     |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B9 | WithCached+NoFields        |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B10| WithCached+TwoScalars      |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B11| WithBoth+TwoScalars        |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| B12| WithGroupCached+TwoScalars |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   —    |
+| B13| Caller+TwoScalars          |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   —    |
+
+#### A matrix coverage
+
+| #  | Scenario   | logf | slog | slogf | zap | zerolog | logrus |
+|----|------------|------|------|-------|-----|---------|--------|
+| A1 | With       |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| A2 | WithOnTop  |  ✓   |  ✓   |   ✓   |  ✓  |    ✓    |   ✓    |
+| A3 | WithGroup  |  ✓   |  ✓   |   ✓   |  ✓  |    —    |   —    |
 
 Notes:
 
-- logrus: no native group support (3, 12 skipped)
-- zerolog: groups via `Dict()` — closest equivalent
-- zap: groups via `zap.Namespace()` — closest equivalent
+- logrus: no native group support (B3, B12 skipped), no ReportCaller (B13 skipped), no WithGroup (A3 skipped)
+- zerolog: groups via `Dict()` — closest equivalent; no WithGroup (A3 skipped)
+- zap: groups via `zap.Namespace()` — closest equivalent for B12/A3
 - slog: native `slog.Group()` and `WithGroup()`
-- All competitors use io.Discard (or closest equivalent, no I/O noise)
-- slog→logf handler: `slog.New(logf.NewSlogHandler(w))` — full B matrix, key production use-case
-- **If a competitor lacks a feature for a scenario — do NOT implement a local workaround. Ask what to do.**
+- All loggers use io.Discard (or closest equivalent, no I/O noise)
+- **If a competitor lacks a feature for a scenario — do NOT implement a local workaround. Mark as skipped.**
 
 ---
 
@@ -299,11 +325,10 @@ Keep existing `latency_test.go` as reference. These are logf's strongest story:
 These are `Test*` (not `Benchmark*`) — they produce formatted tables, not benchstat output.
 Redesign later for more structured reporting.
 
-### Skipped patterns (from existing benchmarks)
+### Skipped patterns
 
 Reviewed existing benchmarks. These patterns exist but are NOT included in the methodology:
 
-- **Parallel** (`b.RunParallel`) — meaningful only with real I/O contention → section E
 - **AtLevel/Check** (guarded log) — micro-optimization, DisabledLevel already covers fast path
 - **WithName** — niche, not a regression risk
 - **Disabled+Fields** — tests Go calling convention, not logf
