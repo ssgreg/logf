@@ -219,6 +219,16 @@ func BenchmarkLogf_Parallel_NoFields(b *testing.B) {
 	})
 }
 
+func BenchmarkLogf_Parallel_NoFields_Nano(b *testing.B) {
+	logger := newLogfSyncNano()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.Info(ctx, "request handled")
+		}
+	})
+}
+
 func BenchmarkLogf_Parallel_TwoScalars(b *testing.B) {
 	logger := newLogfSync()
 	b.RunParallel(func(pb *testing.PB) {

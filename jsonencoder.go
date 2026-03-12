@@ -37,6 +37,13 @@ type JSONEncoderConfig struct {
 	EncodeError    ErrorEncoder
 	EncodeLevel    LevelEncoder
 	EncodeCaller   CallerEncoder
+
+	// Precomputed escaped key fragments: `"key":` — avoids EscapeString on every call.
+	keyLevel  []byte
+	keyTime   []byte
+	keyName   []byte
+	keyMsg    []byte
+	keyCaller []byte
 }
 
 // WithDefaults returns the new config in which all uninitialized fields are
@@ -76,7 +83,36 @@ func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
 		c.EncodeCaller = ShortCallerEncoder
 	}
 
+	c.keyLevel = precomputeKey(c.FieldKeyLevel)
+	c.keyTime = precomputeKey(c.FieldKeyTime)
+	c.keyName = precomputeKey(c.FieldKeyName)
+	c.keyMsg = precomputeKey(c.FieldKeyMsg)
+	c.keyCaller = precomputeKey(c.FieldKeyCaller)
+
 	return c
+}
+
+// precomputeKey builds the escaped JSON key fragment `"key":` once.
+func precomputeKey(k string) []byte {
+	out := make([]byte, 0, len(k)+3)
+	out = append(out, '"')
+	needsEscape := false
+	for i := 0; i < len(k); i++ {
+		if k[i] < 0x20 || k[i] == '\\' || k[i] == '"' || k[i] >= utf8.RuneSelf {
+			needsEscape = true
+			break
+		}
+	}
+	if !needsEscape {
+		out = append(out, k...)
+	} else {
+		b := GetBuffer()
+		_ = EscapeString(b, k)
+		out = append(out, b.Data[:b.Len()]...)
+		b.Free()
+	}
+	out = append(out, '"', ':')
+	return out
 }
 
 // NewJSONEncoder creates the new instance of the JSON Encoder with the
@@ -168,28 +204,31 @@ func (f *jsonEncoder) encode(buf *Buffer, e Entry) error {
 
 	// Level.
 	if !f.DisableFieldLevel {
-		f.addKey(f.FieldKeyLevel)
+		f.addPrecomputedKey(f.keyLevel)
 		f.EncodeLevel(e.Level, f)
 	}
 
 	// Time.
 	if !f.DisableFieldTime {
-		f.EncodeFieldTime(f.FieldKeyTime, e.Time)
+		f.addPrecomputedKey(f.keyTime)
+		f.EncodeTypeTime(e.Time)
 	}
 
 	// Logger name.
 	if !f.DisableFieldName && e.LoggerName != "" {
-		f.EncodeFieldString(f.FieldKeyName, e.LoggerName)
+		f.addPrecomputedKey(f.keyName)
+		f.EncodeTypeString(e.LoggerName)
 	}
 
 	// Message.
 	if !f.DisableFieldMsg {
-		f.EncodeFieldString(f.FieldKeyMsg, e.Text)
+		f.addPrecomputedKey(f.keyMsg)
+		f.EncodeTypeString(e.Text)
 	}
 
 	// Caller.
 	if !f.DisableFieldCaller && e.CallerPC != 0 {
-		f.addKey(f.FieldKeyCaller)
+		f.addPrecomputedKey(f.keyCaller)
 		f.EncodeCaller(e.CallerPC, f)
 	}
 
@@ -673,6 +712,11 @@ func (f *jsonEncoder) appendSeparator() {
 
 func (f *jsonEncoder) empty() bool {
 	return f.buf.Len() == f.startBufLen
+}
+
+func (f *jsonEncoder) addPrecomputedKey(key []byte) {
+	f.appendSeparator()
+	f.buf.AppendBytes(key)
 }
 
 func (f *jsonEncoder) addKey(k string) {

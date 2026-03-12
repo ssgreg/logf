@@ -117,6 +117,14 @@ func newLogfSync() *logf.Logger {
 	return logf.NewLogger(w).WithCaller(false)
 }
 
+func newLogfSyncNano() *logf.Logger {
+	enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
+		EncodeTime: logf.UnixNanoTimeEncoder,
+	})
+	w := logf.NewWriter(logf.LevelDebug, io.Discard, enc)
+	return logf.NewLogger(w).WithCaller(false)
+}
+
 func newLogfSyncInfo() *logf.Logger {
 	w := logf.NewWriter(logf.LevelInfo, io.Discard, logf.NewJSONEncoder.Default())
 	return logf.NewLogger(w).WithCaller(false)
