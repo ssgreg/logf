@@ -184,5 +184,34 @@ func BenchmarkZap_Caller_TwoScalars(b *testing.B) {
 	}
 }
 
+// --- Parallel variants ---
+
+func BenchmarkZap_Parallel_NoFields(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled")
+		}
+	})
+}
+
+func BenchmarkZap_Parallel_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled", zapTwoScalars()...)
+		}
+	})
+}
+
+func BenchmarkZap_Parallel_WithCached_TwoScalars(b *testing.B) {
+	logger := newZapDiscard(zapcore.DebugLevel).With(zapTwoScalars()...)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled", zapTwoScalars()...)
+		}
+	})
+}
+
 // Suppress unused import warning.
 var _ = time.Now

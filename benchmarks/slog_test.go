@@ -45,7 +45,7 @@ func slogSixHeavy() []slog.Attr {
 		slog.Any("ids", heavyInts64),
 		slog.Any("tags", heavyStrings),
 		slog.Duration("latency", heavyDuration),
-		slog.Any("user", map[string]any{"id": 123, "name": "alice"}),
+		slog.Group("user", slog.Int("id", 123), slog.String("name", "alice")),
 	}
 }
 
@@ -193,6 +193,38 @@ func BenchmarkSlog_Caller_TwoScalars(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
 	}
+}
+
+// --- Parallel variants ---
+
+func BenchmarkSlog_Parallel_NoFields(b *testing.B) {
+	logger := newSlogDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.InfoContext(ctx, "request handled")
+		}
+	})
+}
+
+func BenchmarkSlog_Parallel_TwoScalars(b *testing.B) {
+	logger := newSlogDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
+		}
+	})
+}
+
+func BenchmarkSlog_Parallel_WithCached_TwoScalars(b *testing.B) {
+	logger := newSlogDiscard().With(slogTwoScalarsArgs()...)
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
+		}
+	})
 }
 
 // Suppress unused import warning.

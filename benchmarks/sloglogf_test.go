@@ -70,13 +70,24 @@ func BenchmarkSlogLogf_SixScalars(b *testing.B) {
 	}
 }
 
-// B5: SixHeavy
+// B5: SixHeavy — uses slog.Any("user", heavyUser) to show bridge
+// recognizing logf.ObjectEncoder (no json/reflect).
 func BenchmarkSlogLogf_SixHeavy(b *testing.B) {
 	logger := newSlogLogfDiscard()
 	ctx := context.Background()
+	heavy := func() []slog.Attr {
+		return []slog.Attr{
+			slog.String("body", string(heavyBytes)),
+			slog.Time("timestamp", heavyTime),
+			slog.Any("ids", heavyInts64),
+			slog.Any("tags", heavyStrings),
+			slog.Duration("latency", heavyDuration),
+			slog.Any("user", heavyUser),
+		}
+	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogSixHeavy()...)
+		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", heavy()...)
 	}
 }
 
@@ -158,4 +169,36 @@ func BenchmarkSlogLogf_Caller_TwoScalars(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
 	}
+}
+
+// --- Parallel variants ---
+
+func BenchmarkSlogLogf_Parallel_NoFields(b *testing.B) {
+	logger := newSlogLogfDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.InfoContext(ctx, "request handled")
+		}
+	})
+}
+
+func BenchmarkSlogLogf_Parallel_TwoScalars(b *testing.B) {
+	logger := newSlogLogfDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
+		}
+	})
+}
+
+func BenchmarkSlogLogf_Parallel_WithCached_TwoScalars(b *testing.B) {
+	logger := newSlogLogfDiscard().With(slogTwoScalarsArgs()...)
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.LogAttrs(ctx, slog.LevelInfo, "request handled", slogTwoScalars()...)
+		}
+	})
 }

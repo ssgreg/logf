@@ -81,10 +81,13 @@ type writeAppender struct {
 }
 
 func (a *writeAppender) Append(entry Entry) error {
-	err := a.enc.Encode(a.buf, entry)
+	buf, err := a.enc.Encode(entry)
 	if err != nil {
 		return err
 	}
+	a.buf.AppendBytes(buf.Bytes())
+	buf.Free()
+
 	if a.buf.Len() > PageSize {
 		a.Flush()
 	}

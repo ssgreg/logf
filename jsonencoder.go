@@ -3,6 +3,7 @@ package logf
 import (
 	"encoding/base64"
 	"encoding/json"
+	"sync"
 	"time"
 	"unicode/utf8"
 	"unsafe"
@@ -82,7 +83,14 @@ func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
 // given JSONEncoderConfig.
 var NewJSONEncoder = jsonEncoderGetter(
 	func(cfg JSONEncoderConfig) Encoder {
-		return &jsonEncoder{JSONEncoderConfig: cfg.WithDefaults(), slot: AllocEncoderSlot()}
+		enc := &jsonEncoder{JSONEncoderConfig: cfg.WithDefaults(), slot: AllocEncoderSlot()}
+		enc.pool = &sync.Pool{New: func() any {
+			return &jsonEncoder{
+				JSONEncoderConfig: enc.JSONEncoderConfig,
+				slot:              enc.slot,
+			}
+		}}
+		return enc
 	},
 )
 
@@ -112,6 +120,21 @@ type jsonEncoder struct {
 	slot        int // 1-based encoder slot for Bag cache; 0 = no caching
 	buf         *Buffer
 	startBufLen int
+	pool        *sync.Pool // nil for clones, set on root encoder
+}
+
+func (f *jsonEncoder) Clone() Encoder {
+	enc := &jsonEncoder{
+		JSONEncoderConfig: f.JSONEncoderConfig,
+		slot:              f.slot,
+	}
+	enc.pool = &sync.Pool{New: func() any {
+		return &jsonEncoder{
+			JSONEncoderConfig: enc.JSONEncoderConfig,
+			slot:              enc.slot,
+		}
+	}}
+	return enc
 }
 
 func (f *jsonEncoder) TypeEncoder(buf *Buffer) TypeEncoder {
@@ -121,11 +144,27 @@ func (f *jsonEncoder) TypeEncoder(buf *Buffer) TypeEncoder {
 	return f
 }
 
-func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
-	f.buf = buf
-	f.startBufLen = f.buf.Len()
+func (f *jsonEncoder) Encode(e Entry) (*Buffer, error) {
+	clone := f.pool.Get().(*jsonEncoder)
 
-	buf.AppendByte('{')
+	buf := GetBuffer()
+	err := clone.encode(buf, e)
+
+	clone.buf = nil
+	f.pool.Put(clone)
+
+	if err != nil {
+		buf.Free()
+		return nil, err
+	}
+	return buf, nil
+}
+
+func (f *jsonEncoder) encode(buf *Buffer, e Entry) error {
+	f.buf = buf
+	f.startBufLen = buf.Len()
+
+	f.buf.AppendByte('{')
 
 	// Level.
 	if !f.DisableFieldLevel {
@@ -161,17 +200,17 @@ func (f *jsonEncoder) Encode(buf *Buffer, e Entry) error {
 	f.encodeBag(e.LoggerBag)
 
 	// Entry's fields.
-	for _, field := range e.Fields {
-		field.Accept(f)
+	for i := range e.Fields {
+		e.Fields[i].Accept(f)
 	}
 
 	// Close open groups (from WithGroup in Bag chains).
 	for n := countGroups(e.Bag) + countGroups(e.LoggerBag); n > 0; n-- {
-		buf.AppendByte('}')
+		f.buf.AppendByte('}')
 	}
 
-	buf.AppendByte('}')
-	buf.AppendByte('\n')
+	f.buf.AppendByte('}')
+	f.buf.AppendByte('\n')
 
 	return nil
 }

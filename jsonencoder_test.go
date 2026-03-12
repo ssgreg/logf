@@ -308,8 +308,7 @@ func TestEncoder(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			b := NewBuffer()
-			_ = enc.Encode(b, tc.entry)
+			b, _ := enc.Encode(tc.entry)
 
 			if tc.golden != "" {
 				require.EqualValues(t, tc.golden, b.String())
@@ -320,6 +319,7 @@ func TestEncoder(t *testing.T) {
 
 			var a map[string]interface{}
 			require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&a))
+			b.Free()
 		})
 	}
 }

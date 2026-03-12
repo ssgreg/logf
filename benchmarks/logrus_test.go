@@ -158,3 +158,32 @@ func BenchmarkLogrus_WithBoth_TwoScalars(b *testing.B) {
 // B12: WithGroupCached+TwoScalars — skipped, logrus has no native group support
 
 // B13: Caller+TwoScalars — skipped, ssgreg/logrus fork has no ReportCaller
+
+// --- Parallel variants ---
+
+func BenchmarkLogrus_Parallel_NoFields(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info("request handled")
+		}
+	})
+}
+
+func BenchmarkLogrus_Parallel_TwoScalars(b *testing.B) {
+	logger := newLogrusDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.WithFields(logrusTwoScalars()).Info("request handled")
+		}
+	})
+}
+
+func BenchmarkLogrus_Parallel_WithCached_TwoScalars(b *testing.B) {
+	logger := newLogrusDiscard().WithFields(logrusTwoScalars())
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.WithFields(logrusTwoScalars()).Info("request handled")
+		}
+	})
+}

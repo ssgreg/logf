@@ -178,5 +178,34 @@ func BenchmarkZerolog_Caller_TwoScalars(b *testing.B) {
 	}
 }
 
+// --- Parallel variants ---
+
+func BenchmarkZerolog_Parallel_NoFields(b *testing.B) {
+	logger := newZerologDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.Info().Msg("request handled")
+		}
+	})
+}
+
+func BenchmarkZerolog_Parallel_TwoScalars(b *testing.B) {
+	logger := newZerologDiscard()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			zerologTwoScalars(logger.Info()).Msg("request handled")
+		}
+	})
+}
+
+func BenchmarkZerolog_Parallel_WithCached_TwoScalars(b *testing.B) {
+	logger := zerologTwoScalarsCtx(newZerologDiscard().With()).Logger()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			zerologTwoScalars(logger.Info()).Msg("request handled")
+		}
+	})
+}
+
 // Suppress unused import warning.
 var _ = time.Now

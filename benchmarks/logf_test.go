@@ -206,3 +206,71 @@ func BenchmarkLogf_Async_SixScalars(b *testing.B) {
 		logger.Info(ctx, "request handled", logfSixScalars()...)
 	}
 }
+
+// --- Parallel variants (sync) ---
+
+func BenchmarkLogf_Parallel_NoFields(b *testing.B) {
+	logger := newLogfSync()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.Info(ctx, "request handled")
+		}
+	})
+}
+
+func BenchmarkLogf_Parallel_TwoScalars(b *testing.B) {
+	logger := newLogfSync()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.Info(ctx, "request handled", logfTwoScalars()...)
+		}
+	})
+}
+
+func BenchmarkLogf_Parallel_WithCached_TwoScalars(b *testing.B) {
+	logger := newLogfSync().With(logfTwoScalars()...)
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.Info(ctx, "request handled", logfTwoScalars()...)
+		}
+	})
+}
+
+// --- Parallel variants (async / ChannelWriter) ---
+
+func BenchmarkLogf_AsyncParallel_NoFields(b *testing.B) {
+	logger, close := newLogfPooledAsync()
+	defer close()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.Info(ctx, "request handled")
+		}
+	})
+}
+
+func BenchmarkLogf_AsyncParallel_TwoScalars(b *testing.B) {
+	logger, close := newLogfPooledAsync()
+	defer close()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.Info(ctx, "request handled", logfTwoScalars()...)
+		}
+	})
+}
+
+func BenchmarkLogf_AsyncParallel_WithCached_TwoScalars(b *testing.B) {
+	logger, close := newLogfPooledAsync()
+	defer close()
+	logger2 := logger.With(logfTwoScalars()...)
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger2.Info(ctx, "request handled", logfTwoScalars()...)
+		}
+	})
+}

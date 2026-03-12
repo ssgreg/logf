@@ -65,8 +65,12 @@ type failingEncoder struct {
 	e error
 }
 
-func (e *failingEncoder) Encode(*Buffer, Entry) error {
-	return e.e
+func (e *failingEncoder) Encode(Entry) (*Buffer, error) {
+	return nil, e.e
+}
+
+func (e *failingEncoder) Clone() Encoder {
+	return &failingEncoder{e: e.e}
 }
 
 type failingWriter struct {

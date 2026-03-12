@@ -113,17 +113,17 @@ func logfSixHeavy() []logf.Field {
 // --- logf logger constructors ---
 
 func newLogfSync() *logf.Logger {
-	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()))
+	w := logf.NewWriter(logf.LevelDebug, io.Discard, logf.NewJSONEncoder.Default())
 	return logf.NewLogger(w).WithCaller(false)
 }
 
 func newLogfSyncInfo() *logf.Logger {
-	w := logf.NewSyncWriter(logf.LevelInfo, logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()))
+	w := logf.NewWriter(logf.LevelInfo, io.Discard, logf.NewJSONEncoder.Default())
 	return logf.NewLogger(w).WithCaller(false)
 }
 
 func newLogfSyncWithCaller() *logf.Logger {
-	w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()))
+	w := logf.NewWriter(logf.LevelDebug, io.Discard, logf.NewJSONEncoder.Default())
 	return logf.NewLogger(w).WithCaller(true)
 }
 
@@ -131,6 +131,11 @@ func newLogfAsync() (*logf.Logger, logf.ChannelWriterCloseFunc) {
 	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
 		Appender: logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder.Default()),
 	})
+	return logf.NewLogger(w).WithCaller(false), close
+}
+
+func newLogfPooledAsync() (*logf.Logger, func()) {
+	w, close := logf.NewAsyncWriter(logf.LevelDebug, io.Discard, logf.NewJSONEncoder.Default())
 	return logf.NewLogger(w).WithCaller(false), close
 }
 
