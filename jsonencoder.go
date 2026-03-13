@@ -285,49 +285,14 @@ func (f *jsonEncoder) EncodeFieldInt64(k string, v int64) {
 	f.EncodeTypeInt64(v)
 }
 
-func (f *jsonEncoder) EncodeFieldInt32(k string, v int32) {
-	f.addKey(k)
-	f.EncodeTypeInt32(v)
-}
-
-func (f *jsonEncoder) EncodeFieldInt16(k string, v int16) {
-	f.addKey(k)
-	f.EncodeTypeInt16(v)
-}
-
-func (f *jsonEncoder) EncodeFieldInt8(k string, v int8) {
-	f.addKey(k)
-	f.EncodeTypeInt8(v)
-}
-
 func (f *jsonEncoder) EncodeFieldUint64(k string, v uint64) {
 	f.addKey(k)
 	f.EncodeTypeUint64(v)
 }
 
-func (f *jsonEncoder) EncodeFieldUint32(k string, v uint32) {
-	f.addKey(k)
-	f.EncodeTypeUint32(v)
-}
-
-func (f *jsonEncoder) EncodeFieldUint16(k string, v uint16) {
-	f.addKey(k)
-	f.EncodeTypeUint16(v)
-}
-
-func (f *jsonEncoder) EncodeFieldUint8(k string, v uint8) {
-	f.addKey(k)
-	f.EncodeTypeUint8(v)
-}
-
 func (f *jsonEncoder) EncodeFieldFloat64(k string, v float64) {
 	f.addKey(k)
 	f.EncodeTypeFloat64(v)
-}
-
-func (f *jsonEncoder) EncodeFieldFloat32(k string, v float32) {
-	f.addKey(k)
-	f.EncodeTypeFloat32(v)
 }
 
 func (f *jsonEncoder) EncodeFieldString(k string, v string) {
@@ -381,59 +346,14 @@ func (f *jsonEncoder) EncodeFieldBytes(k string, v []byte) {
 	f.EncodeTypeBytes(v)
 }
 
-func (f *jsonEncoder) EncodeFieldBools(k string, v []bool) {
-	f.addKey(k)
-	f.EncodeTypeBools(v)
-}
-
 func (f *jsonEncoder) EncodeFieldInts64(k string, v []int64) {
 	f.addKey(k)
 	f.EncodeTypeInts64(v)
 }
 
-func (f *jsonEncoder) EncodeFieldInts32(k string, v []int32) {
-	f.addKey(k)
-	f.EncodeTypeInts32(v)
-}
-
-func (f *jsonEncoder) EncodeFieldInts16(k string, v []int16) {
-	f.addKey(k)
-	f.EncodeTypeInts16(v)
-}
-
-func (f *jsonEncoder) EncodeFieldInts8(k string, v []int8) {
-	f.addKey(k)
-	f.EncodeTypeInts8(v)
-}
-
-func (f *jsonEncoder) EncodeFieldUints64(k string, v []uint64) {
-	f.addKey(k)
-	f.EncodeTypeUints64(v)
-}
-
-func (f *jsonEncoder) EncodeFieldUints32(k string, v []uint32) {
-	f.addKey(k)
-	f.EncodeTypeUints32(v)
-}
-
-func (f *jsonEncoder) EncodeFieldUints16(k string, v []uint16) {
-	f.addKey(k)
-	f.EncodeTypeUints16(v)
-}
-
-func (f *jsonEncoder) EncodeFieldUints8(k string, v []uint8) {
-	f.addKey(k)
-	f.EncodeTypeUints8(v)
-}
-
 func (f *jsonEncoder) EncodeFieldFloats64(k string, v []float64) {
 	f.addKey(k)
 	f.EncodeTypeFloats64(v)
-}
-
-func (f *jsonEncoder) EncodeFieldFloats32(k string, v []float32) {
-	f.addKey(k)
-	f.EncodeTypeFloats32(v)
 }
 
 func (f *jsonEncoder) EncodeFieldDurations(k string, v []time.Duration) {
@@ -474,37 +394,7 @@ func (f *jsonEncoder) EncodeTypeInt64(v int64) {
 	f.buf.AppendInt(v)
 }
 
-func (f *jsonEncoder) EncodeTypeInt32(v int32) {
-	f.appendSeparator()
-	f.buf.AppendInt(int64(v))
-}
-
-func (f *jsonEncoder) EncodeTypeInt16(v int16) {
-	f.appendSeparator()
-	f.buf.AppendInt(int64(v))
-}
-
-func (f *jsonEncoder) EncodeTypeInt8(v int8) {
-	f.appendSeparator()
-	f.buf.AppendInt(int64(v))
-}
-
 func (f *jsonEncoder) EncodeTypeUint64(v uint64) {
-	f.appendSeparator()
-	f.buf.AppendUint(uint64(v))
-}
-
-func (f *jsonEncoder) EncodeTypeUint32(v uint32) {
-	f.appendSeparator()
-	f.buf.AppendUint(uint64(v))
-}
-
-func (f *jsonEncoder) EncodeTypeUint16(v uint16) {
-	f.appendSeparator()
-	f.buf.AppendUint(uint64(v))
-}
-
-func (f *jsonEncoder) EncodeTypeUint8(v uint8) {
 	f.appendSeparator()
 	f.buf.AppendUint(uint64(v))
 }
@@ -520,20 +410,6 @@ func (f *jsonEncoder) EncodeTypeFloat64(v float64) {
 		f.buf.AppendString(`"-Inf"`)
 	default:
 		f.buf.AppendFloat64(v)
-	}
-}
-
-func (f *jsonEncoder) EncodeTypeFloat32(v float32) {
-	f.appendSeparator()
-	switch {
-	case math.IsNaN(float64(v)):
-		f.buf.AppendString(`"NaN"`)
-	case math.IsInf(float64(v), 1):
-		f.buf.AppendString(`"+Inf"`)
-	case math.IsInf(float64(v), -1):
-		f.buf.AppendString(`"-Inf"`)
-	default:
-		f.buf.AppendFloat32(v)
 	}
 }
 
@@ -554,15 +430,6 @@ func (f *jsonEncoder) EncodeTypeBytes(v []byte) {
 	f.buf.AppendByte('"')
 }
 
-func (f *jsonEncoder) EncodeTypeBools(v []bool) {
-	f.appendSeparator()
-	f.buf.AppendByte('[')
-	for i := range v {
-		f.EncodeTypeBool(v[i])
-	}
-	f.buf.AppendByte(']')
-}
-
 func (f *jsonEncoder) EncodeTypeStrings(v []string) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
@@ -581,83 +448,11 @@ func (f *jsonEncoder) EncodeTypeInts64(v []int64) {
 	f.buf.AppendByte(']')
 }
 
-func (f *jsonEncoder) EncodeTypeInts32(v []int32) {
-	f.appendSeparator()
-	f.buf.AppendByte('[')
-	for i := range v {
-		f.EncodeTypeInt32(v[i])
-	}
-	f.buf.AppendByte(']')
-}
-
-func (f *jsonEncoder) EncodeTypeInts16(v []int16) {
-	f.appendSeparator()
-	f.buf.AppendByte('[')
-	for i := range v {
-		f.EncodeTypeInt16(v[i])
-	}
-	f.buf.AppendByte(']')
-}
-
-func (f *jsonEncoder) EncodeTypeInts8(v []int8) {
-	f.appendSeparator()
-	f.buf.AppendByte('[')
-	for i := range v {
-		f.EncodeTypeInt8(v[i])
-	}
-	f.buf.AppendByte(']')
-}
-
-func (f *jsonEncoder) EncodeTypeUints64(v []uint64) {
-	f.appendSeparator()
-	f.buf.AppendByte('[')
-	for i := range v {
-		f.EncodeTypeUint64(v[i])
-	}
-	f.buf.AppendByte(']')
-}
-
-func (f *jsonEncoder) EncodeTypeUints32(v []uint32) {
-	f.appendSeparator()
-	f.buf.AppendByte('[')
-	for i := range v {
-		f.EncodeTypeUint32(v[i])
-	}
-	f.buf.AppendByte(']')
-}
-
-func (f *jsonEncoder) EncodeTypeUints16(v []uint16) {
-	f.appendSeparator()
-	f.buf.AppendByte('[')
-	for i := range v {
-		f.EncodeTypeUint16(v[i])
-	}
-	f.buf.AppendByte(']')
-}
-
-func (f *jsonEncoder) EncodeTypeUints8(v []uint8) {
-	f.appendSeparator()
-	f.buf.AppendByte('[')
-	for i := range v {
-		f.EncodeTypeUint8(v[i])
-	}
-	f.buf.AppendByte(']')
-}
-
 func (f *jsonEncoder) EncodeTypeFloats64(v []float64) {
 	f.appendSeparator()
 	f.buf.AppendByte('[')
 	for i := range v {
 		f.EncodeTypeFloat64(v[i])
-	}
-	f.buf.AppendByte(']')
-}
-
-func (f *jsonEncoder) EncodeTypeFloats32(v []float32) {
-	f.appendSeparator()
-	f.buf.AppendByte('[')
-	for i := range v {
-		f.EncodeTypeFloat32(v[i])
 	}
 	f.buf.AppendByte(']')
 }

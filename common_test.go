@@ -59,19 +59,6 @@ func (w *testEntryWriter) Enabled(_ context.Context, _ Level) bool {
 	return true
 }
 
-// testSnapshotter implements Snapshotter allowing to check whether
-// TakeSnapshot was called or not. TakeSnapshot returns new object of
-// this type.
-type testSnapshotter struct {
-	Called bool
-}
-
-func (s *testSnapshotter) TakeSnapshot() interface{} {
-	s.Called = true
-
-	return &testSnapshotter{}
-}
-
 // testTypeEncoder implements TypeEncoder storing the last encoding value.
 type testTypeEncoder struct {
 	result interface{}
@@ -89,39 +76,11 @@ func (e *testTypeEncoder) EncodeTypeInt64(v int64) {
 	e.result = v
 }
 
-func (e *testTypeEncoder) EncodeTypeInt32(v int32) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeInt16(v int16) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeInt8(v int8) {
-	e.result = v
-}
-
 func (e *testTypeEncoder) EncodeTypeUint64(v uint64) {
 	e.result = v
 }
 
-func (e *testTypeEncoder) EncodeTypeUint32(v uint32) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeUint16(v uint16) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeUint8(v uint8) {
-	e.result = v
-}
-
 func (e *testTypeEncoder) EncodeTypeFloat64(v float64) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeFloat32(v float32) {
 	e.result = v
 }
 
@@ -145,47 +104,11 @@ func (e *testTypeEncoder) EncodeTypeBytes(v []byte) {
 	e.result = v
 }
 
-func (e *testTypeEncoder) EncodeTypeBools(v []bool) {
-	e.result = v
-}
-
 func (e *testTypeEncoder) EncodeTypeInts64(v []int64) {
 	e.result = v
 }
 
-func (e *testTypeEncoder) EncodeTypeInts32(v []int32) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeInts16(v []int16) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeInts8(v []int8) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeUints64(v []uint64) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeUints32(v []uint32) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeUints16(v []uint16) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeUints8(v []uint8) {
-	e.result = v
-}
-
 func (e *testTypeEncoder) EncodeTypeFloats64(v []float64) {
-	e.result = v
-}
-
-func (e *testTypeEncoder) EncodeTypeFloats32(v []float32) {
 	e.result = v
 }
 
@@ -226,39 +149,11 @@ func (e *testFieldEncoder) EncodeFieldInt64(k string, v int64) {
 	e.result[k] = v
 }
 
-func (e *testFieldEncoder) EncodeFieldInt32(k string, v int32) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldInt16(k string, v int16) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldInt8(k string, v int8) {
-	e.result[k] = v
-}
-
 func (e *testFieldEncoder) EncodeFieldUint64(k string, v uint64) {
 	e.result[k] = v
 }
 
-func (e *testFieldEncoder) EncodeFieldUint32(k string, v uint32) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldUint16(k string, v uint16) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldUint8(k string, v uint8) {
-	e.result[k] = v
-}
-
 func (e *testFieldEncoder) EncodeFieldFloat64(k string, v float64) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldFloat32(k string, v float32) {
 	e.result[k] = v
 }
 
@@ -286,47 +181,11 @@ func (e *testFieldEncoder) EncodeFieldBytes(k string, v []byte) {
 	e.result[k] = v
 }
 
-func (e *testFieldEncoder) EncodeFieldBools(k string, v []bool) {
-	e.result[k] = v
-}
-
 func (e *testFieldEncoder) EncodeFieldInts64(k string, v []int64) {
 	e.result[k] = v
 }
 
-func (e *testFieldEncoder) EncodeFieldInts32(k string, v []int32) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldInts16(k string, v []int16) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldInts8(k string, v []int8) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldUints64(k string, v []uint64) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldUints32(k string, v []uint32) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldUints16(k string, v []uint16) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldUints8(k string, v []uint8) {
-	e.result[k] = v
-}
-
 func (e *testFieldEncoder) EncodeFieldFloats64(k string, v []float64) {
-	e.result[k] = v
-}
-
-func (e *testFieldEncoder) EncodeFieldFloats32(k string, v []float32) {
 	e.result[k] = v
 }
 

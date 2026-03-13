@@ -38,19 +38,6 @@ func (a benchArray) EncodeLogfArray(enc logf.TypeEncoder) error {
 	return nil
 }
 
-// --- benchSnapshotter implements logf.Snapshotter for Any(Snapshotter) benchmarks ---
-
-type benchSnapshotter struct {
-	Value string
-}
-
-func (s *benchSnapshotter) TakeSnapshot() interface{} {
-	return &benchSnapshotter{Value: s.Value}
-}
-
-func (s *benchSnapshotter) String() string {
-	return s.Value
-}
 
 // --- benchStringer implements fmt.Stringer for Stringer/Any(Stringer) benchmarks ---
 
@@ -66,7 +53,6 @@ func (s *benchStringer) String() string {
 var (
 	_ logf.ObjectEncoder = (*benchUser)(nil)
 	_ logf.ArrayEncoder  = benchArray(nil)
-	_ logf.Snapshotter   = (*benchSnapshotter)(nil)
 	_ fmt.Stringer       = (*benchStringer)(nil)
 )
 
@@ -101,10 +87,10 @@ var (
 
 func logfSixHeavy() []logf.Field {
 	return []logf.Field{
-		logf.ConstBytes("body", heavyBytes),
+		logf.Bytes("body", heavyBytes),
 		logf.Time("timestamp", heavyTime),
-		logf.ConstInts64("ids", heavyInts64),
-		logf.ConstStrings("tags", heavyStrings),
+		logf.Ints64("ids", heavyInts64),
+		logf.Strings("tags", heavyStrings),
 		logf.Duration("latency", heavyDuration),
 		logf.Object("user", heavyUser),
 	}

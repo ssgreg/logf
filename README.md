@@ -5,7 +5,7 @@
 [![Go Report Status](https://goreportcard.com/badge/github.com/ssgreg/logf)](https://goreportcard.com/report/github.com/ssgreg/logf)
 [![Coverage Status](https://codecov.io/gh/ssgreg/logf/branch/master/graph/badge.svg)](https://codecov.io/gh/ssgreg/logf)
 
-Faster-than-light, asynchronous, structured logger in Go with zero allocation count.
+Async structured logging for Go. Fast, resilient, slog-compatible.
 
 ## Why logf
 
@@ -22,9 +22,39 @@ scenarios where slog falls short:
   fields to `context.Context` that are automatically included in every log entry.
   Neither slog nor zap support this natively; they require passing a derived
   logger through the call stack.
-- **Async logging out of the box** — logf's channel writer is the only Go logger
-  with built-in asynchronous logging. The caller goroutine never blocks on
-  `write(fd)`, paying only ~125ns per log call regardless of I/O conditions.
+- **Decoupled encoding and I/O** — logf is the only Go logger where encoding
+  and writing are fully separated. This enables async writes, multiple encoders
+  per destination, and per-destination isolation in a single pipeline. The caller
+  goroutine encodes in parallel and never blocks on `write(fd)`.
+
+## Design Philosophy
+
+**The logger must never be the reason your service slows down.**
+
+Writing to a local file is fast. If the disk cannot keep up, you have far bigger
+problems than logging. But production systems rarely log to a single file — they
+fan out to remote destinations: Logstash, Loki, Elasticsearch, S3 archivers.
+Any of these can lag, stall, or go down entirely.
+
+In a traditional synchronous logger, a slow remote destination blocks the
+`write()` call, which blocks the goroutine, which blocks your HTTP handler.
+One sluggish log collector degrades every request in the service. The logger
+becomes the bottleneck.
+
+logf solves this with **channel-based isolation**. Each log entry is encoded in
+the caller's goroutine (parallel across all CPUs) and sent to a channel
+(~20 ns). A dedicated consumer goroutine handles the actual I/O. The caller
+never waits for disk or network — it moves on to serve the next request.
+
+When multiple destinations are involved, each gets its own channel and consumer
+goroutine. A stalled Logstash does not slow down local file writes. Error logs
+routed to an alerting pipeline do not compete with high-volume info logs.
+Destinations are physically isolated — not just logically separated.
+
+This is not a throughput optimization. Throughput is bounded by the slowest
+destination regardless of architecture. This is a **latency isolation**
+strategy: the price your application pays per log call stays constant (~100 ns)
+no matter what happens downstream.
 
 ## Architecture
 
@@ -32,10 +62,11 @@ scenarios where slog falls short:
 (~2us on SSD). All loggers converge to similar encoding speed (~200-500ns) once I/O
 is buffered. The difference is whether buffering is built-in or requires manual setup.
 
-**Async channel architecture** (logf) decouples the caller goroutine from both
-encoding and I/O. The caller only pays for creating an Entry and sending it to
-a channel (~125ns). Encoding and writing happen in a dedicated worker goroutine.
-This provides consistent low latency regardless of I/O conditions.
+**Async channel architecture** (logf) encodes each entry in the caller goroutine
+(parallel across all CPUs) and sends the resulting bytes to a channel (~20 ns).
+A dedicated consumer goroutine handles only the `write(fd)` call. This separates
+CPU-bound work (encoding) from I/O-bound work (writing), keeping caller latency
+consistent regardless of I/O conditions.
 
 **Sync buffered architecture** (zap `BufferedWriteSyncer`) buffers writes in memory
 but encoding still happens in the caller goroutine under a mutex. When the buffer
@@ -74,3 +105,7 @@ determines throughput, latency, and resilience.
 Middleware can attach fields to `context.Context` via `logf.With(ctx, fields...)`,
 and the handler automatically includes them in every log entry — without passing
 a derived logger through the call stack. Neither zap nor standard slog support this.
+
+## TODO
+
+- `Stack(key)` / `StackSkip(key, skip)` field constructor — capture current goroutine stack trace

@@ -144,13 +144,6 @@ func TestLoggerFields(t *testing.T) {
 	assert.Equal(t, "third", w.Entry.LoggerBag.Fields()[2].Key)
 }
 
-func TestLoggerWithFieldsCallSnapshotter(t *testing.T) {
-	w := &testEntryWriter{}
-	ts := testSnapshotter{}
-
-	NewLogger(w).With(Any("snapshotter", &ts))
-	assert.True(t, ts.Called)
-}
 
 func TestLoggerBag(t *testing.T) {
 	w := &testEntryWriter{}
@@ -181,14 +174,12 @@ func TestLoggerLeveledLog(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Level.String(), func(t *testing.T) {
-			ts := testSnapshotter{}
-			c.Fn(ctx, c.Level.String(), Any("snapshotter", &ts))
+			c.Fn(ctx, c.Level.String(), Int("key", 42))
 
 			assert.Equal(t, c.Level.String(), w.Entry.Text)
 			assert.Equal(t, 1, len(w.Entry.Fields))
 			assert.Equal(t, c.Level, w.Entry.Level)
 			assert.WithinDuration(t, time.Now(), w.Entry.Time, time.Second*2)
-			assert.True(t, ts.Called)
 		})
 	}
 }

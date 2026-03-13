@@ -160,8 +160,8 @@ func main() {
 	fmt.Println("=== B5: SixHeavy ===")
 	user := &benchUser{ID: 123, Name: "alice"}
 	logfPrint("", enc, []logf.Field{
-		logf.ConstBytes("body", heavyBytes), logf.Time("timestamp", heavyTime),
-		logf.ConstInts64("ids", heavyInts64), logf.ConstStrings("tags", heavyStrings),
+		logf.Bytes("body", heavyBytes), logf.Time("timestamp", heavyTime),
+		logf.Ints64("ids", heavyInts64), logf.Strings("tags", heavyStrings),
 		logf.Duration("latency", heavyDuration), logf.Object("user", user),
 	})
 	zapPrint("", zap.Binary("body", heavyBytes), zap.Time("timestamp", heavyTime),
