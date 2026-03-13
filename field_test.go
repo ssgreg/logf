@@ -284,6 +284,35 @@ func TestFieldByteString(t *testing.T) {
 	assert.Equal(t, "hello", e.result["k"])
 }
 
+// secretToken implements fmt.Stringer to mask its value in logs.
+type secretToken string
+
+func (t secretToken) String() string {
+	if len(t) > 4 {
+		return string(t[:2]) + "***"
+	}
+	return "***"
+}
+
+func TestFieldMasking(t *testing.T) {
+	raw := secretToken("eyJhbGciOiJSUzI1NiJ9.secret")
+
+	t.Run("Stringer", func(t *testing.T) {
+		e := newTestFieldEncoder()
+		f := Stringer("token", raw)
+		f.Accept(e)
+		assert.Equal(t, "ey***", e.result["token"])
+		assert.NotContains(t, e.result["token"], "secret")
+	})
+	t.Run("Any", func(t *testing.T) {
+		e := newTestFieldEncoder()
+		f := Any("token", raw)
+		f.Accept(e)
+		assert.Equal(t, "ey***", e.result["token"])
+		assert.NotContains(t, e.result["token"], "secret")
+	})
+}
+
 func TestFieldNamedError(t *testing.T) {
 	golden := errors.New("named error")
 
