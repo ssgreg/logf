@@ -38,19 +38,19 @@ func TestField(t *testing.T) {
 			name:     "Int32",
 			fn:       func(v interface{}) Field { return Int32("k", v.(int32)) },
 			original: int32(42),
-			expected: int32(42),
+			expected: int64(42),
 		},
 		{
 			name:     "Int16",
 			fn:       func(v interface{}) Field { return Int16("k", v.(int16)) },
 			original: int16(42),
-			expected: int16(42),
+			expected: int64(42),
 		},
 		{
 			name:     "Int8",
 			fn:       func(v interface{}) Field { return Int8("k", v.(int8)) },
 			original: int8(42),
-			expected: int8(42),
+			expected: int64(42),
 		},
 		{
 			name:     "Uint",
@@ -68,19 +68,19 @@ func TestField(t *testing.T) {
 			name:     "Uint32",
 			fn:       func(v interface{}) Field { return Uint32("k", v.(uint32)) },
 			original: uint32(42),
-			expected: uint32(42),
+			expected: uint64(42),
 		},
 		{
 			name:     "Uint16",
 			fn:       func(v interface{}) Field { return Uint16("k", v.(uint16)) },
 			original: uint16(42),
-			expected: uint16(42),
+			expected: uint64(42),
 		},
 		{
 			name:     "Uint8",
 			fn:       func(v interface{}) Field { return Uint8("k", v.(uint8)) },
 			original: uint8(42),
-			expected: uint8(42),
+			expected: uint64(42),
 		},
 		{
 			name:     "Float64",
@@ -92,7 +92,7 @@ func TestField(t *testing.T) {
 			name:     "Float32",
 			fn:       func(v interface{}) Field { return Float32("k", v.(float32)) },
 			original: float32(42),
-			expected: float32(42),
+			expected: float64(42),
 		},
 		{
 			name:     "Duration",
@@ -105,96 +105,6 @@ func TestField(t *testing.T) {
 			fn:       func(v interface{}) Field { return String("k", v.(string)) },
 			original: "42",
 			expected: "42",
-		},
-		{
-			name:     "ConstBytes",
-			fn:       func(v interface{}) Field { return ConstBytes("k", v.([]byte)) },
-			original: []byte{42},
-			expected: []byte{42},
-		},
-		{
-			name:     "ConstBools",
-			fn:       func(v interface{}) Field { return ConstBools("k", v.([]bool)) },
-			original: []bool{true},
-			expected: []bool{true},
-		},
-		{
-			name:     "ConstInts",
-			fn:       func(v interface{}) Field { return ConstInts("k", v.([]int)) },
-			original: []int{42},
-			expected: []int64{42},
-		},
-		{
-			name:     "ConstInts64",
-			fn:       func(v interface{}) Field { return ConstInts64("k", v.([]int64)) },
-			original: []int64{42},
-			expected: []int64{42},
-		},
-		{
-			name:     "ConstInts32",
-			fn:       func(v interface{}) Field { return ConstInts32("k", v.([]int32)) },
-			original: []int32{42},
-			expected: []int32{42},
-		},
-		{
-			name:     "ConstInts16",
-			fn:       func(v interface{}) Field { return ConstInts16("k", v.([]int16)) },
-			original: []int16{42},
-			expected: []int16{42},
-		},
-		{
-			name:     "ConstInts8",
-			fn:       func(v interface{}) Field { return ConstInts8("k", v.([]int8)) },
-			original: []int8{42},
-			expected: []int8{42},
-		},
-		{
-			name:     "ConstUints",
-			fn:       func(v interface{}) Field { return ConstUints("k", v.([]uint)) },
-			original: []uint{42},
-			expected: []uint64{42},
-		},
-		{
-			name:     "ConstUints64",
-			fn:       func(v interface{}) Field { return ConstUints64("k", v.([]uint64)) },
-			original: []uint64{42},
-			expected: []uint64{42},
-		},
-		{
-			name:     "ConstUints32",
-			fn:       func(v interface{}) Field { return ConstUints32("k", v.([]uint32)) },
-			original: []uint32{42},
-			expected: []uint32{42},
-		},
-		{
-			name:     "ConstUints16",
-			fn:       func(v interface{}) Field { return ConstUints16("k", v.([]uint16)) },
-			original: []uint16{42},
-			expected: []uint16{42},
-		},
-		{
-			name:     "ConstUints8",
-			fn:       func(v interface{}) Field { return ConstUints8("k", v.([]uint8)) },
-			original: []uint8{42},
-			expected: []uint8{42},
-		},
-		{
-			name:     "ConstFloats64",
-			fn:       func(v interface{}) Field { return ConstFloats64("k", v.([]float64)) },
-			original: []float64{42},
-			expected: []float64{42},
-		},
-		{
-			name:     "ConstFloats32",
-			fn:       func(v interface{}) Field { return ConstFloats32("k", v.([]float32)) },
-			original: []float32{42},
-			expected: []float32{42},
-		},
-		{
-			name:     "ConstDurations",
-			fn:       func(v interface{}) Field { return ConstDurations("k", v.([]time.Duration)) },
-			original: []time.Duration{time.Second},
-			expected: []time.Duration{time.Second},
 		},
 	}
 
@@ -254,8 +164,7 @@ func TestFieldArray(t *testing.T) {
 func TestFieldNilArray(t *testing.T) {
 	e := newTestFieldEncoder()
 	f := Array("k", nil)
-	f.Accept(e)
-	assert.Equal(t, "nil", e.result["k"])
+	assert.Panics(t, func() { f.Accept(e) })
 }
 
 func TestFieldObject(t *testing.T) {
@@ -277,11 +186,25 @@ func TestFieldObject(t *testing.T) {
 	})
 }
 
+func TestFieldInline(t *testing.T) {
+	e := newTestFieldEncoder()
+	f := Inline(&testObjectEncoder{})
+	f.Accept(e)
+	assert.Equal(t, "username", e.result["username"])
+	assert.Equal(t, int64(42), e.result["code"])
+}
+
+func TestFieldNilInline(t *testing.T) {
+	e := newTestFieldEncoder()
+	f := Inline(nil)
+	f.Accept(e)
+	assert.Empty(t, e.result)
+}
+
 func TestFieldNilObject(t *testing.T) {
 	e := newTestFieldEncoder()
 	f := Object("k", nil)
-	f.Accept(e)
-	assert.Equal(t, "nil", e.result["k"])
+	assert.Panics(t, func() { f.Accept(e) })
 }
 
 func TestFieldTime(t *testing.T) {
@@ -337,62 +260,6 @@ func TestFieldNilStringer(t *testing.T) {
 	assert.Equal(t, "nil", e.result["k"])
 }
 
-func TestFieldConstStringer(t *testing.T) {
-	golden := "before"
-	str := &testStringer{golden}
-
-	e := newTestFieldEncoder()
-	f := ConstStringer("k", str)
-
-	f.Accept(e)
-	assert.Equal(t, golden, e.result["k"])
-}
-
-func TestFieldNilConstStringer(t *testing.T) {
-	e := newTestFieldEncoder()
-	f := ConstStringer("k", nil)
-
-	f.Accept(e)
-	assert.Equal(t, "nil", e.result["k"])
-}
-func TestFieldConstFormatter(t *testing.T) {
-	golden := "42"
-	e := newTestFieldEncoder()
-	f := ConstFormatter("k", "%d", 42)
-
-	f.Accept(e)
-	assert.Equal(t, golden, e.result["k"])
-}
-
-func TestFieldConstFormatterV(t *testing.T) {
-	type testFormatterV struct {
-		str string
-	}
-
-	e := newTestFieldEncoder()
-	f := ConstFormatterV("k", testFormatterV{"42"})
-
-	f.Accept(e)
-	assert.Equal(t, `logf.testFormatterV{str:"42"}`, e.result["k"])
-}
-
-func TestFieldFormatter(t *testing.T) {
-	type testFormatterV struct {
-		str string
-	}
-	testing := testFormatterV{"42"}
-
-	e := newTestFieldEncoder()
-	f := Formatter("k", "%s", &testing)
-
-	// Change testing value to check that ConstFormatter formats string
-	// during it's call.
-	testing.str = "66"
-
-	f.Accept(e)
-	assert.Equal(t, "&{42}", e.result["k"])
-}
-
 func TestFieldFormatterV(t *testing.T) {
 	type testFormatterV struct {
 		str string
@@ -402,12 +269,19 @@ func TestFieldFormatterV(t *testing.T) {
 	e := newTestFieldEncoder()
 	f := FormatterV("k", &testing)
 
-	// Change testing value to check that ConstFormatter formats string
-	// during it's call.
+	// Change testing value to check that Formatter formats string
+	// during its call.
 	testing.str = "66"
 
 	f.Accept(e)
 	assert.Equal(t, `&logf.testFormatterV{str:"42"}`, e.result["k"])
+}
+
+func TestFieldByteString(t *testing.T) {
+	e := newTestFieldEncoder()
+	f := ByteString("k", []byte("hello"))
+	f.Accept(e)
+	assert.Equal(t, "hello", e.result["k"])
 }
 
 func TestFieldNamedError(t *testing.T) {
@@ -570,6 +444,50 @@ func TestFieldAnyReflect(t *testing.T) {
 		})
 	}
 
+	// Pointer types: non-nil → typed value, nil → FieldTypeAny(nil).
+	t.Run("*string", func(t *testing.T) {
+		s := "hello"
+		f := Any("k", &s)
+		e := newTestFieldEncoder()
+		f.Accept(e)
+		assert.Equal(t, "hello", e.result["k"])
+	})
+	t.Run("*string/nil", func(t *testing.T) {
+		f := Any("k", (*string)(nil))
+		assert.Equal(t, FieldTypeAny, f.Type)
+	})
+	t.Run("*int64", func(t *testing.T) {
+		v := int64(42)
+		f := Any("k", &v)
+		e := newTestFieldEncoder()
+		f.Accept(e)
+		assert.Equal(t, int64(42), e.result["k"])
+	})
+	t.Run("*int64/nil", func(t *testing.T) {
+		f := Any("k", (*int64)(nil))
+		assert.Equal(t, FieldTypeAny, f.Type)
+	})
+	t.Run("*bool", func(t *testing.T) {
+		v := true
+		f := Any("k", &v)
+		e := newTestFieldEncoder()
+		f.Accept(e)
+		assert.Equal(t, true, e.result["k"])
+	})
+	t.Run("*float64", func(t *testing.T) {
+		v := float64(3.14)
+		f := Any("k", &v)
+		e := newTestFieldEncoder()
+		f.Accept(e)
+		assert.Equal(t, float64(3.14), e.result["k"])
+	})
+	t.Run("*time.Duration", func(t *testing.T) {
+		v := time.Minute
+		f := Any("k", &v)
+		e := newTestFieldEncoder()
+		f.Accept(e)
+		assert.Equal(t, time.Minute, e.result["k"])
+	})
 }
 
 func TestFieldAccept(t *testing.T) {
@@ -605,17 +523,17 @@ func TestFieldAccept(t *testing.T) {
 		{
 			name:     "Int32",
 			original: Int32("k", 42),
-			expected: int32(42),
+			expected: int64(42),
 		},
 		{
 			name:     "Int16",
 			original: Int16("k", 42),
-			expected: int16(42),
+			expected: int64(42),
 		},
 		{
 			name:     "Int8",
 			original: Int8("k", 42),
-			expected: int8(42),
+			expected: int64(42),
 		},
 		{
 			name:     "Uint",
@@ -630,17 +548,17 @@ func TestFieldAccept(t *testing.T) {
 		{
 			name:     "Uint32",
 			original: Uint32("k", 42),
-			expected: uint32(42),
+			expected: uint64(42),
 		},
 		{
 			name:     "Uint16",
 			original: Uint16("k", 42),
-			expected: uint16(42),
+			expected: uint64(42),
 		},
 		{
 			name:     "Uint8",
 			original: Uint8("k", 42),
-			expected: uint8(42),
+			expected: uint64(42),
 		},
 		{
 			name:     "Float64",
@@ -650,7 +568,7 @@ func TestFieldAccept(t *testing.T) {
 		{
 			name:     "Float32",
 			original: Float32("k", 42),
-			expected: float32(42),
+			expected: float64(42),
 		},
 		{
 			name:     "Strings",
@@ -658,23 +576,8 @@ func TestFieldAccept(t *testing.T) {
 			expected: []string{"42", "43"},
 		},
 		{
-			name:     "Bools",
-			original: Bools("k", []bool{true, false}),
-			expected: []bool{true, false},
-		},
-		{
-			name:     "ConstBools",
-			original: ConstBools("k", []bool{true, false}),
-			expected: []bool{true, false},
-		},
-		{
 			name:     "Ints",
 			original: Ints("k", []int{42, 43}),
-			expected: []int64{42, 43},
-		},
-		{
-			name:     "ConstInts",
-			original: ConstInts("k", []int{42, 43}),
 			expected: []int64{42, 43},
 		},
 		{
@@ -683,109 +586,9 @@ func TestFieldAccept(t *testing.T) {
 			expected: []int64{42, 43},
 		},
 		{
-			name:     "ConstInts64",
-			original: ConstInts64("k", []int64{42, 43}),
-			expected: []int64{42, 43},
-		},
-		{
-			name:     "Ints32",
-			original: Ints32("k", []int32{42, 43}),
-			expected: []int32{42, 43},
-		},
-		{
-			name:     "ConstInts32",
-			original: ConstInts32("k", []int32{42, 43}),
-			expected: []int32{42, 43},
-		},
-		{
-			name:     "Ints16",
-			original: Ints16("k", []int16{42, 43}),
-			expected: []int16{42, 43},
-		},
-		{
-			name:     "ConstInts16",
-			original: ConstInts16("k", []int16{42, 43}),
-			expected: []int16{42, 43},
-		},
-		{
-			name:     "Ints8",
-			original: Ints8("k", []int8{42}),
-			expected: []int8{42},
-		},
-		{
-			name:     "ConstInts8",
-			original: ConstInts8("k", []int8{42}),
-			expected: []int8{42},
-		},
-		{
-			name:     "Uints",
-			original: Uints("k", []uint{42, 43}),
-			expected: []uint64{42, 43},
-		},
-		{
-			name:     "ConstUints",
-			original: ConstUints("k", []uint{42, 43}),
-			expected: []uint64{42, 43},
-		},
-		{
-			name:     "Uints64",
-			original: Uints64("k", []uint64{42, 43}),
-			expected: []uint64{42, 43},
-		},
-		{
-			name:     "ConstUints64",
-			original: ConstUints64("k", []uint64{42, 43}),
-			expected: []uint64{42, 43},
-		},
-		{
-			name:     "Uints32",
-			original: Uints32("k", []uint32{42, 43}),
-			expected: []uint32{42, 43},
-		},
-		{
-			name:     "ConstUints32",
-			original: ConstUints32("k", []uint32{42, 43}),
-			expected: []uint32{42, 43},
-		},
-		{
-			name:     "Uints16",
-			original: Uints16("k", []uint16{42, 43}),
-			expected: []uint16{42, 43},
-		},
-		{
-			name:     "ConstUints16",
-			original: ConstUints16("k", []uint16{42, 43}),
-			expected: []uint16{42, 43},
-		},
-		{
-			name:     "Uints8",
-			original: Uints8("k", []uint8{42}),
-			expected: []uint8{42},
-		},
-		{
-			name:     "ConstUints8",
-			original: ConstUints8("k", []uint8{42}),
-			expected: []uint8{42},
-		},
-		{
 			name:     "Floats64",
 			original: Floats64("k", []float64{42}),
 			expected: []float64{42},
-		},
-		{
-			name:     "ConstFloats64",
-			original: ConstFloats64("k", []float64{42}),
-			expected: []float64{42},
-		},
-		{
-			name:     "Floats32",
-			original: Floats32("k", []float32{42}),
-			expected: []float32{42},
-		},
-		{
-			name:     "ConstFloats32",
-			original: ConstFloats32("k", []float32{42}),
-			expected: []float32{42},
 		},
 		{
 			name:     "nil",
@@ -795,11 +598,6 @@ func TestFieldAccept(t *testing.T) {
 		{
 			name:     "Bytes",
 			original: Bytes("k", []byte{42, 43}),
-			expected: []byte{42, 43},
-		},
-		{
-			name:     "ConstBytes",
-			original: ConstBytes("k", []byte{42, 43}),
 			expected: []byte{42, 43},
 		},
 		{
@@ -823,18 +621,8 @@ func TestFieldAccept(t *testing.T) {
 			expected: "stringer",
 		},
 		{
-			name:     "ConstStringer",
-			original: ConstStringer("k", &testStringer{"stringer"}),
-			expected: "stringer",
-		},
-		{
 			name:     "Stringer/Nil",
 			original: Stringer("k", nil),
-			expected: "nil", // FIXME
-		},
-		{
-			name:     "ConstStringer/Nil",
-			original: ConstStringer("k", nil),
 			expected: "nil", // FIXME
 		},
 		{
@@ -843,24 +631,9 @@ func TestFieldAccept(t *testing.T) {
 			expected: &testArrayEncoder{},
 		},
 		{
-			name:     "Array/Nil",
-			original: Array("k", nil),
-			expected: "nil", // FIXME
-		},
-		{
 			name:     "Object",
 			original: Object("k", &testObjectEncoder{}),
 			expected: &testObjectEncoder{},
-		},
-		{
-			name:     "Object/Nil",
-			original: Object("k", nil),
-			expected: "nil", // FIXME
-		},
-		{
-			name:     "Object/Nil",
-			original: Object("k", nil),
-			expected: "nil", // FIXME
 		},
 		{
 			name:     "Any",

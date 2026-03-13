@@ -79,38 +79,24 @@ func TestEncoder(t *testing.T) {
 					Float64("float64", 4.2), Float32("float32", 4.2),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bool":true,"int":42,"int64":42,"int32":42,"int16":42,"int8":42,"uint":42,"uint64":42,"uint32":42,"uint16":42,"uint8":42,"float64":4.2,"float32":4.2}` + "\n",
-		},
-		{
-			"FieldsConstSlices",
-			Entry{
-				Fields: []Field{
-					ConstBools("bools", []bool{true}),
-					ConstInts("ints", []int{42}), ConstInts64("ints64", []int64{42}), ConstInts32("ints32", []int32{42}), ConstInts16("ints16", []int16{42}), ConstInts8("ints8", []int8{42}),
-					ConstUints("uints", []uint{42}), ConstUints64("uints64", []uint64{42}), ConstUints32("uints32", []uint32{42}), ConstUints16("uints16", []uint16{42}), ConstUints8("uints8", []uint8{42}),
-					ConstFloats64("floats64", []float64{4.2}), ConstFloats32("floats32", []float32{4.2}),
-				},
-			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bools":[true],"ints":[42],"ints64":[42],"ints32":[42],"ints16":[42],"ints8":[42],"uints":[42],"uints64":[42],"uints32":[42],"uints16":[42],"uints8":[42],"floats64":[4.2],"floats32":[4.2]}` + "\n",
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bool":true,"int":42,"int64":42,"int32":42,"int16":42,"int8":42,"uint":42,"uint64":42,"uint32":42,"uint16":42,"uint8":42,"float64":4.2,"float32":4.199999809265137}` + "\n",
 		},
 		{
 			"FieldsSlices",
 			Entry{
 				Fields: []Field{
-					Bools("bools", []bool{true}),
-					Ints("ints", []int{42}), Ints64("ints64", []int64{42}), Ints32("ints32", []int32{42}), Ints16("ints16", []int16{42}), Ints8("ints8", []int8{42}),
-					Uints("uints", []uint{42}), Uints64("uints64", []uint64{42}), Uints32("uints32", []uint32{42}), Uints16("uints16", []uint16{42}), Uints8("uints8", []uint8{42}),
-					Floats64("floats64", []float64{4.2}), Floats32("floats32", []float32{4.2}),
+					Ints("ints", []int{42}), Ints64("ints64", []int64{42}),
+					Floats64("floats64", []float64{4.2}),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bools":[true],"ints":[42],"ints64":[42],"ints32":[42],"ints16":[42],"ints8":[42],"uints":[42],"uints64":[42],"uints32":[42],"uints16":[42],"uints8":[42],"floats64":[4.2],"floats32":[4.2]}` + "\n",
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","ints":[42],"ints64":[42],"floats64":[4.2]}` + "\n",
 		},
 		{
 			"FieldsDuration",
 			Entry{
 				Fields: []Field{
 					Duration("duration", time.Second),
-					ConstDurations("durations", []time.Duration{time.Second}),
+					Durations("durations", []time.Duration{time.Second}),
 				},
 			},
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","duration":"1s","durations":["1s"]}` + "\n",
@@ -143,6 +129,16 @@ func TestEncoder(t *testing.T) {
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","object":{"username":"username","code":42}}` + "\n",
 		},
 		{
+			"FieldsInline",
+			Entry{
+				Fields: []Field{
+					Inline(&testObjectEncoder{}),
+					String("extra", "value"),
+				},
+			},
+			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","username":"username","code":42,"extra":"value"}` + "\n",
+		},
+		{
 			"FieldsError",
 			Entry{
 				Fields: []Field{
@@ -164,7 +160,7 @@ func TestEncoder(t *testing.T) {
 			"FieldsBytes",
 			Entry{
 				Fields: []Field{
-					ConstBytes("bytes", []byte{0x42}),
+					Bytes("bytes", []byte{0x42}),
 				},
 			},
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bytes":"Qg=="}` + "\n",
@@ -188,10 +184,10 @@ func TestEncoder(t *testing.T) {
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","stringer":"1s"}` + "\n",
 		},
 		{
-			"FieldsConstStringer",
+			"FieldsStringerAlt",
 			Entry{
 				Fields: []Field{
-					ConstStringer("stringer", time.Second),
+					Stringer("stringer", time.Second),
 				},
 			},
 			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","stringer":"1s"}` + "\n",

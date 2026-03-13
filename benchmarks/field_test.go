@@ -32,18 +32,8 @@ func BenchmarkLogf_Field_Error(b *testing.B)    { benchField(b, logf.NamedError(
 func BenchmarkLogf_Field_Bytes(b *testing.B)     { benchField(b, logf.Bytes("k", heavyBytes)) }
 func BenchmarkLogf_Field_Ints64(b *testing.B)    { benchField(b, logf.Ints64("k", heavyInts64)) }
 func BenchmarkLogf_Field_Strings(b *testing.B)   { benchField(b, logf.Strings("k", heavyStrings)) }
-func BenchmarkLogf_Field_Bools(b *testing.B)     { benchField(b, logf.Bools("k", []bool{true, false, true, false})) }
 func BenchmarkLogf_Field_Floats64(b *testing.B)  { benchField(b, logf.Floats64("k", []float64{1.1, 2.2, 3.3, 4.4})) }
 func BenchmarkLogf_Field_Durations(b *testing.B) { benchField(b, logf.Durations("k", []time.Duration{time.Second, time.Minute, time.Hour, time.Millisecond})) }
-
-// --- Slice types (const — no copy, async-unsafe) ---
-
-func BenchmarkLogf_Field_ConstBytes(b *testing.B)     { benchField(b, logf.ConstBytes("k", heavyBytes)) }
-func BenchmarkLogf_Field_ConstInts64(b *testing.B)    { benchField(b, logf.ConstInts64("k", heavyInts64)) }
-func BenchmarkLogf_Field_ConstStrings(b *testing.B)   { benchField(b, logf.ConstStrings("k", heavyStrings)) }
-func BenchmarkLogf_Field_ConstBools(b *testing.B)     { benchField(b, logf.ConstBools("k", []bool{true, false, true, false})) }
-func BenchmarkLogf_Field_ConstFloats64(b *testing.B)  { benchField(b, logf.ConstFloats64("k", []float64{1.1, 2.2, 3.3, 4.4})) }
-func BenchmarkLogf_Field_ConstDurations(b *testing.B) { benchField(b, logf.ConstDurations("k", []time.Duration{time.Second, time.Minute, time.Hour, time.Millisecond})) }
 
 // --- Composite types ---
 
@@ -56,6 +46,5 @@ func BenchmarkLogf_Field_Formatter(b *testing.B) { benchField(b, logf.Formatter(
 // --- Any variants ---
 
 func BenchmarkLogf_Field_AnyValue(b *testing.B)       { benchField(b, logf.Any("k", 42)) }
-func BenchmarkLogf_Field_AnySnapshotter(b *testing.B) { benchField(b, logf.Any("k", &benchSnapshotter{Value: "snap"})) }
 func BenchmarkLogf_Field_AnyStringer(b *testing.B)    { benchField(b, logf.Any("k", &benchStringer{Value: "hello"})) }
 func BenchmarkLogf_Field_AnyMap(b *testing.B)         { benchField(b, logf.Any("k", map[string]int{"a": 1, "b": 2})) }
