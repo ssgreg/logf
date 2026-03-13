@@ -320,6 +320,12 @@ func Any(k string, v interface{}) Field {
 		return Array(k, rv)
 	case ObjectEncoder:
 		return Object(k, rv)
+	// fmt.Stringer MUST stay after concrete types (time.Duration, error, etc.)
+	// and before default. Moving it earlier would shadow typed handling;
+	// moving it into default would let reflect.String leak raw values
+	// from types that implement Stringer for masking (e.g. secrets).
+	case fmt.Stringer:
+		return String(k, rv.String())
 
 	case nil:
 		break
@@ -340,9 +346,6 @@ func Any(k string, v interface{}) Field {
 			return Uint64(k, val.Uint())
 		case reflect.Float32, reflect.Float64:
 			return Float64(k, val.Float())
-		}
-		if s, ok := rv.(fmt.Stringer); ok {
-			return String(k, s.String())
 		}
 	}
 
