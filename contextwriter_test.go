@@ -28,11 +28,11 @@ func TestWithEmptyContext(t *testing.T) {
 }
 
 func TestContextWriter(t *testing.T) {
-	sink := &testEntryWriter{}
+	sink := &testHandler{}
 	cw := NewContextWriter(sink)
 
 	ctx := With(context.Background(), String("request_id", "abc"))
-	_ = cw.WriteEntry(ctx, Entry{Level: LevelInfo, Text: "hello"})
+	_ = cw.Handle(ctx, Entry{Level: LevelInfo, Text: "hello"})
 
 	assert.NotNil(t, sink.Entry.Bag)
 	assert.True(t, sink.Entry.Bag.HasField("request_id"))
@@ -40,24 +40,24 @@ func TestContextWriter(t *testing.T) {
 }
 
 func TestContextWriterNoBag(t *testing.T) {
-	sink := &testEntryWriter{}
+	sink := &testHandler{}
 	cw := NewContextWriter(sink)
 
-	_ = cw.WriteEntry(context.Background(), Entry{Level: LevelInfo, Text: "no bag"})
+	_ = cw.Handle(context.Background(), Entry{Level: LevelInfo, Text: "no bag"})
 
 	assert.Nil(t, sink.Entry.Bag)
 	assert.Equal(t, "no bag", sink.Entry.Text)
 }
 
 func TestContextWriterPreservesLoggerBag(t *testing.T) {
-	sink := &testEntryWriter{}
+	sink := &testHandler{}
 	cw := NewContextWriter(sink)
 
 	loggerBag := NewBag(String("service", "api"))
 	ctx := With(context.Background(), String("request_id", "abc"))
 
 	e := Entry{LoggerBag: loggerBag, Level: LevelInfo, Text: "both bags"}
-	_ = cw.WriteEntry(ctx, e)
+	_ = cw.Handle(ctx, e)
 
 	assert.NotNil(t, sink.Entry.LoggerBag)
 	assert.NotNil(t, sink.Entry.Bag)
@@ -114,7 +114,7 @@ func indexOf(s, sub string) int {
 }
 
 func TestContextWriterFieldSource(t *testing.T) {
-	sink := &testEntryWriter{}
+	sink := &testHandler{}
 
 	traceSource := FieldSource(func(ctx context.Context) []Field {
 		if v := ctx.Value(traceKey{}); v != nil {
@@ -128,7 +128,7 @@ func TestContextWriterFieldSource(t *testing.T) {
 	ctx := context.WithValue(context.Background(), traceKey{}, "abc-123")
 	ctx = With(ctx, String("rid", "r1"))
 
-	_ = cw.WriteEntry(ctx, Entry{Level: LevelInfo, Text: "ext", Fields: []Field{Int("x", 1)}})
+	_ = cw.Handle(ctx, Entry{Level: LevelInfo, Text: "ext", Fields: []Field{Int("x", 1)}})
 
 	// Bag is set from context.
 	assert.NotNil(t, sink.Entry.Bag)
@@ -141,21 +141,21 @@ func TestContextWriterFieldSource(t *testing.T) {
 }
 
 func TestContextWriterFieldSourceNoFields(t *testing.T) {
-	sink := &testEntryWriter{}
+	sink := &testHandler{}
 
 	emptySource := FieldSource(func(ctx context.Context) []Field {
 		return nil
 	})
 
 	cw := NewContextWriter(sink, emptySource)
-	_ = cw.WriteEntry(context.Background(), Entry{Level: LevelInfo, Text: "noop", Fields: []Field{Int("x", 1)}})
+	_ = cw.Handle(context.Background(), Entry{Level: LevelInfo, Text: "noop", Fields: []Field{Int("x", 1)}})
 
 	assert.Equal(t, 1, len(sink.Entry.Fields))
 	assert.Equal(t, "x", sink.Entry.Fields[0].Key)
 }
 
 func TestContextWriterMultipleSources(t *testing.T) {
-	sink := &testEntryWriter{}
+	sink := &testHandler{}
 
 	src1 := FieldSource(func(ctx context.Context) []Field {
 		return []Field{String("a", "1")}
@@ -165,7 +165,7 @@ func TestContextWriterMultipleSources(t *testing.T) {
 	})
 
 	cw := NewContextWriter(sink, src1, src2)
-	_ = cw.WriteEntry(context.Background(), Entry{Level: LevelInfo, Text: "multi", Fields: []Field{String("c", "3")}})
+	_ = cw.Handle(context.Background(), Entry{Level: LevelInfo, Text: "multi", Fields: []Field{String("c", "3")}})
 
 	// Order: src1 fields, src2 fields, original fields.
 	assert.Equal(t, 3, len(sink.Entry.Fields))

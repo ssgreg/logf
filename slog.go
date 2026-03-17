@@ -8,20 +8,20 @@ import (
 )
 
 // NewSlogHandler returns a [slog.Handler] that writes log records
-// to the given [EntryWriter].
+// to the given [Handler].
 //
 // Fields added with [slog.Logger.With] become [Entry.LoggerBag],
 // which the JSON encoder caches per unique Bag version.
 // Each call to WithAttrs allocates a new Bag automatically.
 //
-// The handler propagates context to [EntryWriter.WriteEntry],
+// The handler propagates context to [Handler.Handle],
 // so field bags attached via [With] are resolved by [NewContextWriter].
-func NewSlogHandler(w EntryWriter) slog.Handler {
+func NewSlogHandler(w Handler) slog.Handler {
 	return &slogHandler{w: w, addCaller: true}
 }
 
 type slogHandler struct {
-	w EntryWriter
+	w Handler
 
 	bag       *Bag
 	name      string
@@ -35,7 +35,7 @@ func (h *slogHandler) Enabled(ctx context.Context, level slog.Level) bool {
 
 // Handle converts a slog.Record to a logf.Entry and writes it.
 func (h *slogHandler) Handle(ctx context.Context, r slog.Record) error {
-	return h.w.WriteEntry(ctx, h.buildEntry(r))
+	return h.w.Handle(ctx, h.buildEntry(r))
 }
 
 // WithAttrs returns a new handler whose pre-resolved fields include

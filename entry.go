@@ -2,7 +2,6 @@ package logf
 
 import (
 	"context"
-	"sync"
 	"time"
 )
 
@@ -35,39 +34,16 @@ type Entry struct {
 	CallerPC uintptr
 }
 
-// EntryWriter is the interface that should do real logging stuff.
-type EntryWriter interface {
-	WriteEntry(context.Context, Entry) error
+// Handler is the interface that should do real logging stuff.
+type Handler interface {
+	Handle(context.Context, Entry) error
 	Enabled(context.Context, Level) bool
 }
 
-// NewSyncWriter returns an EntryWriter that encodes and writes entries
-// synchronously in the caller's goroutine. It is safe for concurrent use.
-func NewSyncWriter(level Level, appender Appender) EntryWriter {
-	return &syncWriter{level: level, appender: appender}
-}
-
-type syncWriter struct {
-	mu       sync.Mutex
-	level    Level
-	appender Appender
-}
-
-func (w *syncWriter) WriteEntry(_ context.Context, entry Entry) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	return w.appender.Append(entry)
-}
-
-func (w *syncWriter) Enabled(_ context.Context, lvl Level) bool {
-	return w.level.Enabled(lvl)
-}
-
-// nopWriter is an EntryWriter that discards everything.
+// nopHandler is an Handler that discards everything.
 // Used by DisabledLogger.
-type nopWriter struct{}
+type nopHandler struct{}
 
-func (nopWriter) WriteEntry(context.Context, Entry) error { return nil }
+func (nopHandler) Handle(context.Context, Entry) error { return nil }
 
-func (nopWriter) Enabled(context.Context, Level) bool { return false }
+func (nopHandler) Enabled(context.Context, Level) bool { return false }
