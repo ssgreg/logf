@@ -1,0 +1,193 @@
+package logf
+
+import (
+	"context"
+	"errors"
+	"io"
+	"sync"
+)
+
+// NewRouter returns a new RouterBuilder.
+func NewRouter() *RouterBuilder {
+	return &RouterBuilder{}
+}
+
+// RouterBuilder accumulates routes and builds a fan-out Handler.
+//
+// Usage:
+//
+//	router, close, err := NewRouter().
+//	    Route(jsonEnc,
+//	        Output(LevelDebug, kibana),
+//	        Output(LevelInfo, stderr),
+//	    ).
+//	    Build()
+type RouterBuilder struct {
+	groups []encoderGroup
+	err    error
+}
+
+// Route adds an encoder group with the given outputs. All outputs in a
+// group share one Encode call per entry.
+func (b *RouterBuilder) Route(enc Encoder, opts ...RouteOption) *RouterBuilder {
+	g := encoderGroup{enc: enc}
+	for _, opt := range opts {
+		opt(&g)
+	}
+	b.groups = append(b.groups, g)
+	return b
+}
+
+// Build validates the configuration and returns the Router as a Handler.
+// The returned close function calls Flush and Sync on all writers.
+// Build returns an error if the configuration is invalid (no routes or
+// no outputs).
+func (b *RouterBuilder) Build() (Handler, func() error, error) {
+	if b.err != nil {
+		return nil, nil, b.err
+	}
+
+	var totalOutputs int
+	for _, g := range b.groups {
+		totalOutputs += len(g.outputs)
+	}
+	if totalOutputs == 0 {
+		return nil, nil, errors.New("logf: router has no outputs")
+	}
+
+	r := &router{}
+
+	for _, g := range b.groups {
+		if len(g.outputs) == 0 {
+			continue
+		}
+
+		eg := routerEncoderGroup{
+			enc:      g.enc,
+			minLevel: g.outputs[0].level,
+		}
+
+		for _, o := range g.outputs {
+			if o.level > eg.minLevel {
+				eg.minLevel = o.level
+			}
+			ro := &routerOutput{
+				level: o.level,
+				w:     o.w,
+			}
+			eg.outputs = append(eg.outputs, ro)
+			r.allOutputs = append(r.allOutputs, ro)
+		}
+
+		r.groups = append(r.groups, eg)
+	}
+
+	// Compute global min level for fast Enabled check.
+	r.minLevel = r.groups[0].minLevel
+	for _, g := range r.groups[1:] {
+		if g.minLevel > r.minLevel {
+			r.minLevel = g.minLevel
+		}
+	}
+
+	return r, r.close, nil
+}
+
+type encoderGroup struct {
+	enc     Encoder
+	outputs []output
+}
+
+type output struct {
+	level Level
+	w     Writer
+}
+
+// RouteOption configures a route within an encoder group.
+type RouteOption func(*encoderGroup)
+
+// Output returns a RouteOption that adds a destination with the given
+// level filter and writer. The caller goroutine writes encoded data
+// directly — no channel, no consumer goroutine, zero per-message
+// allocations. The Writer must be safe for concurrent use.
+//
+// For async I/O with batching and spike tolerance, wrap the writer in
+// a SlabWriter before passing it to Output:
+//
+//	sw := logf.NewSlabWriter(conn, 64*1024, 8, logf.WithFlushInterval(100*time.Millisecond))
+//	defer sw.Close()
+//	router, close, _ := logf.NewRouter().
+//	    Route(enc, logf.Output(logf.LevelDebug, sw)).
+//	    Build()
+func Output(level Level, w io.Writer) RouteOption {
+	return func(g *encoderGroup) {
+		g.outputs = append(g.outputs, output{level: level, w: WriterFromIO(w)})
+	}
+}
+
+// router is the fan-out Handler built by RouterBuilder.
+type router struct {
+	groups     []routerEncoderGroup
+	allOutputs []*routerOutput
+	minLevel   Level
+	closed     sync.Once
+}
+
+type routerEncoderGroup struct {
+	enc      Encoder
+	outputs  []*routerOutput
+	minLevel Level
+}
+
+// routerOutput writes directly from the caller goroutine.
+type routerOutput struct {
+	level Level
+	w     Writer
+}
+
+func (r *router) Enabled(_ context.Context, lvl Level) bool {
+	return r.minLevel.Enabled(lvl)
+}
+
+func (r *router) Handle(_ context.Context, e Entry) error {
+	var writeErr error
+
+	for i := range r.groups {
+		g := &r.groups[i]
+
+		if !g.minLevel.Enabled(e.Level) {
+			continue
+		}
+
+		buf, err := g.enc.Encode(e)
+		if err != nil {
+			return err
+		}
+		encoded := buf.Bytes()
+
+		for _, o := range g.outputs {
+			if !o.level.Enabled(e.Level) {
+				continue
+			}
+			_, err := o.w.Write(encoded)
+			if err != nil {
+				writeErr = errors.Join(writeErr, err)
+			}
+		}
+
+		buf.Free()
+	}
+
+	return writeErr
+}
+
+func (r *router) close() error {
+	var err error
+	r.closed.Do(func() {
+		for _, o := range r.allOutputs {
+			err = errors.Join(err, o.w.Flush())
+			err = errors.Join(err, o.w.Sync())
+		}
+	})
+	return err
+}

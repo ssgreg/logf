@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-// NewLogger returns a new Logger with the given EntryWriter.
+// NewLogger returns a new Logger with the given Handler.
 // Level filtering is controlled by the writer's Enabled method.
-func NewLogger(w EntryWriter) *Logger {
+func NewLogger(w Handler) *Logger {
 	return &Logger{
 		w:         w,
 		addCaller: true,
@@ -23,10 +23,10 @@ func DisabledLogger() *Logger {
 
 // Logger is the fast, asynchronous, structured logger.
 //
-// The Logger wraps EntryWriter to check logging level and provide a bit of
+// The Logger wraps Handler to check logging level and provide a bit of
 // syntactic sugar.
 type Logger struct {
-	w EntryWriter
+	w Handler
 
 	bag        *Bag
 	name       string
@@ -99,7 +99,7 @@ func (l *Logger) With(fs ...Field) *Logger {
 }
 
 // Slog returns a *slog.Logger that shares this Logger's writer, bag,
-// and name. Level filtering is delegated to the same EntryWriter.
+// and name. Level filtering is delegated to the same Handler.
 func (l *Logger) Slog() *slog.Logger {
 	return slog.New(&slogHandler{
 		w:         l.w,
@@ -186,7 +186,7 @@ func (l *Logger) write(ctx context.Context, extraSkip int, lv Level, text string
 		e.CallerPC = CallerPC(1 + l.callerSkip + extraSkip)
 	}
 
-	_ = l.w.WriteEntry(ctx, e)
+	_ = l.w.Handle(ctx, e)
 }
 
 func (l *Logger) clone() *Logger {
@@ -228,4 +228,4 @@ func FromContext(ctx context.Context) *Logger {
 
 type contextKeyLogger struct{}
 
-var defaultDisabledLogger = NewLogger(nopWriter{})
+var defaultDisabledLogger = NewLogger(nopHandler{})

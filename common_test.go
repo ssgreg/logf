@@ -45,17 +45,28 @@ func (a *testAppender) Sync() error {
 	return nil
 }
 
-// testEntryWriter implements EntryWriter storing the last Entry.
-type testEntryWriter struct {
-	Entry *Entry
+// testHandler implements Handler storing all entries.
+type testHandler struct {
+	Entry      *Entry
+	Entries    []Entry
+	level      Level
+	checkLevel bool
 }
 
-func (w *testEntryWriter) WriteEntry(_ context.Context, e Entry) error {
+func newLeveledTestHandler(level Level) *testHandler {
+	return &testHandler{level: level, checkLevel: true}
+}
+
+func (w *testHandler) Handle(_ context.Context, e Entry) error {
 	w.Entry = &e
+	w.Entries = append(w.Entries, e)
 	return nil
 }
 
-func (w *testEntryWriter) Enabled(_ context.Context, _ Level) bool {
+func (w *testHandler) Enabled(_ context.Context, lvl Level) bool {
+	if w.checkLevel {
+		return w.level.Enabled(lvl)
+	}
 	return true
 }
 

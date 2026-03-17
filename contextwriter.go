@@ -24,28 +24,28 @@ func Fields(ctx context.Context) []Field {
 // to support external field sources (e.g. tracing, request ID middleware).
 type FieldSource func(ctx context.Context) []Field
 
-// ContextWriter is an EntryWriter middleware that extracts the Bag and
+// ContextWriter is an Handler middleware that extracts the Bag and
 // external fields from the context and attaches them to the Entry before
 // passing it downstream.
 type ContextWriter struct {
-	next    EntryWriter
+	next    Handler
 	sources []FieldSource
 }
 
-// NewContextWriter returns a new ContextWriter wrapping the given EntryWriter.
-// Optional FieldSource functions are called on each WriteEntry to collect
+// NewContextWriter returns a new ContextWriter wrapping the given Handler.
+// Optional FieldSource functions are called on each Handle to collect
 // additional fields from the context. These fields are prepended to Entry.Fields.
-func NewContextWriter(next EntryWriter, sources ...FieldSource) *ContextWriter {
+func NewContextWriter(next Handler, sources ...FieldSource) *ContextWriter {
 	return &ContextWriter{next: next, sources: sources}
 }
 
-// WriteEntry extracts the Bag from ctx, collects fields from external sources,
-// and delegates to the next EntryWriter.
+// Handle extracts the Bag from ctx, collects fields from external sources,
+// and delegates to the next Handler.
 func (w *ContextWriter) Enabled(ctx context.Context, lvl Level) bool {
 	return w.next.Enabled(ctx, lvl)
 }
 
-func (w *ContextWriter) WriteEntry(ctx context.Context, e Entry) error {
+func (w *ContextWriter) Handle(ctx context.Context, e Entry) error {
 	if bag := BagFromContext(ctx); bag != nil {
 		e.Bag = bag
 	}
@@ -60,5 +60,5 @@ func (w *ContextWriter) WriteEntry(ctx context.Context, e Entry) error {
 		}
 	}
 
-	return w.next.WriteEntry(ctx, e)
+	return w.next.Handle(ctx, e)
 }

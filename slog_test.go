@@ -26,7 +26,7 @@ func newSink() *entrySink {
 	}
 }
 
-func (s *entrySink) WriteEntry(_ context.Context, e Entry) error {
+func (s *entrySink) Handle(_ context.Context, e Entry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.entries = append(s.entries, e)
@@ -169,11 +169,14 @@ func TestSlogHandlerJSON(t *testing.T) {
 }
 
 func TestSlogHandlerDebugFiltered(t *testing.T) {
-	w := NewSyncWriter(LevelInfo, &testAppender{})
+	w := newLeveledTestHandler(LevelInfo)
 	slog.New(NewSlogHandler(w)).Debug("debug-should-not-appear")
 
 	// Debug is below LevelInfo, so Enabled returns false and
 	// slog.Logger won't call Handle at all — nothing written.
+	if len(w.Entries) != 0 {
+		t.Error("debug entry should have been filtered")
+	}
 }
 
 func TestSlogHandlerWithGroupEmpty(t *testing.T) {
@@ -217,7 +220,7 @@ func TestSlogHandlerContext(t *testing.T) {
 }
 
 func TestSlogHandlerEnabled(t *testing.T) {
-	w := NewSyncWriter(LevelWarn, &testAppender{})
+	w := newLeveledTestHandler(LevelWarn)
 	h := NewSlogHandler(w)
 	ctx := context.Background()
 

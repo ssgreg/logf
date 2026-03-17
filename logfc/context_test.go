@@ -34,15 +34,15 @@ func TestWithName(t *testing.T) {
 }
 
 func TestWithGroup(t *testing.T) {
-	appender := mockAppender{}
-	logger := logf.NewLogger(logf.NewSyncWriter(logf.LevelDebug, &appender))
+	w := &mockHandler{}
+	logger := logf.NewLogger(w)
 	ctx := New(context.Background(), logger)
 
 	ctx = WithGroup(ctx, "http")
 	Info(ctx, "req", logf.Int("status", 200))
 
-	assert.Equal(t, 1, len(appender.entries))
-	bag := appender.entries[0].LoggerBag
+	assert.Equal(t, 1, len(w.entries))
+	bag := w.entries[0].LoggerBag
 	assert.NotNil(t, bag)
 	assert.Equal(t, "http", bag.Group())
 }
@@ -62,7 +62,7 @@ func TestCallerSkip(t *testing.T) {
 }
 
 func TestAtLevel(t *testing.T) {
-	logger := logf.NewLogger(logf.NewSyncWriter(logf.LevelDebug, logf.NewDiscardAppender()))
+	logger := logf.NewLogger(&mockHandler{})
 	ctx := New(context.Background(), logger)
 
 	called := false
@@ -92,20 +92,20 @@ func TestLevels(t *testing.T) {
 			})
 
 			text := "test text"
-			appender := mockAppender{}
-			logger := logf.NewLogger(logf.NewSyncWriter(logf.LevelDebug, &appender))
+			w := &mockHandler{}
+			logger := logf.NewLogger(w)
 			ctx := New(context.Background(), logger)
 			test.Log(ctx, text)
-			assert.Equal(t, 1, len(appender.entries))
-			assert.Equal(t, text, appender.entries[0].Text)
-			assert.Equal(t, test.Level, appender.entries[0].Level)
+			assert.Equal(t, 1, len(w.entries))
+			assert.Equal(t, text, w.entries[0].Text)
+			assert.Equal(t, test.Level, w.entries[0].Level)
 		})
 	}
 }
 
 func TestAtLevelCallerPointsToCallSite(t *testing.T) {
-	appender := mockAppender{}
-	logger := logf.NewLogger(logf.NewSyncWriter(logf.LevelDebug, &appender))
+	w := &mockHandler{}
+	logger := logf.NewLogger(w)
 	ctx := New(context.Background(), logger)
 
 	_, _, expectedLine, _ := runtime.Caller(0)
@@ -113,8 +113,8 @@ func TestAtLevelCallerPointsToCallSite(t *testing.T) {
 		log(ctx, "at-level-test") // expectedLine + 2
 	})
 
-	assert.Equal(t, 1, len(appender.entries))
-	pc := appender.entries[0].CallerPC
+	assert.Equal(t, 1, len(w.entries))
+	pc := w.entries[0].CallerPC
 	assert.NotZero(t, pc, "CallerPC should be set")
 
 	frames := runtime.CallersFrames([]uintptr{pc})
@@ -127,15 +127,15 @@ func TestAtLevelCallerPointsToCallSite(t *testing.T) {
 }
 
 func TestCallerPointsToCallSite(t *testing.T) {
-	appender := mockAppender{}
-	logger := logf.NewLogger(logf.NewSyncWriter(logf.LevelDebug, &appender))
+	w := &mockHandler{}
+	logger := logf.NewLogger(w)
 	ctx := New(context.Background(), logger)
 
 	_, expectedFile, expectedLine, _ := runtime.Caller(0)
 	Debug(ctx, "caller-test") // expectedLine + 1
 
-	assert.Equal(t, 1, len(appender.entries))
-	pc := appender.entries[0].CallerPC
+	assert.Equal(t, 1, len(w.entries))
+	pc := w.entries[0].CallerPC
 	assert.NotZero(t, pc, "CallerPC should be set")
 
 	frames := runtime.CallersFrames([]uintptr{pc})
@@ -146,20 +146,15 @@ func TestCallerPointsToCallSite(t *testing.T) {
 		"expected file %s, got %s", expectedFile, f.File)
 }
 
-type mockAppender struct {
+type mockHandler struct {
 	entries []logf.Entry
 }
 
-func (a *mockAppender) Append(entry logf.Entry) error {
-	a.entries = append(a.entries, entry)
-
+func (w *mockHandler) Handle(_ context.Context, e logf.Entry) error {
+	w.entries = append(w.entries, e)
 	return nil
 }
 
-func (a *mockAppender) Sync() (err error) {
-	return nil
-}
-
-func (a *mockAppender) Flush() error {
-	return nil
+func (w *mockHandler) Enabled(_ context.Context, _ logf.Level) bool {
+	return true
 }

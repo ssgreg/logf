@@ -124,10 +124,38 @@ func newLogfAsync() (*logf.Logger, logf.ChannelWriterCloseFunc) {
 	return logf.NewLogger(w).WithCaller(false), close
 }
 
-func newLogfPooledAsync() (*logf.Logger, func()) {
-	w, close := logf.NewAsyncWriter(logf.LevelDebug, io.Discard, logf.NewJSONEncoder(logf.JSONEncoderConfig{}))
-	return logf.NewLogger(w).WithCaller(false), close
+func newLogfRouter() (*logf.Logger, func()) {
+	enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
+		EncodeTime:     logf.RFC3339NanoTimeEncoder,
+		EncodeDuration: logf.NanoDurationEncoder,
+	})
+	h, closeFn, err := logf.NewRouter().
+		Route(enc, logf.Output(logf.LevelDebug, io.Discard)).
+		Build()
+	if err != nil {
+		panic(err)
+	}
+	return logf.NewLogger(h).WithCaller(false), func() { closeFn() }
 }
+
+func newLogfRouterSlab() (*logf.Logger, func()) {
+	enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
+		EncodeTime:     logf.RFC3339NanoTimeEncoder,
+		EncodeDuration: logf.NanoDurationEncoder,
+	})
+	sw := logf.NewSlabWriter(io.Discard, 64*1024, 8)
+	h, closeFn, err := logf.NewRouter().
+		Route(enc, logf.Output(logf.LevelDebug, sw)).
+		Build()
+	if err != nil {
+		panic(err)
+	}
+	return logf.NewLogger(h).WithCaller(false), func() {
+		closeFn()
+		sw.Close()
+	}
+}
+
 
 // --- lockedBufWriter — thread-safe buffered writer (used by zerolog in latency tests) ---
 

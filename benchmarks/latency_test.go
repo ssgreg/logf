@@ -82,14 +82,14 @@ func TestLatencyDistribution(t *testing.T) {
 		reportLatency(t, "logf async", samples)
 	}
 
-	// --- logf sync (unbuffered entry writer, buffered appender) ---
+	// --- logf sync (pooled writer) ---
 	{
 		ff, _ := os.CreateTemp("", "latency-logfsync-*.log")
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
 		enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{})
-		w := logf.NewSyncWriter(logf.LevelDebug, logf.NewWriteAppender(ff, enc))
+		w := logf.NewWriter(logf.LevelDebug, ff, enc)
 		logger := logf.NewLogger(w).WithCaller(false)
 		ctx := context.Background()
 
@@ -100,7 +100,7 @@ func TestLatencyDistribution(t *testing.T) {
 			logger.Info(ctx, "request handled")
 			samples[i] = time.Since(start)
 		}
-		reportLatency(t, "logf sync (buffered appender)", samples)
+		reportLatency(t, "logf sync (pooled writer)", samples)
 	}
 
 	// --- zap (sync, unbuffered) ---

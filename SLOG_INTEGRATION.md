@@ -1,28 +1,11 @@
-# slog Integration Roadmap
+# slog Integration — Decisions & TODOs
 
-logf and slog are not competing APIs — they are complementary.
-slog provides stdlib portability; logf provides async I/O, context-scoped
-fields, and buffered writing. The goal is full interchangeability:
-use either API anywhere, share the same pipeline, see the same fields.
+## TODO: Roadmap
 
-Best of both worlds, not a choice between them.
+### 1. Production Constructor (high)
 
-## Current State
-
-- `logf.NewSlogHandler(w, opts)` — drop-in `slog.Handler` backed by
-  logf's channel writer, buffered appender, and JSON encoder.
-- `logf.With(ctx, fields...)` — attaches fields to `context.Context`
-  via Bag. The slog handler picks them up automatically through
-  `ContextWriter`.
-- `logfc` package — helper to store/retrieve `logf.Logger` in context.
-
-## 1. Production Constructor
-
-**Status: postponed. Priority: high.**
-
-Current setup requires 5 lines and knowledge of the internal wiring order
-(encoder → appender → channel writer → context writer). Even the author
-forgets the sequence. This must become a single call:
+Single call to set up the full pipeline. User should never need to know
+what ChannelWriter or ContextWriter are.
 
 ```go
 rt, close := logf.NewRuntime(logf.Config{
@@ -30,306 +13,69 @@ rt, close := logf.NewRuntime(logf.Config{
     Level:  logf.LevelInfo,
 })
 defer close()
-
 logger := rt.Logger()           // *logf.Logger
 slogger := rt.SlogLogger()      // *slog.Logger (same pipeline)
 ```
 
-Key requirement: the user should never need to know what `WriteAppender`,
-`ChannelWriter`, or `ContextWriter` are to get a working production logger.
-One function, one config, done.
+### 2. SlogFromContext (high)
 
-## 2. SlogFromContext
-
-**Status: postponed. Priority: high. Requires design work.**
-
-Bridge between logf context and slog world. One context, two API entry
-points, single async pipeline.
-
-Problem: your code uses `logfc.Get(ctx)`, a colleague's library uses
-`slog.InfoContext(ctx, ...)`. Without a bridge, these are two parallel
-worlds — different outputs, different fields, different buffering.
+Bridge logf context to slog. One context, two APIs, single pipeline.
 
 ```go
-// Middleware — one line:
 ctx = logf.NewContext(ctx, logger)
-
-// Your code — logf API:
-logfc.Info(ctx, "processing", logf.String("order_id", id))
-
-// Colleague's library — slog API, same pipeline:
-slogger := logf.SlogFromContext(ctx)
-slogger.InfoContext(ctx, "validating", "amount", amount)
-// ↑ goes through logf async channel, sees request_id from Bag
+slogger := logf.SlogFromContext(ctx)  // shares pipeline + Bag fields
 ```
 
-Open questions:
+Open: Logger.w is private — expose Writer(), store in context, or derive from Runtime.
 
-- Logger.w is private. SlogFromContext needs EntryWriter access.
-  Options: expose Logger.Writer(), store EntryWriter in context,
-  or derive from Runtime (#1).
-- Allocation: creating *slog.Logger on every call vs caching in context.
-  Per-request call in middleware is fine; per-log-line is not.
-- Interaction with slog.SetDefault: if Runtime sets global slog default,
-  SlogFromContext is only needed for per-request logger variants.
+### 3. WithAttrs (low)
 
-## 3. WithAttrs — Unified Context Fields
+`slog.Attr` → `logf.Field` conversion, stored in Bag. Cold path only.
 
-Allow adding slog-style attributes to context, visible to both logf and slog.
+### 4. OTel FieldSource (medium)
 
-```go
-// Middleware — uses slog types, no logf import needed
-ctx = logf.WithAttrs(ctx, slog.String("request_id", rid))
+Sub-package `logfotel` — extracts trace_id/span_id from OTel context.
 
-// Works in both:
-logger.Info(ctx, "done")               // logf — sees request_id
-slog.InfoContext(ctx, "done")           // slog — sees request_id
-```
+### 5. HTTP Field Middleware (medium)
 
-`WithAttrs` converts `slog.Attr` → `logf.Field` once (cold path) and stores
-in the context Bag. No conversion on the hot path.
+Field injection (method, path, request_id), not logging middleware.
 
-## 4. OTel FieldSource
+### 6. ErrAttr (trivial)
 
-Built-in `FieldSource` that extracts `trace_id` and `span_id` from
-OpenTelemetry context. One line to enable:
+`logf.ErrAttr(err)` → `slog.Attr` with logf conventions.
 
-```go
-w := logf.NewContextWriter(next, logf.OTelFieldSource())
-```
+### 7. ReplaceAttr support for slog handler
 
-Every log entry automatically includes trace correlation. Works for both
-logf and slog (through the shared ContextWriter).
+Empty-attr check in `attrToField` exists for this. Needs options struct.
 
-Separate build tag or sub-package (`logfotel`) to avoid hard dependency
-on OpenTelemetry.
+### 8. Revisit level checker design
 
-## 5. HTTP Field Middleware
+Current: static level baked into EntryWriter. Doesn't cover dynamic levels
+(MutableLevel wrapper?), per-request override via context, or LevelEnabler
+as separate optional interface.
 
-Not a logging middleware — a field injection middleware. Enriches context
-with request metadata (method, path, request_id, remote_addr). Any logger
-downstream sees these fields automatically.
+### 9. Revisit ErrorEncoder
 
-```go
-mux.Use(logf.HTTPMiddleware(logf.HTTPMiddlewareConfig{
-    RequestID: true,    // generates or reads X-Request-ID
-    Method:    true,
-    Path:      true,
-}))
-```
+`DefaultErrorEncoder` uses global mutable state (cached closure).
+`errorEncoderGetter`/`Default()` is over-engineered. `encodeError` copies
+config on every call. May be unnecessary in v2 Handler/Encoder architecture.
 
-Handler code just calls `logger.Info(ctx, "done")` — request fields are
-already there.
+## Accepted: Level on Writer, no WithLevel
 
-## 6. ErrAttr — Dual Error Helper
+**Done.** Level lives on Writer via `Enabled(context.Context, Level) bool`.
+Logger has no level field, caches enabler at construction. teeWriter
+returns OR of sub-writers. Removed from v1: Logger.level, WithLevel,
+LevelChecker, LevelCheckerGetter.
 
-```go
-// logf
-logger.Error(ctx, "failed", logf.Err(err))
+## Accepted: WriteEntry returns error
 
-// slog — same semantics, returns slog.Attr
-slog.ErrorContext(ctx, "failed", logf.ErrAttr(err))
-```
+**Done.** `WriteEntry(context.Context, Entry) error`. Logger ignores error.
+Middleware can react: teeWriter uses `errors.Join`, channelWriter signals
+backpressure.
 
-`ErrAttr` returns `slog.Attr` following logf conventions: `"error"` key,
-verbose error field if the error implements `VerboseError`.
+## Design: Bag v2 — linked list + slot cache
 
-## Priority
-
-| # | Feature         | Value                      | Complexity |
-| - | --------------- | -------------------------- | ---------- |
-| 1 | Production ctor | lowers barrier to entry    | low        |
-| 2 | SlogFromContext | dual API from one context  | low        |
-| 3 | WithAttrs       | unified context fields     | low        |
-| 4 | OTel source     | observability ready        | medium     |
-| 5 | HTTP middleware  | zero-config request fields | medium     |
-| 6 | ErrAttr         | API polish                 | trivial    |
-
-## Accepted Decisions
-
-### Level Architecture — Final Decision
-
-**Level lives on Writer (via LevelEnabler), not on Logger. No WithLevel.**
-
-**Current implementation:** `Enabled(context.Context, Level) bool` added directly
-to `EntryWriter` interface. Writer constructors accept level explicitly:
-`NewChannelWriter(level, cfg)`, `NewSyncWriter(level, appender)`.
-Each writer stores level and checks via `Level.Enabled(lvl)` — simple static
-comparison. `ContextWriter` delegates `Enabled` to the next writer.
-
-**TODO:** Revisit level checker design. Current static level on each writer
-doesn't cover: dynamic levels (MutableLevel as writer wrapper?), per-request
-level override via context, LevelEnabler as separate optional interface
-(current design bakes Enabled into EntryWriter — may want to decouple later).
-
-**DONE:** Renamed `unbufferedEntryWriter` → `syncWriter` (`NewSyncWriter`).
-Added `sync.Mutex` — now safe for concurrent use. `NewUnbufferedEntryWriter`
-kept as deprecated alias for backward compatibility.
-
-**TODO:** Revisit ErrorEncoder design. `DefaultErrorEncoder` called
-`NewErrorEncoder.Default()` on every error field encode — allocated a closure
-each time. Quick fix: cached the result in a package-level `defaultErrorEncoder`
-variable (global mutable state, not ideal). Deeper issues:
-- `errorEncoderGetter` / `Default()` pattern is over-engineered for a simple
-  config → function mapping. Consider replacing with a plain `init()` or
-  direct variable initialization.
-- `encodeError` calls `c.WithDefaults()` on every invocation (copies struct,
-  checks VerboseFieldSuffix) — unnecessary if config is immutable after init.
-- `fmt.Sprintf("%+v", err)` in verbose path allocates; consider lazy or
-  opt-out by default.
-- Entire ErrorEncoder indirection may be unnecessary in v2 Handler/Encoder
-  architecture — error encoding could be a method on Encoder directly.
-
-Logger has no level field. Level check is delegated to Writer via optional
-`LevelEnabler` interface with context:
-
-```go
-type LevelEnabler interface {
-    Enabled(context.Context, Level) bool
-}
-```
-
-Logger caches the enabler at construction to avoid per-call type assertion:
-
-```go
-type Logger struct {
-    w       EntryWriter
-    enabler LevelEnabler  // cached from w, nil if w doesn't implement
-    // ... name, bag
-}
-
-func NewLogger(w EntryWriter) *Logger {
-    l := &Logger{w: w}
-    if e, ok := w.(LevelEnabler); ok {
-        l.enabler = e
-    }
-    return l
-}
-
-func (l *Logger) enabled(ctx context.Context, lvl Level) bool {
-    if l.enabler != nil {
-        return l.enabler.Enabled(ctx, lvl)
-    }
-    return true
-}
-```
-
-teeWriter returns OR of all sub-writers:
-
-```go
-func (t *teeWriter) Enabled(ctx context.Context, level Level) bool {
-    for _, w := range t.writers {
-        if enabler, ok := w.(LevelEnabler); ok && enabler.Enabled(ctx, level) {
-            return true
-        }
-    }
-    return false
-}
-```
-
-#### How we arrived at this decision
-
-**Step 1: Enabled on Writer for fan-out.** Without per-destination level
-check, fan-out with ring buffer forces all destinations to receive and
-encode entries at the lowest level — wasting ~200ns per discarded entry.
-Solution: optional `LevelEnabler` interface on `EntryWriter`.
-
-**Step 2: v1 WithLevel bug discovered.** v1 `WithLevel` uses AND
-composition — can only narrow, never widen:
-
-```go
-// v1: AND — broken
-logger := NewLogger(LevelError, w)
-logger.WithLevel(LevelDebug)  // Debug && Error = Error. Debug still blocked.
-```
-
-First fix idea: change AND to REPLACE. Makes WithLevel bidirectional.
-
-**Step 3: duplicate level problem.** If level is on Logger AND on Writer,
-fan-out requires specifying level twice — on Logger (min of all writers)
-and on each Writer. Logger level is derived information, error-prone.
-
-**Step 4: level on Writer only — eliminates duplication.** But then
-WithLevel override on Logger can't be "undone" (no way to say "go back
-to Writer's level"). Explored `WithLevel(LevelFromWriter)` sentinel —
-ugly.
-
-**Step 5: WithLevel is not needed.** Research confirmed: no major Go
-logger (zap, zerolog, logrus, slog) has per-request level as a commonly
-used pattern. Real per-request override (A/B testing) is more complex
-than "just set Debug" — it's per-destination ("debug for file but not
-for kibana"). This is Writer territory, not Logger. Libraries won't
-override level; business logic will, and it will write custom solutions.
-
-**Step 6: context in Enabled.** For per-request decisions (A/B testing,
-per-tenant debug), Writer needs request context. slog does the same:
-`Handler.Enabled(context.Context, slog.Level) bool`. This makes Writer
-the single authority for level decisions — global, per-destination,
-and per-request.
-
-**Step 7: no logger name in Enabled.** Considered passing logger name
-to allow per-component filtering ("debug for http handlers"). Decided
-against: YAGNI, name is available in context fields if needed, and it
-bloats the interface for every middleware writer.
-
-#### What we remove from v1
-
-- `Logger.level` field
-- `WithLevel()` method
-- `LevelChecker` type
-- `LevelCheckerGetter` interface
-- `LevelCheckerGetterFunc` type
-- REPLACE/AND debate
-
-#### What we add
-
-- `LevelEnabler` optional interface on `EntryWriter`
-- `Enabled(context.Context, Level) bool` — with context for per-request
-- `MutableLevel` now implements `LevelEnabler` (was `LevelCheckerGetter`)
-
-### WriteEntry returns error
-
-v1 `WriteEntry` returns nothing:
-
-```go
-// v1
-type EntryWriter interface {
-    WriteEntry(context.Context, Entry)
-}
-```
-
-v2 adds error return for chain (middleware) awareness:
-
-```go
-// v2
-type EntryWriter interface {
-    WriteEntry(context.Context, Entry) error
-}
-```
-
-Logger ignores the error (same as slog `_ = handler.Handle(ctx, r)`),
-but middleware writers can react:
-
-- `teeWriter`: if one destination fails, continues to the rest, returns
-  `errors.Join`.
-- `filterWriter`: propagates error from next writer.
-- `channelWriter`: returns error if channel is full (backpressure signal).
-
-Without error return, chain writers are blind to downstream failures.
-
-### Bag v2: linked list + encoder slot cache
-
-v1 Bag merges all parent fields into a flat slice on every `With`. v2
-uses a linked list and per-encoder-slot cache on the Bag itself.
-
-#### v1 problems
-
-1. `Bag.With` copies all parent fields — O(N) per call.
-2. Encoder-local LRU cache (`map[int32][]byte`, limit=100) — LRU can
-   evict live entries, `container/list` allocates per `Set`.
-3. Global `atomic.AddInt32` for version on every Bag creation.
-
-#### v2 design
+Not yet implemented.
 
 ```go
 type Bag struct {
@@ -339,318 +85,45 @@ type Bag struct {
 }
 ```
 
-- **Linked list.** `With` creates a new node pointing to parent.
-  No field copy, no merge, no atomic. O(1).
-- **Slot cache.** Each encoder gets a slot index (0, 1, ...) assigned
-  at Runtime creation (single-threaded). Encoder reads/writes only its
-  slot. No mutex, no atomic, no CAS — different goroutines touch
-  different slots.
-- **Cache lifetime = Bag lifetime.** When Bag is GC'd, cache is GC'd.
-  No LRU, no eviction, no limit.
-- **version field removed.** Not needed — cache is on Bag, not in
-  encoder-local map.
+- **With** creates a new node pointing to parent. No copy, no atomic.
+- **Slot cache**: each encoder gets a slot index assigned by Runtime at
+  creation. Encoder reads/writes only its slot. No sync on hot path.
+- **Cache lifetime = Bag lifetime**. No LRU, no eviction.
+- **Seed pattern**: `NewContext` seeds root Bag with slotCount from Logger.
+  `logf.With` inherits slotCount from parent. No seed → nil cache → graceful
+  degradation (encode every time).
 
-#### Slot assignment
+Removes from v1: `Bag.version`, global atomic counter, field merge in With,
+encoder-local LRU cache.
 
-Runtime assigns slots at creation (single-threaded, before any
-logging):
+## Design: Groups — WithGroup + Group field
 
-```go
-func NewRuntime(opts ...Option) *Runtime {
-    slot := 0
-    for _, dest := range rt.destinations {
-        dest.encoder.slot = slot
-        slot++
-    }
-    rt.slotCount = slot
-}
-```
+### `logf.Group(key, fields...)` — inline field
 
-Typical: JSON file (slot 0) + text stderr (slot 1) = 2 slots.
+`FieldTypeGroup`. Encoder opens `{`, encodes sub-fields, closes `}`.
+Works in With — stored in Bag, cached.
 
-#### Encoder with slot cache
+### `Logger.WithGroup(name)` — permanent namespace (slog compat)
 
-```go
-func (f *jsonEncoder) encodeBag(bag *Bag) {
-    if bag == nil {
-        return
-    }
-    if data := bag.cache[f.slot]; data != nil {
-        f.buf.AppendBytes(data)  // cache hit, ~3ns memcopy
-        return
-    }
+Irreversible. Stored as `Bag.group string`. Encoder splits group nodes
+(write `"name":{`, no caching) and field nodes (use slot cache).
+Closing braces via `countGroups()` walk, O(depth), typically 1-3.
 
-    start := f.buf.Len()
-    f.encodeBag(bag.parent)          // parent first (may hit cache)
-    for _, field := range bag.fields {
-        field.Accept(f)              // encode only own fields
-    }
+### WithGroup vs WithName
 
-    encoded := make([]byte, f.buf.Len()-start)
-    copy(encoded, f.buf.Data[start:])
-    bag.cache[f.slot] = encoded      // cache includes parent bytes
-}
-```
+- **WithName** — logger identity, flat dotted path. On `Logger.name`.
+- **WithGroup** — field namespace, nested JSON. On `Bag.group`.
 
-Recursive: parent cache is reused. First log from `http` logger:
-encode `base` (cache miss) + encode `http` (cache miss). Second log:
-one cache hit for `http` (includes base bytes). Parent shared between
-`http` and `db` loggers — base cache hit for both after first encode.
+## Design: Logger.Slog()
 
-#### Context Bag: seed + inherit
+`logf.Logger` → `*slog.Logger` bridge. Transfers writer, Bag, name.
+slog has no WithName — `Logger.Slog()` is the only way name reaches slog.
 
-Problem: `logf.With(ctx, fields...)` does not know slotCount.
-
-Solution: `NewContext` seeds an empty root Bag with slotCount from
-Logger. All subsequent `logf.With` calls inherit slotCount from parent.
-
-```go
-func NewContext(ctx context.Context, l *Logger) context.Context {
-    ctx = context.WithValue(ctx, loggerKey, l)
-    return context.WithValue(ctx, bagKey, &Bag{
-        cache: make([][]byte, l.slotCount),  // seed
-    })
-}
-
-func With(ctx context.Context, fs ...Field) context.Context {
-    parent := bagFromContext(ctx)
-    var cache [][]byte
-    if parent != nil {
-        cache = make([][]byte, len(parent.cache))  // inherit
-    }
-    return context.WithValue(ctx, bagKey, &Bag{
-        fields: fs,
-        parent: parent,
-        cache:  cache,
-    })
-}
-```
-
-Typical middleware flow:
-
-```go
-ctx = logf.NewContext(ctx, logger)                    // seed
-ctx = logf.With(ctx, logf.String("request_id", rid)) // inherited
-ctx = logf.With(ctx, logf.String("user_id", uid))    // inherited
-logger.Info(ctx, "done")                              // cache hit
-```
-
-If `logf.With` is called without seed (no `NewContext`), parent is nil,
-cache is nil — graceful degradation, encoder encodes every time.
-
-#### No sync, no atomic on hot path
-
-- Slot assignment: single-threaded at creation.
-- Encoder writes only its own slot — no cross-goroutine access.
-- Cache allocation: at `NewContext` (seed) or `With` (inherit) —
-  caller goroutine, before any channel send.
-- Channel send provides happens-before for encoder reads.
-
-#### Bag: what we remove from v1
-
-- `Bag.version int32` and global `nextVersion` atomic counter
-- `Bag.With` field merge (O(N) copy)
-- Encoder-local `Cache` (LRU with `container/list`)
-
-#### Bag: what we add
-
-- `Bag.parent *Bag` — linked list
-- `Bag.cache [][]byte` — per-encoder slot
-- Seed pattern via `NewContext`
-- Encoder `slot int` assigned by Runtime
-
-### Groups: WithGroup and Group field
-
-slog.Handler has two group mechanisms. logf supports both.
-
-#### `logf.Group(key, fields...)` — inline field (native API)
-
-New `FieldTypeGroup`. Self-contained: only listed fields are nested.
-
-```go
-logger.Info(ctx, "done",
-    logf.Group("request", logf.String("id", "abc"), logf.Int("status", 200)),
-    logf.String("duration", "50ms"),  // outside group
-)
-// → {"msg":"done", "request":{"id":"abc", "status":200}, "duration":"50ms"}
-```
-
-Works in `With` too — Group is a regular Field, stored in Bag, cached:
-
-```go
-logger2 := logger.With(logf.Group("request", logf.String("id", "abc")))
-```
-
-Encoder: open `{`, encode sub-fields, close `}`. No Bag interaction.
-
-#### `Logger.WithGroup(name)` — permanent namespace (slog compat)
-
-All subsequent fields (from With and per-call) are nested under group.
-Irreversible — no CloseGroup. Needed for slog.Handler.WithGroup.
-
-```go
-httpLogger := logger.WithGroup("http")
-httpLogger.Info(ctx, "done", logf.Int("status", 200))
-// → {"msg":"done", "http":{"status":200}}
-```
-
-Implemented via `Bag.group` field:
-
-```go
-type Bag struct {
-    fields []Field
-    parent *Bag
-    group  string     // empty = no group
-    cache  atomic.Pointer[bagCache]
-}
-```
-
-Encoder splits group nodes and field nodes:
-
-- **Group node** (`bag.group != ""`): writes `"name":{` directly, no caching.
-  Trivially cheap — one `addKey` + one byte.
-- **Field node**: uses per-encoder slot cache. Cached bytes include all
-  parent content (including group openings from parent group nodes).
-- **Closing braces**: `countGroups(bag)` walks the Bag chain to count
-  open groups, appends `}` after entry fields.
-
-```go
-func (f *jsonEncoder) encodeBag(bag *Bag) {
-    if bag == nil { return }
-
-    // Group node: just open nested object, no caching.
-    if bag.group != "" {
-        f.encodeBag(bag.parent)
-        f.addKey(bag.group)
-        f.buf.AppendByte('{')
-        return
-    }
-
-    // Field node: use cache.
-    if data := bag.LoadCache(f.slot); data != nil {
-        f.buf.AppendBytes(data)
-        return
-    }
-    start := f.buf.Len()
-    f.encodeBag(bag.parent)
-    for _, field := range bag.fields { field.Accept(f) }
-    bag.StoreCache(f.slot, f.buf.Data[start:])
-}
-```
-
-Cache stays a plain `[]byte` — no encoder-specific metadata (like group
-count) leaks into Bag. Group counting is O(depth), depth is typically 1-3.
-
-#### WithGroup vs WithName
-
-They do NOT compete:
-
-- **WithName** — logger identity. Flat dotted path: `fb.agent.rt`.
-  Stays on `Logger.name` and `Entry.LoggerName`.
-- **WithGroup** — field namespace. Nested JSON: `{"http":{"status":200}}`.
-  Lives in Bag.group.
-
-WithName = "where am I?" (metadata). WithGroup = "nest my fields" (structure).
-
-#### slog adapter
-
-slogHandler is a thin bridge — just writer + Bag, no options:
-
-```go
-func NewSlogHandler(w EntryWriter) slog.Handler
-
-func (h *slogHandler) WithGroup(name string) slog.Handler {
-    return &slogHandler{w: h.w, bag: h.bag.WithGroup(name)}
-}
-
-func (h *slogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-    return &slogHandler{w: h.w, bag: h.bag.With(convertAttrs(attrs)...)}
-}
-
-func (h *slogHandler) Enabled(ctx context.Context, level slog.Level) bool {
-    return h.w.Enabled(ctx, slogLevelToLogf(level))
-}
-```
-
-Level filtering delegated to EntryWriter (same as Logger). Groups are
-always nested (matching slog.JSONHandler).
-
-**TODO:** Add ReplaceAttr support. The empty-attr check in `attrToField`
-(`a.Equal(slog.Attr{})`) exists for this — ReplaceAttr can return zero
-Attr to suppress a field. Will require reintroducing an options struct.
-
-Bag linked list preserves WithGroup/WithAttrs ordering naturally.
-Multiple WithAttrs after WithGroup all land inside the group — no
-duplicate keys, no wrapping hacks.
-
-### Logger.Slog() — bridge to slog
-
-logf is the primary API. slog.Logger is derived from logf.Logger:
-
-```go
-func (l *Logger) Slog() *slog.Logger {
-    return slog.New(&slogHandler{
-        w:         l.w,
-        bag:       l.bag,
-        name:      l.name,       // transferred
-        slotCount: l.slotCount,
-    })
-}
-```
-
-Name transfers automatically:
-
-```go
-httpLogger := logf.NewLogger(w).WithName("fb").WithName("agent")
-
-httpLogger.Info(ctx, "request")          // {"name":"fb.agent", ...}
-httpLogger.Slog().Info("request")        // {"name":"fb.agent", ...}
-
-logf.Default().Slog().Info("request")    // {"msg":"request"}  — no name, ok
-```
-
-slog has no WithName. Logger.Slog() is the only way name reaches slog.
-Without it, slog handler has no name — empty string, field omitted.
-Explicit, deterministic, no context dependency.
-
-### Zero-cost opt-in
-
-Every feature is pay-only-if-used. Three levels of involvement:
-
-```go
-// Level 1: Logger.With only — no context Bag at all
-logger := logf.NewLogger(w).WithName("http").With(logf.String("env", "prod"))
-logger.Info(ctx, "request", logf.Int("status", 200))
-logger.Slog().Info("request", "status", 200)
-// Both: {"name":"http", "env":"prod", "status":200}
-
-// Level 2: Logger.With + context fields
-ctx = logf.NewContext(ctx, logger)
-ctx = logf.With(ctx, logf.String("request_id", rid))
-logger.Info(ctx, "done")
-// {"name":"http", "env":"prod", "request_id":"abc", ...}
-
-// Level 3: Pure slog, logf is just backend
-slog.SetDefault(slog.New(logf.NewSlogHandler(w)))
-slog.Info("request", "status", 200)
-// Async, buffered — but no name, no context fields
-```
-
-What you skip costs nothing:
-
-- **No context Bag** → no seed/inherit allocations, encoder skips context bag.
-- **No WithGroup** → `Bag.group` empty, encoder skips.
-- **No Slog()** → slog handler never created.
-- **No WithName** → name empty, field omitted from output.
-
-### Interface architecture: one Handler, one Encoder
+## Design: One Handler Interface
 
 v2 merges EntryWriter and Appender into a single Handler interface.
-Appender is eliminated.
 
 ```go
-// Single pipeline interface — middleware and terminals alike.
-// Renamed from EntryWriter. Appender merged in.
 type Handler interface {
     Enabled(context.Context, Level) bool
     Handle(context.Context, Entry) error
@@ -658,101 +131,59 @@ type Handler interface {
     Sync() error
 }
 
-// Serialization — pure, no I/O, no lifecycle.
 type Encoder interface {
     Encode(*Buffer, Entry) error
 }
 ```
 
-Middleware uses embed helper to avoid Flush/Sync/Enabled boilerplate:
+**Why one interface.** v1 split (EntryWriter + Appender) forced channelWriter
+to accept only Appender. Adding a second async destination required
+nonBlockingAppender in logfx — a workaround. With one interface,
+channelWriter takes Handler downstream. Full composition, no workarounds.
+
+**Flush ≠ Sync.** Both on Handler because channelWriter's downstream is
+Handler, and optional interfaces (Flusher/Syncer) break through middleware
+wrapping. Flush = write buffered data to OS (cheap, on idle). Sync = fsync
+(expensive, on shutdown). zap conflates both; logf separates for performance.
+
+**ForwardHandler** — embed helper for middleware. Only override Handle:
 
 ```go
 type ForwardHandler struct{ Next Handler }
-
-func (f ForwardHandler) Enabled(ctx context.Context, lvl Level) bool {
-    return f.Next.Enabled(ctx, lvl)
-}
-func (f ForwardHandler) Flush() error { return f.Next.Flush() }
-func (f ForwardHandler) Sync() error  { return f.Next.Sync() }
-
-// Middleware — only Handle:
-type samplingHandler struct {
-    ForwardHandler
-    rate int
-}
-func (h *samplingHandler) Handle(ctx context.Context, e Entry) error {
-    if !h.sample() { return nil }
-    return h.Next.Handle(ctx, e)
-}
+// Enabled, Flush, Sync delegate to Next automatically.
 ```
 
-#### Why one interface (not two)
-
-The v1 split (EntryWriter + Appender) forced channelWriter to accept
-only Appender. Adding a second async destination required duplicating
-the async runtime at Appender level (nonBlockingAppender in logfx) —
-a workaround for channelWriter not accepting Handler downstream.
-
-With one interface, channelWriter takes Handler:
-
-```text
-Logger → contextHandler → channelWriter → teeHandler → writeHandler (file)
-                                                      → channelWriter₂ → dumpServerHandler (HTTP)
-```
-
-Full composition. No nonBlockingAppender needed. Each destination gets
-its own channelWriter with independent channel and worker.
-
-#### Why Flush and Sync on Handler
-
-User never calls Flush/Sync directly — only Close().
-channelWriter manages lifecycle internally (drain → flush → sync).
-
-But Flush/Sync must be on the public interface because channelWriter's
-downstream is Handler, and channelWriter needs to flush/sync it.
-Optional interfaces (Flusher/Syncer) break when middleware wraps
-a terminal — middleware hides the terminal's Flusher from channelWriter.
-
-Flush ≠ Sync:
-
-- **Flush** — write buffered data to OS (cheap, frequent, on idle)
-- **Sync** — fsync to disk (expensive, rare, on close/error)
-
-zap conflates both into Sync() because it has no runtime — user calls
-`defer logger.Sync()` manually. logf's channelWriter separates them
-for performance: Flush on every channel drain, Sync only on shutdown.
-
-#### channelWriter owns its context
-
-channelWriter does NOT pass request context through the channel.
-It creates its own context for downstream I/O lifecycle:
+## Design: TeeWriter — synchronous fan-out
 
 ```go
-func (l *channelWriter) init(cfg Config) {
-    l.ctx, l.cancel = context.WithCancel(context.Background())
-    l.ch = make(chan Entry, l.Capacity)
-    go l.worker()
-}
-
-func (l *channelWriter) close() {
-    l.cancel()     // signal downstream: cancel last I/O
-    close(l.ch)    // drain remaining
-    l.Wait()
-}
-
-func (l *channelWriter) handle(e Entry) {
-    l.Next.Handle(l.ctx, e)  // channelWriter's context, not request's
-}
+func NewTeeWriter(writers ...EntryWriter) EntryWriter
 ```
 
-Request context is irrelevant at I/O level — it was about "what to log",
-not "where to write". Downstream handlers use channelWriter's context
-for graceful shutdown of network/DB connections.
+Delegates Handle, Flush, Sync to all targets in caller's goroutine.
+Enabled returns true if any target is enabled. Errors via `errors.Join`.
 
-#### channelWriter: overflow strategy and observer
+Same goroutine, same thread — simple, no channels.
+
+## Design: RouteWriter — multi-destination async
+
+Each destination gets its own channelWriter with independent goroutine,
+channel, buffer, and overflow strategy:
+
+```text
+Logger → contextWriter → routeWriter → channelWriter₁ → writeHandler (file)
+                                      → channelWriter₂ → dumpServerHandler (HTTP)
+```
+
+- **Independent goroutines** — slow HTTP destination doesn't block fast file.
+- **Independent overflow** — file blocks (nothing lost), HTTP drops (never blocks).
+- **Independent lifecycle** — each channelWriter owns its context, Flush, Sync.
+
+RouteWriter itself is synchronous fan-out (like TeeWriter) but its children
+are channelWriters — so each destination is async independently.
+
+### channelWriter: overflow + observer
 
 From production experience (nonBlockingAppender in logfx/runvm-agent):
-channelWriter v2 supports configurable overflow and opt-in metrics.
 
 ```go
 type ChannelWriterConfig struct {
@@ -760,72 +191,16 @@ type ChannelWriterConfig struct {
     OnOverflow  OverflowStrategy       // Block (default) | Drop
     Observer    ChannelWriterObserver   // nil = no-op (zero cost)
 }
-
-type ChannelWriterObserver interface {
-    OnHandleStarted(entryTimestamp time.Time)
-    OnHandleCompleted(entryTimestamp time.Time, err error)
-    OnDropped(Entry)
-    OnFlushStarted()
-    OnFlushCompleted(error)
-    OnSyncStarted()
-    OnSyncCompleted(error)
-}
 ```
 
-- **Block** (v1 default) — caller waits, nothing lost.
+- **Block** — caller waits, nothing lost.
 - **Drop** — caller never blocked, entry lost, observer notified.
 
-This eliminates the need for nonBlockingAppender — channelWriter
-handles both modes. Observer enables latency/error/drop metrics
-without coupling to a specific metrics library.
+Observer enables latency/error/drop metrics without coupling to a
+specific metrics library. Eliminates need for nonBlockingAppender.
 
-#### teeHandler — fan-out for Handler
+## Idea: Debug Ring Buffer
 
-```go
-func NewTeeHandler(handlers ...Handler) Handler
-```
-
-Delegates Handle, Flush, Sync to all targets. Enabled returns true
-if any target is enabled. Replaces compositeAppender from logfx.
-
-```text
-Logger → contextHandler → channelWriter → teeHandler → writeHandler (file)
-                                                      → channelWriter₂ → dumpServerHandler
-```
-
-Each destination can have its own channelWriter (independent async,
-independent overflow strategy). Or share one channelWriter upstream
-if all destinations are fast enough.
-
-### Debug Ring Buffer — separate design
-
-**Status: idea. Separate from slog integration.**
-
-Post-mortem debugging: when a problem occurs, debug logs are already lost.
-Dynamic level only helps for reproducible issues ("enable debug, wait,
-catch"). A ring buffer solves the non-reproducible case:
-
-- Always keep last N debug entries in memory (circular buffer).
-- On trigger (panic, error, signal) — dump the buffer to file.
-- Caller pays only for Entry creation (~50ns), no encoding until dump.
-- After dump, buffer resets and continues.
-- Depends on LevelEnabler: file channelWriter skips Debug (Enabled=false),
-  only ring buffer accepts them (Enabled=true).
-
-This would be a unique feature — neither slog, zap, nor zerolog offer it.
-
-## Design Principles
-
-- **Interchangeability.** Use `logf.Logger` or `slog.Logger` anywhere
-  in the same application. Both write to the same async pipeline, both
-  see the same context fields. Switching between them is zero-cost.
-- **Complementarity.** slog brings stdlib portability and ecosystem.
-  logf brings async I/O, context Bag, buffered writing. Together they
-  cover more than either alone.
-- **Context is the field bus.** Fields attached to context are visible
-  to any logger (logf or slog) that uses the shared ContextWriter.
-- **One-line migration.** Switching from `slog.NewJSONHandler` to logf
-  backend should require changing one line. No code changes elsewhere.
-- **No forced dependency.** OTel, HTTP middleware, and other integrations
-  live in sub-packages. Core logf has zero external dependencies beyond
-  stdlib.
+Post-mortem debugging: keep last N debug entries in memory (ring buffer).
+On trigger (panic, error, signal) — dump to file. Caller pays ~50ns,
+no encoding until dump. Depends on LevelEnabler per-destination filtering.
