@@ -59,17 +59,20 @@ func TestLatencyDistribution(t *testing.T) {
 	t.Logf("Writing %d log entries per logger to %s", latencySamples, f.Name())
 	t.Logf("")
 
-	// --- logf async (channel writer + buffered appender) ---
+	// --- logf async (router + slab writer) ---
 	{
 		ff, _ := os.CreateTemp("", "latency-logf-*.log")
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		w, cl := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
-			Appender: logf.NewWriteAppender(ff, logf.NewJSONEncoder(logf.JSONEncoderConfig{})),
-		})
+		enc := logf.JSON().Build()
+		sw := logf.NewSlabWriter(ff, 64*1024, 8)
+		defer sw.Close()
+		h, cl, _ := logf.NewRouter().
+			Route(enc, logf.Output(logf.LevelDebug, sw)).
+			Build()
 		defer cl()
-		logger := logf.NewLogger(w).WithCaller(false)
+		logger := logf.New(h).WithCaller(false)
 		ctx := context.Background()
 
 		samples := make([]time.Duration, latencySamples)
@@ -79,7 +82,7 @@ func TestLatencyDistribution(t *testing.T) {
 			logger.Info(ctx, "request handled")
 			samples[i] = time.Since(start)
 		}
-		reportLatency(t, "logf async", samples)
+		reportLatency(t, "logf async (slab)", samples)
 	}
 
 	// --- logf sync (pooled writer) ---
@@ -88,9 +91,9 @@ func TestLatencyDistribution(t *testing.T) {
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{})
-		w := logf.NewWriter(logf.LevelDebug, ff, enc)
-		logger := logf.NewLogger(w).WithCaller(false)
+		enc := logf.JSON().Build()
+		w := logf.NewSyncHandler(logf.LevelDebug, ff, enc)
+		logger := logf.New(w).WithCaller(false)
 		ctx := context.Background()
 
 		samples := make([]time.Duration, latencySamples)
@@ -276,23 +279,26 @@ func TestSlowIOLatency(t *testing.T) {
 	t.Logf("Parallel: %d goroutines, %d samples total", runtime.NumCPU(), latencySamples)
 	t.Logf("")
 
-	// --- logf async ---
+	// --- logf async (slab) ---
 	{
 		ff, _ := os.CreateTemp("", "slowio-logf-*.log")
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		sw := &slowWriter{w: ff, slowPct: 0.02, delay: 1 * time.Millisecond}
-		w, cl := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
-			Appender: logf.NewWriteAppender(sw, logf.NewJSONEncoder(logf.JSONEncoderConfig{})),
-		})
+		slow := &slowWriter{w: ff, slowPct: 0.02, delay: 1 * time.Millisecond}
+		enc := logf.JSON().Build()
+		sw := logf.NewSlabWriter(slow, 64*1024, 8)
+		defer sw.Close()
+		h, cl, _ := logf.NewRouter().
+			Route(enc, logf.Output(logf.LevelDebug, sw)).
+			Build()
 		defer cl()
-		logger := logf.NewLogger(w).WithCaller(false)
+		logger := logf.New(h).WithCaller(false)
 
 		samples := collectParallelLatency(func() {
 			logger.Info(context.Background(), "request handled")
 		})
-		reportLatency(t, "logf async (channel)", samples)
+		reportLatency(t, "logf async (slab)", samples)
 	}
 
 	// --- zap sync unbuffered ---
@@ -415,24 +421,27 @@ func TestGoroutineScalability(t *testing.T) {
 	}
 	t.Log(header)
 
-	// logf async
+	// logf async (slab)
 	{
 		results := make([]float64, len(goroutineCounts))
 		for gi, numG := range goroutineCounts {
 			ff, _ := os.CreateTemp("", "scale-logf-*.log")
-			w, cl := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
-				Appender: logf.NewWriteAppender(ff, logf.NewJSONEncoder(logf.JSONEncoderConfig{})),
-			})
-			logger := logf.NewLogger(w).WithCaller(false)
+			enc := logf.JSON().Build()
+			sw := logf.NewSlabWriter(ff, 64*1024, 8)
+			h, cl, _ := logf.NewRouter().
+				Route(enc, logf.Output(logf.LevelDebug, sw)).
+				Build()
+			logger := logf.New(h).WithCaller(false)
 
 			results[gi] = measureThroughput(numG, totalOps, func() {
 				logger.Info(context.Background(), "request handled")
 			})
 			cl()
+			sw.Close()
 			ff.Close()
 			os.Remove(ff.Name())
 		}
-		logResults(t, "logf async", goroutineCounts, results)
+		logResults(t, "logf async (slab)", goroutineCounts, results)
 	}
 
 	// zap unbuffered

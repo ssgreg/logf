@@ -7,44 +7,6 @@ import (
 	"unsafe"
 )
 
-// testAppender
-type testAppender struct {
-	Entries          []Entry
-	FlushCallCounter int
-	SyncCallCounter  int
-
-	AppendError error
-	FlushError  error
-	SyncError   error
-}
-
-func (a *testAppender) Append(e Entry) error {
-	if a.AppendError != nil {
-		return a.AppendError
-	}
-	a.Entries = append(a.Entries, e)
-
-	return nil
-}
-
-func (a *testAppender) Flush() error {
-	if a.FlushError != nil {
-		return a.FlushError
-	}
-	a.FlushCallCounter++
-
-	return nil
-}
-
-func (a *testAppender) Sync() error {
-	if a.SyncError != nil {
-		return a.SyncError
-	}
-	a.SyncCallCounter++
-
-	return nil
-}
-
 // testHandler implements Handler storing all entries.
 type testHandler struct {
 	Entry      *Entry

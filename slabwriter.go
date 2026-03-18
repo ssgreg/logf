@@ -9,9 +9,6 @@ import (
 	"time"
 )
 
-// ErrClosed is returned by Write and Flush after Close has been called.
-var ErrClosed = errors.New("logf: SlabWriter is closed")
-
 const (
 	defaultSlabSize  = 4 * 1024
 	defaultSlabCount = 4
@@ -84,11 +81,14 @@ const (
 //	16 × 64 KB =   1 MB  (high throughput + long spike tolerance)
 //
 // When all slabs are in flight and the pool is empty, Write blocks
-// until a slab is recycled.
+// until a slab is recycled. With WithDropOnFull, Write never blocks:
+// if the I/O goroutine cannot keep up, the current slab's data is
+// silently discarded and the slab is reused. Use Dropped to monitor
+// the total number of messages lost.
 //
 // Concurrency: Write and Flush are safe for concurrent use.
-// Close may be called concurrently with Write; after Close returns,
-// Write and Flush return ErrClosed. Close itself is idempotent.
+// Write and Flush must not be called after or concurrently with Close.
+// Close itself is idempotent.
 type SlabWriter struct {
 	mu            sync.Mutex
 	slabSize      int
@@ -96,6 +96,7 @@ type SlabWriter struct {
 	full          chan []byte   // filled slabs → I/O goroutine
 	current       []byte        // active slab
 	pos           int           // write position in current slab
+	msgCount      int           // messages in current slab (for drop accounting)
 	flushBuf      []byte        // reusable buffer for idle flush (ioLoop only)
 	w             Writer        // destination
 	errW          io.Writer     // destination for I/O error reports (nil = discard)
@@ -104,8 +105,21 @@ type SlabWriter struct {
 	stop          chan struct{} // closed to signal shutdown
 	done          chan struct{} // closed when I/O goroutine exits
 	closeErr      error         // Flush/Sync errors from drain; set before done is closed
-	closed        atomic.Bool   // set by Close, checked by Write/Flush
 	closeOnce     sync.Once     // prevents double-close panic
+	dropOnFull    bool          // if true, drop data instead of blocking on full pool
+	dropped       atomic.Int64  // total messages dropped (only in dropOnFull mode)
+	written       atomic.Int64  // total messages accepted by Write
+	writeErrors   atomic.Int64  // total write errors (ioLoop only)
+}
+
+// SlabStats contains runtime statistics for monitoring.
+type SlabStats struct {
+	QueuedSlabs int   // slabs waiting for I/O
+	FreeSlabs   int   // slabs available in pool
+	TotalSlabs  int   // total slab count
+	Dropped     int64 // total messages dropped (dropOnFull mode)
+	Written     int64 // total messages accepted by Write
+	WriteErrors int64 // total write errors
 }
 
 // SlabOption configures a SlabWriter.
@@ -117,6 +131,16 @@ type SlabOption func(*SlabWriter)
 func WithFlushInterval(d time.Duration) SlabOption {
 	return func(sw *SlabWriter) {
 		sw.flushInterval = d
+	}
+}
+
+// WithDropOnFull makes Write non-blocking: when the I/O goroutine
+// cannot keep up and all slabs are in flight, the current slab's
+// data is dropped instead of blocking the caller. The total number
+// of dropped messages is available via Dropped.
+func WithDropOnFull() SlabOption {
+	return func(sw *SlabWriter) {
+		sw.dropOnFull = true
 	}
 }
 
@@ -165,11 +189,8 @@ func NewSlabWriter(w io.Writer, slabSize, slabCount int, opts ...SlabOption) *Sl
 
 // Write copies p into the current slab. When a slab fills up it is
 // sent to the I/O goroutine and a fresh slab is grabbed from the pool.
-// Write is safe for concurrent use; it returns ErrClosed after Close.
+// Write is safe for concurrent use. It must not be called after Close.
 func (sb *SlabWriter) Write(p []byte) (int, error) {
-	if sb.closed.Load() {
-		return 0, ErrClosed
-	}
 	sb.mu.Lock()
 	written := 0
 	for written < len(p) {
@@ -186,16 +207,16 @@ func (sb *SlabWriter) Write(p []byte) (int, error) {
 		sb.pos += n
 		written += n
 	}
+	sb.msgCount++
+	sb.written.Add(1)
 	sb.mu.Unlock()
 	return len(p), nil
 }
 
-// Flush sends the current partial slab to the I/O goroutine.
-// It returns ErrClosed after Close.
+// Flush enqueues the current partial slab for writing by the I/O
+// goroutine. It does not wait for the write to complete. For a
+// durable flush, use Close. It must not be called after Close.
 func (sb *SlabWriter) Flush() error {
-	if sb.closed.Load() {
-		return ErrClosed
-	}
 	sb.mu.Lock()
 	if sb.pos > 0 {
 		sb.swapSlab()
@@ -214,9 +235,10 @@ func (sb *SlabWriter) Sync() error {
 // multiple times; subsequent calls return the same error.
 func (sb *SlabWriter) Close() error {
 	sb.closeOnce.Do(func() {
-		sb.closed.Store(true)
 		sb.mu.Lock()
 		if sb.pos > 0 {
+			// Non-blocking: current slab is not counted in full or pool,
+			// so at least one slot in full is always free.
 			sb.full <- sb.current[:sb.pos]
 		}
 		sb.mu.Unlock()
@@ -226,12 +248,48 @@ func (sb *SlabWriter) Close() error {
 	return sb.closeErr
 }
 
+// Dropped returns the total number of messages dropped due to
+// backpressure (only meaningful when WithDropOnFull is enabled).
+// The count is approximate for messages larger than slabSize.
+func (sb *SlabWriter) Dropped() int64 {
+	return sb.dropped.Load()
+}
+
+// Stats returns a snapshot of runtime statistics. Safe to call
+// concurrently from a metrics scraper without blocking Write.
+func (sb *SlabWriter) Stats() SlabStats {
+	return SlabStats{
+		QueuedSlabs: len(sb.full),
+		FreeSlabs:   len(sb.pool),
+		TotalSlabs:  cap(sb.full),
+		Dropped:     sb.dropped.Load(),
+		Written:     sb.written.Load(),
+		WriteErrors: sb.writeErrors.Load(),
+	}
+}
+
 // swapSlab sends the current slab (trimmed to pos) to the I/O goroutine
 // and grabs a fresh slab from the pool.
+//
+// In dropOnFull mode the pool is checked first (non-blocking). If a
+// free slab is available, the full send is guaranteed non-blocking by
+// the slab-count invariant (pool + full + processing + current = N).
+// If the pool is empty, the data is dropped and the current slab is reused.
 func (sb *SlabWriter) swapSlab() {
-	sb.full <- sb.current[:sb.pos]
-	sb.current = <-sb.pool
+	if sb.dropOnFull {
+		select {
+		case fresh := <-sb.pool:
+			sb.full <- sb.current[:sb.pos]
+			sb.current = fresh
+		default:
+			sb.dropped.Add(int64(sb.msgCount))
+		}
+	} else {
+		sb.full <- sb.current[:sb.pos]
+		sb.current = <-sb.pool
+	}
 	sb.pos = 0
+	sb.msgCount = 0
 }
 
 func (sb *SlabWriter) ioLoop() {
@@ -264,30 +322,52 @@ func (sb *SlabWriter) ioLoop() {
 
 		select {
 		case slab := <-sb.full:
-			if timer != nil {
-				timer.Stop()
-			}
+			stopTimer(timer, timerC)
 			sb.processSlab(slab)
 		case <-timerC:
 			sb.flushPartial()
 		case <-sb.stop:
-			if timer != nil {
-				timer.Stop()
-			}
+			stopTimer(timer, timerC)
 			sb.drain()
 			return
 		}
 	}
 }
 
+// stopTimer stops the timer and drains its channel if it already fired.
+func stopTimer(t *time.Timer, ch <-chan time.Time) {
+	if t != nil && !t.Stop() {
+		select {
+		case <-ch:
+		default:
+		}
+	}
+}
+
 // processSlab writes the slab to the destination and recycles it.
 func (sb *SlabWriter) processSlab(slab []byte) {
-	if _, err := sb.w.Write(slab); err != nil {
+	sb.safeWrite(slab)
+	sb.pool <- slab[:cap(slab)]
+}
+
+// safeWrite writes p to the destination, recovering from panics.
+func (sb *SlabWriter) safeWrite(p []byte) {
+	err := sb.tryWrite(p)
+	if err != nil {
 		sb.reportError(err)
 	} else {
 		sb.reportOK()
 	}
-	sb.pool <- slab[:cap(slab)]
+}
+
+func (sb *SlabWriter) tryWrite(p []byte) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
+	_, err = sb.w.Write(p)
+	return err
 }
 
 // flushPartial copies the current partial slab data and writes it.
@@ -304,12 +384,12 @@ func (sb *SlabWriter) flushPartial() {
 	}
 	n := copy(sb.flushBuf[:sb.pos], sb.current[:sb.pos])
 	sb.pos = 0
+	sb.msgCount = 0
 	sb.mu.Unlock()
-	if _, err := sb.w.Write(sb.flushBuf[:n]); err != nil {
-		sb.reportError(err)
-	} else {
-		sb.reportOK()
-	}
+	// SAFETY: after Unlock, producers may immediately write into current
+	// at pos 0, but flushBuf already holds a snapshot. flushBuf is owned
+	// exclusively by ioLoop, so no concurrent access is possible.
+	sb.safeWrite(sb.flushBuf[:n])
 }
 
 // reportError tracks consecutive write errors and reports transitions
@@ -317,6 +397,7 @@ func (sb *SlabWriter) flushPartial() {
 // Called only from ioLoop (single goroutine, no mutex needed for errCount).
 func (sb *SlabWriter) reportError(err error) {
 	sb.errCount++
+	sb.writeErrors.Add(1)
 	if sb.errCount == 1 && sb.errW != nil {
 		fmt.Fprintf(sb.errW, "logf: SlabWriter: %v\n", err)
 	}

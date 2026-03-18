@@ -78,17 +78,14 @@ func BenchmarkFileParallel_Logf_NoBuffer(b *testing.B) {
 	defer os.Remove(f.Name())
 	defer f.Close()
 
-	enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
-		EncodeTime:     logf.RFC3339NanoTimeEncoder,
-		EncodeDuration: logf.NanoDurationEncoder,
-	})
+	enc := logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder).Build()
 	h, closeFn, err := logf.NewRouter().
 		Route(enc, logf.Output(logf.LevelDebug, f)).
 		Build()
 	if err != nil {
 		b.Fatal(err)
 	}
-	logger := logf.NewLogger(h).WithCaller(false)
+	logger := logf.New(h).WithCaller(false)
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -101,25 +98,24 @@ func BenchmarkFileParallel_Logf_NoBuffer(b *testing.B) {
 	closeFn()
 }
 
-// --- logf: Router → BufferedWriter 256 KB → file ---
+// --- logf: Router → SlabWriter 256 KB (4×64 KB) → file ---
 
-func BenchmarkFileParallel_Logf_Buffer256KB(b *testing.B) {
+func BenchmarkFileParallel_Logf_Slab256KB(b *testing.B) {
 	f := tempFile(b)
 	defer os.Remove(f.Name())
 	defer f.Close()
 
-	bw, closeBW := logf.NewBufferedWriter(f, logf.WithBufSize(256*1024))
-	enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
-		EncodeTime:     logf.RFC3339NanoTimeEncoder,
-		EncodeDuration: logf.NanoDurationEncoder,
-	})
+	sw := logf.NewSlabWriter(f, 64*1024, 4,
+		logf.WithFlushInterval(time.Second),
+	)
+	enc := logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder).Build()
 	h, closeFn, err := logf.NewRouter().
-		Route(enc, logf.Output(logf.LevelDebug, bw)).
+		Route(enc, logf.Output(logf.LevelDebug, sw)).
 		Build()
 	if err != nil {
 		b.Fatal(err)
 	}
-	logger := logf.NewLogger(h).WithCaller(false)
+	logger := logf.New(h).WithCaller(false)
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -130,7 +126,7 @@ func BenchmarkFileParallel_Logf_Buffer256KB(b *testing.B) {
 	})
 	b.StopTimer()
 	closeFn()
-	closeBW()
+	sw.Close()
 }
 
 // --- logf: Router → SlabWriter 64 KB × 4 → file ---
@@ -143,17 +139,14 @@ func BenchmarkFileParallel_Logf_Slab64Kx4(b *testing.B) {
 	sw := logf.NewSlabWriter(f, 64*1024, 4,
 		logf.WithFlushInterval(time.Second),
 	)
-	enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
-		EncodeTime:     logf.RFC3339NanoTimeEncoder,
-		EncodeDuration: logf.NanoDurationEncoder,
-	})
+	enc := logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder).Build()
 	h, closeFn, err := logf.NewRouter().
 		Route(enc, logf.Output(logf.LevelDebug, sw)).
 		Build()
 	if err != nil {
 		b.Fatal(err)
 	}
-	logger := logf.NewLogger(h).WithCaller(false)
+	logger := logf.New(h).WithCaller(false)
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -168,4 +161,102 @@ func BenchmarkFileParallel_Logf_Slab64Kx4(b *testing.B) {
 
 	// SlabWriter is blocking — 0 drops by design.
 	b.ReportMetric(0, "drops")
+}
+
+func BenchmarkFileParallel_Logf_Slab64Kx4_Drop(b *testing.B) {
+	f := tempFile(b)
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	sw := logf.NewSlabWriter(f, 64*1024, 4,
+		logf.WithFlushInterval(time.Second),
+		logf.WithDropOnFull(),
+	)
+	enc := logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder).Build()
+	h, closeFn, err := logf.NewRouter().
+		Route(enc, logf.Output(logf.LevelDebug, sw)).
+		Build()
+	if err != nil {
+		b.Fatal(err)
+	}
+	logger := logf.New(h).WithCaller(false)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.Info(ctx, "request handled", logfTwoScalars()...)
+		}
+	})
+	b.StopTimer()
+	_ = closeFn()
+	_ = sw.Close()
+
+	b.ReportMetric(float64(sw.Dropped()), "drops")
+}
+
+func BenchmarkFileParallel_Logf_Slab64Kx1(b *testing.B) {
+	f := tempFile(b)
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	// 1 slab = minimal config, blocking. Equivalent to a single 64KB buffer.
+	sw := logf.NewSlabWriter(f, 64*1024, 1,
+		logf.WithFlushInterval(time.Second),
+	)
+	enc := logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder).Build()
+	h, closeFn, err := logf.NewRouter().
+		Route(enc, logf.Output(logf.LevelDebug, sw)).
+		Build()
+	if err != nil {
+		b.Fatal(err)
+	}
+	logger := logf.New(h).WithCaller(false)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.Info(ctx, "request handled", logfTwoScalars()...)
+		}
+	})
+	b.StopTimer()
+	_ = closeFn()
+	_ = sw.Close()
+
+	// 1 slab blocking — 0 drops by design.
+	b.ReportMetric(0, "drops")
+}
+
+func BenchmarkFileParallel_Logf_Slab64Kx2_Drop(b *testing.B) {
+	f := tempFile(b)
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	// 2 slabs: 1 current + 1 spare. Minimal working drop config.
+	sw := logf.NewSlabWriter(f, 64*1024, 2,
+		logf.WithFlushInterval(time.Second),
+		logf.WithDropOnFull(),
+	)
+	enc := logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder).Build()
+	h, closeFn, err := logf.NewRouter().
+		Route(enc, logf.Output(logf.LevelDebug, sw)).
+		Build()
+	if err != nil {
+		b.Fatal(err)
+	}
+	logger := logf.New(h).WithCaller(false)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		ctx := context.Background()
+		for pb.Next() {
+			logger.Info(ctx, "request handled", logfTwoScalars()...)
+		}
+	})
+	b.StopTimer()
+	_ = closeFn()
+	_ = sw.Close()
+
+	b.ReportMetric(float64(sw.Dropped()), "drops")
 }

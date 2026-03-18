@@ -35,7 +35,7 @@ func TestWithName(t *testing.T) {
 
 func TestWithGroup(t *testing.T) {
 	w := &mockHandler{}
-	logger := logf.NewLogger(w)
+	logger := logf.New(w)
 	ctx := New(context.Background(), logger)
 
 	ctx = WithGroup(ctx, "http")
@@ -62,7 +62,7 @@ func TestCallerSkip(t *testing.T) {
 }
 
 func TestAtLevel(t *testing.T) {
-	logger := logf.NewLogger(&mockHandler{})
+	logger := logf.New(&mockHandler{})
 	ctx := New(context.Background(), logger)
 
 	called := false
@@ -93,7 +93,7 @@ func TestLevels(t *testing.T) {
 
 			text := "test text"
 			w := &mockHandler{}
-			logger := logf.NewLogger(w)
+			logger := logf.New(w)
 			ctx := New(context.Background(), logger)
 			test.Log(ctx, text)
 			assert.Equal(t, 1, len(w.entries))
@@ -105,7 +105,7 @@ func TestLevels(t *testing.T) {
 
 func TestAtLevelCallerPointsToCallSite(t *testing.T) {
 	w := &mockHandler{}
-	logger := logf.NewLogger(w)
+	logger := logf.New(w)
 	ctx := New(context.Background(), logger)
 
 	_, _, expectedLine, _ := runtime.Caller(0)
@@ -128,7 +128,7 @@ func TestAtLevelCallerPointsToCallSite(t *testing.T) {
 
 func TestCallerPointsToCallSite(t *testing.T) {
 	w := &mockHandler{}
-	logger := logf.NewLogger(w)
+	logger := logf.New(w)
 	ctx := New(context.Background(), logger)
 
 	_, expectedFile, expectedLine, _ := runtime.Caller(0)

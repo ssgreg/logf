@@ -27,9 +27,9 @@ func TestWithEmptyContext(t *testing.T) {
 	assert.Nil(t, Fields(ctx))
 }
 
-func TestContextWriter(t *testing.T) {
+func TestContextHandler(t *testing.T) {
 	sink := &testHandler{}
-	cw := NewContextWriter(sink)
+	cw := NewContextHandler(sink)
 
 	ctx := With(context.Background(), String("request_id", "abc"))
 	_ = cw.Handle(ctx, Entry{Level: LevelInfo, Text: "hello"})
@@ -39,9 +39,9 @@ func TestContextWriter(t *testing.T) {
 	assert.Equal(t, "hello", sink.Entry.Text)
 }
 
-func TestContextWriterNoBag(t *testing.T) {
+func TestContextHandlerNoBag(t *testing.T) {
 	sink := &testHandler{}
-	cw := NewContextWriter(sink)
+	cw := NewContextHandler(sink)
 
 	_ = cw.Handle(context.Background(), Entry{Level: LevelInfo, Text: "no bag"})
 
@@ -49,9 +49,9 @@ func TestContextWriterNoBag(t *testing.T) {
 	assert.Equal(t, "no bag", sink.Entry.Text)
 }
 
-func TestContextWriterPreservesLoggerBag(t *testing.T) {
+func TestContextHandlerPreservesLoggerBag(t *testing.T) {
 	sink := &testHandler{}
-	cw := NewContextWriter(sink)
+	cw := NewContextHandler(sink)
 
 	loggerBag := NewBag(String("service", "api"))
 	ctx := With(context.Background(), String("request_id", "abc"))
@@ -65,7 +65,7 @@ func TestContextWriterPreservesLoggerBag(t *testing.T) {
 	assert.True(t, sink.Entry.Bag.HasField("request_id"))
 }
 
-func TestContextWriterEncodesContextBag(t *testing.T) {
+func TestContextHandlerEncodesContextBag(t *testing.T) {
 	ctx := With(context.Background(), String("rid", "123"))
 	bag := BagFromContext(ctx)
 
@@ -75,7 +75,7 @@ func TestContextWriterEncodesContextBag(t *testing.T) {
 		Text:  "test",
 	}
 
-	enc := NewJSONEncoder(JSONEncoderConfig{})
+	enc := JSON().Build()
 	buf, _ := enc.Encode(e)
 
 	assert.Contains(t, buf.String(), `"rid":"123"`)
@@ -90,7 +90,7 @@ func TestContextBagBeforeLoggerBag(t *testing.T) {
 		Text:      "order",
 	}
 
-	enc := NewJSONEncoder(JSONEncoderConfig{})
+	enc := JSON().Build()
 	buf, _ := enc.Encode(e)
 
 	s := buf.String()
@@ -113,7 +113,7 @@ func indexOf(s, sub string) int {
 	return -1
 }
 
-func TestContextWriterFieldSource(t *testing.T) {
+func TestContextHandlerFieldSource(t *testing.T) {
 	sink := &testHandler{}
 
 	traceSource := FieldSource(func(ctx context.Context) []Field {
@@ -123,7 +123,7 @@ func TestContextWriterFieldSource(t *testing.T) {
 		return nil
 	})
 
-	cw := NewContextWriter(sink, traceSource)
+	cw := NewContextHandler(sink, traceSource)
 
 	ctx := context.WithValue(context.Background(), traceKey{}, "abc-123")
 	ctx = With(ctx, String("rid", "r1"))
@@ -140,21 +140,21 @@ func TestContextWriterFieldSource(t *testing.T) {
 	assert.Equal(t, "x", sink.Entry.Fields[1].Key)
 }
 
-func TestContextWriterFieldSourceNoFields(t *testing.T) {
+func TestContextHandlerFieldSourceNoFields(t *testing.T) {
 	sink := &testHandler{}
 
 	emptySource := FieldSource(func(ctx context.Context) []Field {
 		return nil
 	})
 
-	cw := NewContextWriter(sink, emptySource)
+	cw := NewContextHandler(sink, emptySource)
 	_ = cw.Handle(context.Background(), Entry{Level: LevelInfo, Text: "noop", Fields: []Field{Int("x", 1)}})
 
 	assert.Equal(t, 1, len(sink.Entry.Fields))
 	assert.Equal(t, "x", sink.Entry.Fields[0].Key)
 }
 
-func TestContextWriterMultipleSources(t *testing.T) {
+func TestContextHandlerMultipleSources(t *testing.T) {
 	sink := &testHandler{}
 
 	src1 := FieldSource(func(ctx context.Context) []Field {
@@ -164,7 +164,7 @@ func TestContextWriterMultipleSources(t *testing.T) {
 		return []Field{String("b", "2")}
 	})
 
-	cw := NewContextWriter(sink, src1, src2)
+	cw := NewContextHandler(sink, src1, src2)
 	_ = cw.Handle(context.Background(), Entry{Level: LevelInfo, Text: "multi", Fields: []Field{String("c", "3")}})
 
 	// Order: src1 fields, src2 fields, original fields.
@@ -186,7 +186,7 @@ func TestContextBagCaching(t *testing.T) {
 		Text:  "test",
 	}
 
-	enc := NewJSONEncoder(JSONEncoderConfig{})
+	enc := JSON().Build()
 
 	buf1, _ := enc.Encode(e)
 	buf2, _ := enc.Encode(e)

@@ -9,6 +9,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// blockingWriter blocks on every Write until ch is closed.
+type blockingWriter struct {
+	ch chan struct{}
+}
+
+func (w *blockingWriter) Write(p []byte) (int, error) {
+	<-w.ch
+	return len(p), nil
+}
+
 type collectWriter struct {
 	mu     sync.Mutex
 	writes []string
@@ -162,6 +172,88 @@ func TestSlabBufferDefaultParams(t *testing.T) {
 	_, _ = sb.Write([]byte("test"))
 	_ = sb.Close()
 	assert.Equal(t, "test", cw.allData())
+}
+
+func TestSlabWriterDropOnFull(t *testing.T) {
+	// slowWriter simulates a destination that can't keep up.
+	// slabCount=2: one current + one in pool → full channel capacity 2.
+	// After filling both, the next swap must drop.
+	sw := &slowWriter{delay: 50 * time.Millisecond}
+	sb := NewSlabWriter(sw, 8, 2, WithDropOnFull())
+
+	// Fill slab 1 (8 bytes) → swap: goes to full (ioLoop picks it up, blocks on slow write).
+	_, _ = sb.Write([]byte("aaaaaaaa"))
+	// Fill slab 2 (8 bytes) → swap: goes to full (ioLoop still busy).
+	_, _ = sb.Write([]byte("bbbbbbbb"))
+	// Fill current (which is the only slab left) → swap: full is at capacity → DROP.
+	_, _ = sb.Write([]byte("cccccccc"))
+
+	_ = sb.Close()
+
+	assert.Greater(t, sb.Dropped(), int64(0), "expected some bytes to be dropped")
+}
+
+func TestSlabWriterDropOnFullCounter(t *testing.T) {
+	// Block ioLoop completely by using a writer that never returns.
+	blocked := make(chan struct{})
+	bw := &blockingWriter{ch: blocked}
+	sb := NewSlabWriter(bw, 16, 2, WithDropOnFull())
+
+	// Write 1: fills slab → swap checks pool (1 slab) → got it, send to full. OK.
+	// ioLoop picks from full, blocks on blockingWriter.Write.
+	_, _ = sb.Write(make([]byte, 16))
+	// Write 2: fills slab → swap checks pool (empty) → DROP (16 bytes).
+	_, _ = sb.Write(make([]byte, 16))
+	// Write 3: fills slab (no swap yet — swap fires when NEXT write sees avail==0).
+	_, _ = sb.Write(make([]byte, 16))
+	// Write 4: avail==0 → swap checks pool (empty) → DROP (16 bytes).
+	_, _ = sb.Write(make([]byte, 16))
+
+	assert.Equal(t, int64(2), sb.Dropped(), "expected 2 messages dropped")
+
+	// Unblock ioLoop and close.
+	close(blocked)
+	_ = sb.Close()
+}
+
+func TestSlabWriterNoDropWhenKeepingUp(t *testing.T) {
+	cw := &collectWriter{}
+	sb := NewSlabWriter(cw, 1024, 4, WithDropOnFull())
+
+	for i := 0; i < 100; i++ {
+		_, _ = sb.Write([]byte("msg"))
+	}
+	_ = sb.Close()
+
+	assert.Equal(t, int64(0), sb.Dropped())
+	assert.Contains(t, cw.allData(), "msg")
+}
+
+func TestSlabWriterDropOnFullNonBlocking(t *testing.T) {
+	// Verify Write never blocks even with a completely stuck destination.
+	blocked := make(chan struct{})
+	bw := &blockingWriter{ch: blocked}
+	sb := NewSlabWriter(bw, 8, 2, WithDropOnFull())
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 1000; i++ {
+			_, _ = sb.Write([]byte("12345678"))
+		}
+	}()
+
+	select {
+	case <-done:
+		// Producer finished without blocking — correct.
+	case <-time.After(1 * time.Second):
+		t.Fatal("producer blocked for >1s — WithDropOnFull should prevent this")
+	}
+
+	assert.Greater(t, sb.Dropped(), int64(0))
+
+	close(blocked)
+	_ = sb.Close()
 }
 
 func TestSlabWriterFlushPartialNoDeadlock(t *testing.T) {

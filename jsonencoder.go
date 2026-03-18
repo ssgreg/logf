@@ -93,14 +93,118 @@ func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
 	return c
 }
 
+// JSONEncoderBuilder configures and builds a JSON Encoder.
+// Use NewJSONEncoder() to create one, chain setter methods,
+// then call Build() or pass to LoggerBuilder.EncoderFrom().
+type JSONEncoderBuilder struct {
+	cfg JSONEncoderConfig
+}
+
+// JSON returns a new JSONEncoderBuilder with default settings.
+//
+// Default:
+//	enc := logf.JSON().Build()
+//
+// Custom:
+//	enc := logf.JSON().TimeKey("time").LevelKey("severity").Build()
+func JSON() *JSONEncoderBuilder {
+	return &JSONEncoderBuilder{}
+}
+
+func (b *JSONEncoderBuilder) TimeKey(k string) *JSONEncoderBuilder {
+	b.cfg.FieldKeyTime = k
+	return b
+}
+
+func (b *JSONEncoderBuilder) LevelKey(k string) *JSONEncoderBuilder {
+	b.cfg.FieldKeyLevel = k
+	return b
+}
+
+func (b *JSONEncoderBuilder) MsgKey(k string) *JSONEncoderBuilder {
+	b.cfg.FieldKeyMsg = k
+	return b
+}
+
+func (b *JSONEncoderBuilder) NameKey(k string) *JSONEncoderBuilder {
+	b.cfg.FieldKeyName = k
+	return b
+}
+
+func (b *JSONEncoderBuilder) CallerKey(k string) *JSONEncoderBuilder {
+	b.cfg.FieldKeyCaller = k
+	return b
+}
+
+func (b *JSONEncoderBuilder) DisableTime() *JSONEncoderBuilder {
+	b.cfg.DisableFieldTime = true
+	return b
+}
+
+func (b *JSONEncoderBuilder) DisableLevel() *JSONEncoderBuilder {
+	b.cfg.DisableFieldLevel = true
+	return b
+}
+
+func (b *JSONEncoderBuilder) DisableMsg() *JSONEncoderBuilder {
+	b.cfg.DisableFieldMsg = true
+	return b
+}
+
+func (b *JSONEncoderBuilder) DisableName() *JSONEncoderBuilder {
+	b.cfg.DisableFieldName = true
+	return b
+}
+
+func (b *JSONEncoderBuilder) DisableCaller() *JSONEncoderBuilder {
+	b.cfg.DisableFieldCaller = true
+	return b
+}
+
+func (b *JSONEncoderBuilder) EncodeTime(e TimeEncoder) *JSONEncoderBuilder {
+	b.cfg.EncodeTime = e
+	return b
+}
+
+func (b *JSONEncoderBuilder) EncodeDuration(e DurationEncoder) *JSONEncoderBuilder {
+	b.cfg.EncodeDuration = e
+	return b
+}
+
+func (b *JSONEncoderBuilder) EncodeLevel(e LevelEncoder) *JSONEncoderBuilder {
+	b.cfg.EncodeLevel = e
+	return b
+}
+
+func (b *JSONEncoderBuilder) EncodeCaller(e CallerEncoder) *JSONEncoderBuilder {
+	b.cfg.EncodeCaller = e
+	return b
+}
+
+func (b *JSONEncoderBuilder) EncodeError(e ErrorEncoder) *JSONEncoderBuilder {
+	b.cfg.EncodeError = e
+	return b
+}
+
+// Build finalizes the configuration and returns a ready Encoder.
+func (b *JSONEncoderBuilder) Build() Encoder {
+	return buildJSONEncoder(b.cfg)
+}
+
 // NewJSONEncoder creates a new JSON Encoder with the given config.
+// For a builder-style API, use JSON() instead.
+func NewJSONEncoder(cfg JSONEncoderConfig) Encoder {
+	return buildJSONEncoder(cfg)
+}
+
+// buildJSONEncoder creates a new JSON Encoder with the given config.
 //
 // Each encoder owns a dedicated sync.Pool whose New func pre-fills
 // JSONEncoderConfig and slot. This avoids copying ~200 bytes of config
 // on every Encode call (as a global pool would require) and eliminates
 // pointer indirection that a *JSONEncoderConfig approach would add to
 // every field access in the hot path.
-func NewJSONEncoder(cfg JSONEncoderConfig) Encoder {
+func buildJSONEncoder(cfg JSONEncoderConfig) Encoder {
 	enc := &jsonEncoder{JSONEncoderConfig: cfg.WithDefaults(), slot: AllocEncoderSlot()}
 	enc.pool = &sync.Pool{New: func() any {
 		return &jsonEncoder{
@@ -170,7 +274,7 @@ func (f *jsonEncoder) encode(buf *Buffer, e Entry) error {
 	}
 
 	// Time.
-	if !f.DisableFieldTime {
+	if !f.DisableFieldTime && !e.Time.IsZero() {
 		f.addPrecomputedKey(f.keyTime)
 		cur := f.buf.Len()
 		f.EncodeTime(e.Time, f)
@@ -201,11 +305,21 @@ func (f *jsonEncoder) encode(buf *Buffer, e Entry) error {
 		}
 	}
 
+	// Skip trailing groups that would produce empty objects.
+	loggerBag := e.LoggerBag
+	ctxBag := e.Bag
+	if len(e.Fields) == 0 {
+		loggerBag = skipTrailingGroups(loggerBag)
+		if !bagHasFields(loggerBag) {
+			ctxBag = skipTrailingGroups(ctxBag)
+		}
+	}
+
 	// Context fields (request-scoped).
-	f.encodeBag(e.Bag)
+	f.encodeBag(ctxBag)
 
 	// Logger's fields (service-scoped).
-	f.encodeBag(e.LoggerBag)
+	f.encodeBag(loggerBag)
 
 	// Entry's fields.
 	for i := range e.Fields {
@@ -213,7 +327,7 @@ func (f *jsonEncoder) encode(buf *Buffer, e Entry) error {
 	}
 
 	// Close open groups (from WithGroup in Bag chains).
-	for n := countGroups(e.Bag) + countGroups(e.LoggerBag); n > 0; n-- {
+	for n := countGroups(ctxBag) + countGroups(loggerBag); n > 0; n-- {
 		f.buf.AppendByte('}')
 	}
 
@@ -232,6 +346,26 @@ func countGroups(bag *Bag) int {
 		}
 	}
 	return n
+}
+
+// skipTrailingGroups strips consecutive group nodes from the tip of a
+// Bag chain. These groups have no fields after them and would produce
+// empty JSON objects.
+func skipTrailingGroups(bag *Bag) *Bag {
+	for bag != nil && bag.group != "" {
+		bag = bag.parent
+	}
+	return bag
+}
+
+// bagHasFields reports whether the Bag chain contains any field nodes.
+func bagHasFields(bag *Bag) bool {
+	for b := bag; b != nil; b = b.parent {
+		if len(b.fields) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *jsonEncoder) encodeBag(bag *Bag) {
@@ -332,6 +466,13 @@ func (f *jsonEncoder) EncodeFieldObject(k string, v ObjectEncoder) {
 }
 
 func (f *jsonEncoder) EncodeFieldGroup(k string, fs []Field) {
+	if k == "" {
+		// Inline group: emit fields at current level.
+		for _, field := range fs {
+			field.Accept(f)
+		}
+		return
+	}
 	f.addKey(k)
 	f.appendSeparator()
 	f.buf.AppendByte('{')

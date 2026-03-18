@@ -15,7 +15,7 @@ import (
 // Each call to WithAttrs allocates a new Bag automatically.
 //
 // The handler propagates context to [Handler.Handle],
-// so field bags attached via [With] are resolved by [NewContextWriter].
+// so field bags attached via [With] are resolved by [NewContextHandler].
 func NewSlogHandler(w Handler) slog.Handler {
 	return &slogHandler{w: w, addCaller: true}
 }
@@ -92,7 +92,7 @@ func (h *slogHandler) collectRecordFields(r slog.Record) []Field {
 
 	fields := make([]Field, 0, r.NumAttrs())
 	r.Attrs(func(a slog.Attr) bool {
-		if f := attrToField(a); f.Key != "" {
+		if f := attrToField(a); f.Key != "" || f.Type == FieldTypeGroup {
 			fields = append(fields, f)
 		}
 
@@ -163,7 +163,7 @@ func groupAttrToField(key string, attrs []slog.Attr) Field {
 func convertAttrs(attrs []slog.Attr) []Field {
 	fields := make([]Field, 0, len(attrs))
 	for _, a := range attrs {
-		if f := attrToField(a); f.Key != "" {
+		if f := attrToField(a); f.Key != "" || f.Type == FieldTypeGroup {
 			fields = append(fields, f)
 		}
 	}

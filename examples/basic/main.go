@@ -8,11 +8,7 @@ import (
 )
 
 func main() {
-	// The default channel writer writes to stdout using json encoder.
-	writer, writerClose := logf.NewChannelWriter.Default()
-	defer writerClose()
-
-	logger := logf.NewLogger(writer)
+	logger := logf.NewLogger().Build()
 
 	logger.Info(context.Background(), "got cpu info", logf.Int("count", runtime.NumCPU()))
 }

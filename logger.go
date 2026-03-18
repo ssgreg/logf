@@ -6,9 +6,10 @@ import (
 	"time"
 )
 
-// NewLogger returns a new Logger with the given Handler.
-// Level filtering is controlled by the writer's Enabled method.
-func NewLogger(w Handler) *Logger {
+// New returns a new Logger with the given Handler.
+// Level filtering is controlled by the handler's Enabled method.
+// For a builder-style API, use NewLogger() instead.
+func New(w Handler) *Logger {
 	return &Logger{
 		w:         w,
 		addCaller: true,
@@ -228,4 +229,4 @@ func FromContext(ctx context.Context) *Logger {
 
 type contextKeyLogger struct{}
 
-var defaultDisabledLogger = NewLogger(nopHandler{})
+var defaultDisabledLogger = New(nopHandler{})

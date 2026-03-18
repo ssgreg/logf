@@ -25,42 +25,42 @@ func TestEncoder(t *testing.T) {
 			Entry{
 				Text: "m",
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"m"}` + "\n",
+			`{"level":"error","msg":"m"}` + "\n",
 		},
 		{
 			"LevelDebug",
 			Entry{
 				Level: LevelDebug,
 			},
-			`{"level":"debug","ts":"0001-01-01T00:00:00Z","msg":""}` + "\n",
+			`{"level":"debug","msg":""}` + "\n",
 		},
 		{
 			"LevelInfo",
 			Entry{
 				Level: LevelInfo,
 			},
-			`{"level":"info","ts":"0001-01-01T00:00:00Z","msg":""}` + "\n",
+			`{"level":"info","msg":""}` + "\n",
 		},
 		{
 			"LevelWarn",
 			Entry{
 				Level: LevelWarn,
 			},
-			`{"level":"warn","ts":"0001-01-01T00:00:00Z","msg":""}` + "\n",
+			`{"level":"warn","msg":""}` + "\n",
 		},
 		{
 			"LevelError",
 			Entry{
 				Level: LevelError,
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":""}` + "\n",
+			`{"level":"error","msg":""}` + "\n",
 		},
 		{
 			"LoggerName",
 			Entry{
 				LoggerName: "logger.name",
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","logger":"logger.name","msg":""}` + "\n",
+			`{"level":"error","logger":"logger.name","msg":""}` + "\n",
 		},
 		{
 			"CallerPC",
@@ -79,7 +79,7 @@ func TestEncoder(t *testing.T) {
 					Float64("float64", 4.2), Float32("float32", 4.2),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bool":true,"int":42,"int64":42,"int32":42,"int16":42,"int8":42,"uint":42,"uint64":42,"uint32":42,"uint16":42,"uint8":42,"float64":4.2,"float32":4.199999809265137}` + "\n",
+			`{"level":"error","msg":"","bool":true,"int":42,"int64":42,"int32":42,"int16":42,"int8":42,"uint":42,"uint64":42,"uint32":42,"uint16":42,"uint8":42,"float64":4.2,"float32":4.199999809265137}` + "\n",
 		},
 		{
 			"FieldsSlices",
@@ -89,7 +89,7 @@ func TestEncoder(t *testing.T) {
 					Floats64("floats64", []float64{4.2}),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","ints":[42],"ints64":[42],"floats64":[4.2]}` + "\n",
+			`{"level":"error","msg":"","ints":[42],"ints64":[42],"floats64":[4.2]}` + "\n",
 		},
 		{
 			"FieldsDuration",
@@ -99,7 +99,7 @@ func TestEncoder(t *testing.T) {
 					Durations("durations", []time.Duration{time.Second}),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","duration":"1s","durations":["1s"]}` + "\n",
+			`{"level":"error","msg":"","duration":"1s","durations":["1s"]}` + "\n",
 		},
 		{
 			"FieldsTime",
@@ -108,7 +108,7 @@ func TestEncoder(t *testing.T) {
 					Time("time", time.Unix(320836234, 0).UTC()),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","time":"1980-03-02T09:10:34Z"}` + "\n",
+			`{"level":"error","msg":"","time":"1980-03-02T09:10:34Z"}` + "\n",
 		},
 		{
 			"FieldsArray",
@@ -117,7 +117,7 @@ func TestEncoder(t *testing.T) {
 					Array("array", &testArrayEncoder{}),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","array":[42]}` + "\n",
+			`{"level":"error","msg":"","array":[42]}` + "\n",
 		},
 		{
 			"FieldsObject",
@@ -126,7 +126,7 @@ func TestEncoder(t *testing.T) {
 					Object("object", &testObjectEncoder{}),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","object":{"username":"username","code":42}}` + "\n",
+			`{"level":"error","msg":"","object":{"username":"username","code":42}}` + "\n",
 		},
 		{
 			"FieldsInline",
@@ -136,7 +136,7 @@ func TestEncoder(t *testing.T) {
 					String("extra", "value"),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","username":"username","code":42,"extra":"value"}` + "\n",
+			`{"level":"error","msg":"","username":"username","code":42,"extra":"value"}` + "\n",
 		},
 		{
 			"FieldsError",
@@ -145,7 +145,7 @@ func TestEncoder(t *testing.T) {
 					Error(&verboseError{"short", "verbose"}),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","error":"short","error.verbose":"verbose"}` + "\n",
+			`{"level":"error","msg":"","error":"short","error.verbose":"verbose"}` + "\n",
 		},
 		{
 			"FieldsNilError",
@@ -154,7 +154,7 @@ func TestEncoder(t *testing.T) {
 					NamedError("error", nil),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","error":"<nil>"}` + "\n",
+			`{"level":"error","msg":"","error":"<nil>"}` + "\n",
 		},
 		{
 			"FieldsBytes",
@@ -163,7 +163,7 @@ func TestEncoder(t *testing.T) {
 					Bytes("bytes", []byte{0x42}),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","bytes":"Qg=="}` + "\n",
+			`{"level":"error","msg":"","bytes":"Qg=="}` + "\n",
 		},
 		{
 			"FieldsStrings",
@@ -172,7 +172,7 @@ func TestEncoder(t *testing.T) {
 					Strings("strings", []string{"a", "b"}),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","strings":["a","b"]}` + "\n",
+			`{"level":"error","msg":"","strings":["a","b"]}` + "\n",
 		},
 		{
 			"FieldsStringer",
@@ -181,7 +181,7 @@ func TestEncoder(t *testing.T) {
 					Stringer("stringer", time.Second),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","stringer":"1s"}` + "\n",
+			`{"level":"error","msg":"","stringer":"1s"}` + "\n",
 		},
 		{
 			"FieldsStringerAlt",
@@ -190,7 +190,7 @@ func TestEncoder(t *testing.T) {
 					Stringer("stringer", time.Second),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","stringer":"1s"}` + "\n",
+			`{"level":"error","msg":"","stringer":"1s"}` + "\n",
 		},
 		{
 			"FieldsNilStringer",
@@ -199,7 +199,7 @@ func TestEncoder(t *testing.T) {
 					Stringer("stringer", nil),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","stringer":"nil"}` + "\n",
+			`{"level":"error","msg":"","stringer":"nil"}` + "\n",
 		},
 		{
 			"FieldsFormatter",
@@ -208,7 +208,7 @@ func TestEncoder(t *testing.T) {
 					Formatter("fmt", "%d", 42),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","fmt":"42"}` + "\n",
+			`{"level":"error","msg":"","fmt":"42"}` + "\n",
 		},
 		{
 			"FieldsAny",
@@ -217,7 +217,7 @@ func TestEncoder(t *testing.T) {
 					Any("any", &struct{ Field string }{Field: "42"}),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","any":{"Field":"42"}}` + "\n",
+			`{"level":"error","msg":"","any":{"Field":"42"}}` + "\n",
 		},
 		{
 			"FieldsGroup",
@@ -226,7 +226,7 @@ func TestEncoder(t *testing.T) {
 					Group("request", String("id", "abc"), Int("status", 200)),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","request":{"id":"abc","status":200}}` + "\n",
+			`{"level":"error","msg":"","request":{"id":"abc","status":200}}` + "\n",
 		},
 		{
 			"FieldsGroupEmpty",
@@ -235,7 +235,7 @@ func TestEncoder(t *testing.T) {
 					Group("empty"),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","empty":{}}` + "\n",
+			`{"level":"error","msg":"","empty":{}}` + "\n",
 		},
 		{
 			"FieldsGroupNested",
@@ -244,7 +244,7 @@ func TestEncoder(t *testing.T) {
 					Group("outer", String("a", "1"), Group("inner", Int("b", 2))),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","outer":{"a":"1","inner":{"b":2}}}` + "\n",
+			`{"level":"error","msg":"","outer":{"a":"1","inner":{"b":2}}}` + "\n",
 		},
 		{
 			"FieldsLoggerBag",
@@ -253,7 +253,7 @@ func TestEncoder(t *testing.T) {
 					Int("int", 42),
 				),
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","int":42}` + "\n",
+			`{"level":"error","msg":"","int":42}` + "\n",
 		},
 		{
 			"FieldsLoggerBagFirst",
@@ -265,7 +265,7 @@ func TestEncoder(t *testing.T) {
 					String("string", "42"),
 				},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","int":42,"string":"42"}` + "\n",
+			`{"level":"error","msg":"","int":42,"string":"42"}` + "\n",
 		},
 		{
 			"WithGroup",
@@ -273,7 +273,7 @@ func TestEncoder(t *testing.T) {
 				LoggerBag: NewBag(String("a", "1")).WithGroup("http").With(String("method", "GET")),
 				Fields:    []Field{Int("status", 200)},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","a":"1","http":{"method":"GET","status":200}}` + "\n",
+			`{"level":"error","msg":"","a":"1","http":{"method":"GET","status":200}}` + "\n",
 		},
 		{
 			"WithGroupNested",
@@ -281,7 +281,7 @@ func TestEncoder(t *testing.T) {
 				LoggerBag: NewBag().WithGroup("http").WithGroup("request").With(String("path", "/api")),
 				Fields:    []Field{Int("status", 200)},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","http":{"request":{"path":"/api","status":200}}}` + "\n",
+			`{"level":"error","msg":"","http":{"request":{"path":"/api","status":200}}}` + "\n",
 		},
 		{
 			"WithGroupNoFields",
@@ -289,7 +289,7 @@ func TestEncoder(t *testing.T) {
 				LoggerBag: NewBag().WithGroup("http"),
 				Fields:    []Field{Int("status", 200)},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","http":{"status":200}}` + "\n",
+			`{"level":"error","msg":"","http":{"status":200}}` + "\n",
 		},
 		{
 			"WithGroupAndWith",
@@ -297,11 +297,32 @@ func TestEncoder(t *testing.T) {
 				LoggerBag: NewBag().WithGroup("http").With(String("method", "GET")).With(String("path", "/api")),
 				Fields:    []Field{Int("status", 200)},
 			},
-			`{"level":"error","ts":"0001-01-01T00:00:00Z","msg":"","http":{"method":"GET","path":"/api","status":200}}` + "\n",
+			`{"level":"error","msg":"","http":{"method":"GET","path":"/api","status":200}}` + "\n",
+		},
+		{
+			"WithGroupEmpty",
+			Entry{
+				LoggerBag: NewBag().WithGroup("http"),
+			},
+			`{"level":"error","msg":""}` + "\n",
+		},
+		{
+			"WithGroupNestedEmpty",
+			Entry{
+				LoggerBag: NewBag().WithGroup("http").WithGroup("request"),
+			},
+			`{"level":"error","msg":""}` + "\n",
+		},
+		{
+			"WithGroupPartiallyEmpty",
+			Entry{
+				LoggerBag: NewBag().WithGroup("http").With(String("host", "localhost")).WithGroup("request"),
+			},
+			`{"level":"error","msg":"","http":{"host":"localhost"}}` + "\n",
 		},
 	}
 
-	enc := NewJSONEncoder(JSONEncoderConfig{})
+	enc := JSON().Build()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -365,7 +386,7 @@ func TestEscapeStringBytes(t *testing.T) {
 }
 
 func TestEncodeFloatNaNInf(t *testing.T) {
-	enc := NewJSONEncoder(JSONEncoderConfig{})
+	enc := JSON().Build()
 
 	testCases := []struct {
 		name   string
@@ -401,11 +422,11 @@ func TestEncodeNoopEncoderFallback(t *testing.T) {
 	// No-op CallerEncoder: writes nothing.
 	noopCaller := func(pc uintptr, m TypeEncoder) {}
 
-	enc := NewJSONEncoder(JSONEncoderConfig{
-		EncodeLevel:  LevelEncoder(noopLevel),
-		EncodeTime:   TimeEncoder(noopTime),
-		EncodeCaller: CallerEncoder(noopCaller),
-	})
+	enc := JSON().
+		EncodeLevel(LevelEncoder(noopLevel)).
+		EncodeTime(TimeEncoder(noopTime)).
+		EncodeCaller(CallerEncoder(noopCaller)).
+		Build()
 
 	e := Entry{
 		Level:    LevelInfo,

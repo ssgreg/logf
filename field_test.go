@@ -197,8 +197,7 @@ func TestFieldInline(t *testing.T) {
 func TestFieldNilInline(t *testing.T) {
 	e := newTestFieldEncoder()
 	f := Inline(nil)
-	f.Accept(e)
-	assert.Empty(t, e.result)
+	assert.Panics(t, func() { f.Accept(e) })
 }
 
 func TestFieldNilObject(t *testing.T) {

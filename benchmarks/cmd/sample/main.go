@@ -41,10 +41,7 @@ func (u *benchUser) MarshalZerologObject(e *zerolog.Event) {
 // --- logf helpers ---
 
 func logfEnc() logf.Encoder {
-	return logf.NewJSONEncoder(logf.JSONEncoderConfig{
-		EncodeTime:     logf.RFC3339NanoTimeEncoder,
-		EncodeDuration: logf.NanoDurationEncoder,
-	})
+	return logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder).Build()
 }
 
 func logfPrint(label string, enc logf.Encoder, fields []logf.Field) {
