@@ -5,27 +5,55 @@
 [![Go Report Status](https://goreportcard.com/badge/github.com/ssgreg/logf)](https://goreportcard.com/report/github.com/ssgreg/logf)
 [![Coverage Status](https://codecov.io/gh/ssgreg/logf/branch/master/graph/badge.svg)](https://codecov.io/gh/ssgreg/logf)
 
-Async structured logging for Go. Fast, resilient, slog-compatible.
+Structured logging for Go — context-aware, slog-native, fast.
+
+## Features
+
+- **Context-aware fields** — `logf.With(ctx, fields...)` attaches fields to context, automatically included in every log entry
+- **Native slog bridge** — `logger.Slog()` returns a `*slog.Logger` sharing the same pipeline, fields, and name. Passes `testing/slogtest`
+- **Router** — multi-destination fan-out with per-output level filtering and encoder groups
+- **Async buffered I/O** — SlabWriter with pre-allocated slab pool, zero per-message allocations
+- **Builder API** — `logf.NewLogger().Level(logf.LevelInfo).Build()` for quick setup
+- **Zero-alloc hot path** — 0 allocs/op across all benchmarks
+
+## Quick Start
+
+```go
+// Minimal — JSON to stderr:
+logger := logf.NewLogger().Build()
+
+// Production — custom encoder, stdout:
+logger := logf.NewLogger().
+    Level(logf.LevelInfo).
+    Output(os.Stdout).
+    EncoderFrom(logf.JSON().TimeKey("time")).
+    Context().
+    Build()
+
+// slog backend:
+slogger := logger.Slog()
+```
 
 ## Why logf
 
 slog from the standard library is sufficient for most applications. logf targets
 scenarios where slog falls short:
 
-- **High-throughput logging (>100K logs/sec)** — logf's buffered file I/O is 2×
-  faster than slog (285 ns/op vs 518 ns/op) due to built-in write batching.
+- **High-throughput logging (>100K logs/sec)** — encoding is parallel across
+  goroutines (no global mutex), writes are memcpy into pre-allocated slabs
+  (~17 ns), and a background goroutine flushes large blocks. Result: 2× faster
+  than slog (285 ns/op vs 518 ns/op) under parallel file I/O.
 - **Unstable I/O / spike protection** — under simulated slow disk (2% of writes
   sleep 1ms), slog p99 = 2.5ms while logf p99 = 71µs. slog holds a mutex over
   the entire `Handle()` call (encode + write), causing cascading delays under
-  contention. logf's async channel decouples callers from I/O entirely.
+  contention. logf's slab pool decouples callers from I/O entirely.
 - **Request-scoped fields via context** — `logf.With(ctx, fields...)` attaches
   fields to `context.Context` that are automatically included in every log entry.
   Neither slog nor zap support this natively; they require passing a derived
   logger through the call stack.
-- **Decoupled encoding and I/O** — logf is the only Go logger where encoding
-  and writing are fully separated. This enables async writes, multiple encoders
-  per destination, and per-destination isolation in a single pipeline. The caller
-  goroutine encodes in parallel and never blocks on `write(fd)`.
+- **Decoupled encoding and I/O** — the Router encodes once per encoder group
+  and fans out to multiple writers. Each writer can be sync or async (SlabWriter)
+  independently. A stalled network destination does not block file writes.
 
 ## Design Philosophy
 
@@ -283,7 +311,7 @@ their application code.
 logger := slog.New(slog.NewJSONHandler(file, nil))
 
 // slog + logf backend — async, buffered, same API
-enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{})
+enc := logf.JSON().Build()
 sw := logf.NewSlabWriter(file, 64*1024, 8)
 defer sw.Close()
 h, close, _ := logf.NewRouter().
@@ -298,7 +326,13 @@ it is an infrastructure layer behind the standard one. Think of it as choosing
 nginx vs another HTTP server: the HTTP interface is the same, but the backend
 determines throughput, latency, and resilience.
 
-**Context-scoped fields** are a unique logf feature available through the slog handler.
+**`Logger.Slog()` produces a fully integrated `*slog.Logger`** — not a separate
+logger, but a view of the same pipeline. It inherits accumulated `.With()` fields,
+`.WithName()` identity, and the full Handler chain (Router, ContextHandler, etc.).
+Logging via slog and logf in the same request produces identical context fields,
+the same encoder, the same destination. There is no state divergence.
+
+**Context-scoped fields** work through the slog handler as well.
 Middleware can attach fields to `context.Context` via `logf.With(ctx, fields...)`,
 and the handler automatically includes them in every log entry — without passing
 a derived logger through the call stack. Neither zap nor standard slog support this.
