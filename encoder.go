@@ -109,3 +109,8 @@ type FieldEncoder interface {
 type TypeEncoderFactory interface {
 	TypeEncoder(*Buffer) TypeEncoder
 }
+
+// EncoderBuilder can build an Encoder. Implemented by JSONEncoderBuilder.
+type EncoderBuilder interface {
+	Build() Encoder
+}

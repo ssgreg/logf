@@ -274,7 +274,7 @@ tolerance, and simpler code (no consumer goroutine in the Router).
 ## slog Compatibility
 
 logf provides `logf.NewSlogHandler` — a drop-in `slog.Handler` implementation
-backed by logf's channel writer and encoder. This gives slog users the benefits
+backed by logf's Router and encoder. This gives slog users the benefits
 of async logging, buffered I/O, and context-scoped fields without changing
 their application code.
 
@@ -283,11 +283,14 @@ their application code.
 logger := slog.New(slog.NewJSONHandler(file, nil))
 
 // slog + logf backend — async, buffered, same API
-w, close := logf.NewChannelWriter(logf.ChannelWriterConfig{
-    Appender: logf.NewWriteAppender(file, logf.NewJSONEncoder(logf.JSONEncoderConfig{})),
-})
+enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{})
+sw := logf.NewSlabWriter(file, 64*1024, 8)
+defer sw.Close()
+h, close, _ := logf.NewRouter().
+    Route(enc, logf.Output(logf.LevelDebug, sw)).
+    Build()
 defer close()
-logger := slog.New(logf.NewSlogHandler(w, nil))
+logger := slog.New(logf.NewSlogHandler(h))
 ```
 
 The rest of the application code stays the same. logf is not another logging API —

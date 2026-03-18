@@ -54,19 +54,6 @@ func BenchmarkChannel(b *testing.B) {
 	<-done
 }
 
-// BenchmarkBufferedWriter measures throughput: producer → sync BufferedWriter → discard.
-func BenchmarkBufferedWriter(b *testing.B) {
-	bw, closeBW := NewBufferedWriter(discardWriter{}, WithBufSize(64*1024))
-
-	b.SetBytes(int64(len(msg)))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = bw.Write(msg)
-	}
-	b.StopTimer()
-	_ = closeBW()
-}
-
 // --- Parallel benchmarks: multiple producers → channel → writer ---
 
 // BenchmarkParallelSlabBufferSlowIO: N producers → channel → slab buffer → slow writer.
@@ -81,33 +68,6 @@ func BenchmarkParallelSlabBufferSlowIO(b *testing.B) {
 			_, _ = slab.Write(data)
 		}
 		_ = slab.Close()
-	}()
-
-	b.SetBytes(int64(len(msg)))
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			ch <- msg
-		}
-	})
-	b.StopTimer()
-	close(ch)
-	<-done
-	b.ReportMetric(float64(b.N)/float64(sw.writes), "msgs/write")
-}
-
-// BenchmarkParallelBufferedWriterSlowIO: N producers → channel → sync BufferedWriter 64KB → slow writer.
-func BenchmarkParallelBufferedWriterSlowIO(b *testing.B) {
-	sw := &slowWriter{delay: 100 * time.Microsecond}
-	bw, closeBW := NewBufferedWriter(sw, WithBufSize(64*1024))
-	ch := make(chan []byte, runtime.NumCPU()*2)
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for data := range ch {
-			_, _ = bw.Write(data)
-		}
-		_ = closeBW()
 	}()
 
 	b.SetBytes(int64(len(msg)))
@@ -174,30 +134,6 @@ func BenchmarkBurstSlabBuffer(b *testing.B) {
 	b.ReportMetric(float64(b.N)/float64(sw.writes), "msgs/write")
 }
 
-func BenchmarkBurstBufferedWriter(b *testing.B) {
-	sw := &slowWriter{delay: 10 * time.Microsecond, perByte: time.Nanosecond}
-	bw, closeBW := NewBufferedWriter(sw, WithBufSize(64*1024))
-	ch := make(chan []byte, 20)
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for data := range ch {
-			_, _ = bw.Write(data)
-		}
-		_ = closeBW()
-	}()
-
-	b.SetBytes(int64(len(msg)))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		ch <- msg
-	}
-	b.StopTimer()
-	close(ch)
-	<-done
-	b.ReportMetric(float64(b.N)/float64(sw.writes), "msgs/write")
-}
-
 // --- Real file I/O benchmarks ---
 
 func BenchmarkFileSlabBuffer(b *testing.B) {
@@ -216,36 +152,6 @@ func BenchmarkFileSlabBuffer(b *testing.B) {
 			_, _ = slab.Write(data)
 		}
 		_ = slab.Close()
-	}()
-
-	b.SetBytes(int64(len(msg)))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		ch <- msg
-	}
-	b.StopTimer()
-	close(ch)
-	<-done
-}
-
-func BenchmarkFileBufferedWriter(b *testing.B) {
-	f, err := os.CreateTemp("", "bench-bw-*")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-	bw, closeBW := NewBufferedWriter(f, WithBufSize(64*1024))
-	ch := make(chan []byte, 20)
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for data := range ch {
-			_, _ = bw.Write(data)
-		}
-		if err := closeBW(); err != nil {
-			b.Errorf("closeBW: %v", err)
-		}
 	}()
 
 	b.SetBytes(int64(len(msg)))
@@ -388,38 +294,6 @@ func BenchmarkParallelBurstConcurrentSlab(b *testing.B) {
 	b.ReportMetric(float64(b.N)/float64(sw.writes), "msgs/write")
 }
 
-// BenchmarkParallelBurstChannelBufferedWriter: N producers → channel → BufferedWriter → proportional slow writer.
-func BenchmarkParallelBurstChannelBufferedWriter(b *testing.B) {
-	sw := &slowWriter{delay: 10 * time.Microsecond, perByte: time.Nanosecond}
-	bw, closeBW := NewBufferedWriter(sw, WithBufSize(64*1024))
-	ch := make(chan []byte, runtime.NumCPU()*2)
-	if cap(ch) < 4 {
-		ch = make(chan []byte, 4)
-	}
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for data := range ch {
-			_, _ = bw.Write(data)
-		}
-		_ = closeBW()
-	}()
-
-	b.SetBytes(int64(len(msg)))
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			cp := make([]byte, len(msg))
-			copy(cp, msg)
-			ch <- cp
-		}
-	})
-	b.StopTimer()
-	close(ch)
-	<-done
-	b.ReportMetric(float64(b.N)/float64(sw.writes), "msgs/write")
-}
-
 // --- Parallel real file I/O benchmarks ---
 
 // BenchmarkParallelFileConcurrentSlab: N producers → concurrent slab → real file.
@@ -483,75 +357,6 @@ func BenchmarkParallelFileConcurrentSlabSmall(b *testing.B) {
 	})
 	b.StopTimer()
 	_ = slab.Close()
-}
-
-// BenchmarkParallelFileChannelBufferedWriter: N producers → channel → BufferedWriter → real file.
-func BenchmarkParallelFileChannelBufferedWriter(b *testing.B) {
-	f, err := os.CreateTemp("", "bench-pcbw-*")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-	bw, closeBW := NewBufferedWriter(f, WithBufSize(64*1024))
-	ch := make(chan []byte, runtime.NumCPU()*2)
-	if cap(ch) < 4 {
-		ch = make(chan []byte, 4)
-	}
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for data := range ch {
-			_, _ = bw.Write(data)
-		}
-		_ = closeBW()
-	}()
-
-	b.SetBytes(int64(len(msg)))
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			cp := make([]byte, len(msg))
-			copy(cp, msg)
-			ch <- cp
-		}
-	})
-	b.StopTimer()
-	close(ch)
-	<-done
-}
-
-// BenchmarkParallelFileChannelBufferedWriter1000: N producers → channel(1000) → BufferedWriter → real file.
-func BenchmarkParallelFileChannelBufferedWriter1000(b *testing.B) {
-	f, err := os.CreateTemp("", "bench-pcbw1k-*")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-	bw, closeBW := NewBufferedWriter(f, WithBufSize(64*1024))
-	ch := make(chan []byte, 1000)
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for data := range ch {
-			_, _ = bw.Write(data)
-		}
-		_ = closeBW()
-	}()
-
-	b.SetBytes(int64(len(msg)))
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			cp := make([]byte, len(msg))
-			copy(cp, msg)
-			ch <- cp
-		}
-	})
-	b.StopTimer()
-	close(ch)
-	<-done
 }
 
 // BenchmarkParallelFileChannelSlab: N producers → channel → slab → real file.

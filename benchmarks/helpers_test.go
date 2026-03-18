@@ -99,50 +99,33 @@ func logfSixHeavy() []logf.Field {
 // --- logf logger constructors ---
 
 func newLogfSync() *logf.Logger {
-	enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
-		EncodeTime:     logf.RFC3339NanoTimeEncoder,
-		EncodeDuration: logf.NanoDurationEncoder,
-	})
-	w := logf.NewWriter(logf.LevelDebug, io.Discard, enc)
-	return logf.NewLogger(w).WithCaller(false)
+	return logf.NewLogger().
+		Output(io.Discard).
+		EncoderFrom(logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder)).
+		Build().WithCaller(false)
 }
 
 func newLogfSyncInfo() *logf.Logger {
-	w := logf.NewWriter(logf.LevelInfo, io.Discard, logf.NewJSONEncoder(logf.JSONEncoderConfig{}))
-	return logf.NewLogger(w).WithCaller(false)
+	return logf.NewLogger().Level(logf.LevelInfo).Output(io.Discard).Build().WithCaller(false)
 }
 
 func newLogfSyncWithCaller() *logf.Logger {
-	w := logf.NewWriter(logf.LevelDebug, io.Discard, logf.NewJSONEncoder(logf.JSONEncoderConfig{}))
-	return logf.NewLogger(w).WithCaller(true)
-}
-
-func newLogfAsync() (*logf.Logger, logf.ChannelWriterCloseFunc) {
-	w, close := logf.NewChannelWriter(logf.LevelDebug, logf.ChannelWriterConfig{
-		Appender: logf.NewWriteAppender(io.Discard, logf.NewJSONEncoder(logf.JSONEncoderConfig{})),
-	})
-	return logf.NewLogger(w).WithCaller(false), close
+	return logf.NewLogger().Output(io.Discard).Build()
 }
 
 func newLogfRouter() (*logf.Logger, func()) {
-	enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
-		EncodeTime:     logf.RFC3339NanoTimeEncoder,
-		EncodeDuration: logf.NanoDurationEncoder,
-	})
+	enc := logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder).Build()
 	h, closeFn, err := logf.NewRouter().
 		Route(enc, logf.Output(logf.LevelDebug, io.Discard)).
 		Build()
 	if err != nil {
 		panic(err)
 	}
-	return logf.NewLogger(h).WithCaller(false), func() { closeFn() }
+	return logf.New(h).WithCaller(false), func() { closeFn() }
 }
 
 func newLogfRouterSlab() (*logf.Logger, func()) {
-	enc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
-		EncodeTime:     logf.RFC3339NanoTimeEncoder,
-		EncodeDuration: logf.NanoDurationEncoder,
-	})
+	enc := logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder).Build()
 	sw := logf.NewSlabWriter(io.Discard, 64*1024, 8)
 	h, closeFn, err := logf.NewRouter().
 		Route(enc, logf.Output(logf.LevelDebug, sw)).
@@ -150,7 +133,7 @@ func newLogfRouterSlab() (*logf.Logger, func()) {
 	if err != nil {
 		panic(err)
 	}
-	return logf.NewLogger(h).WithCaller(false), func() {
+	return logf.New(h).WithCaller(false), func() {
 		closeFn()
 		sw.Close()
 	}

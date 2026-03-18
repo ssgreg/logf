@@ -6,13 +6,16 @@ import (
 	"testing"
 )
 
-func benchLogger(lvl Level, addCaller bool) (*Logger, ChannelWriterCloseFunc) {
-	enc := NewJSONEncoder(JSONEncoderConfig{})
-	w, close := NewChannelWriter(lvl, ChannelWriterConfig{
-		Appender: NewWriteAppender(io.Discard, enc),
-	})
-	l := NewLogger(w).WithCaller(addCaller)
-	return l, close
+func benchLogger(lvl Level, addCaller bool) (*Logger, func() error) {
+	enc := JSON().Build()
+	h, closeFn, err := NewRouter().
+		Route(enc, Output(lvl, io.Discard)).
+		Build()
+	if err != nil {
+		panic(err)
+	}
+	l := New(h).WithCaller(addCaller)
+	return l, closeFn
 }
 
 func benchFields() []Field {
@@ -29,7 +32,7 @@ var benchCtx = context.Background()
 
 // Internal API benchmarks that require package-level access (package logf).
 // These test functionality not reachable from the external benchmarks/ package:
-//   - ContextWriter, FieldSource, With(ctx), FromContext, NewContext
+//   - ContextHandler, FieldSource, With(ctx), FromContext, NewContext
 //   - LogDepth (unexported-friendly caller depth)
 //   - Bag.With (context-based field accumulation)
 //
@@ -39,13 +42,16 @@ var benchCtx = context.Background()
 // --- Context bag ---
 
 func BenchmarkContextBag(b *testing.B) {
-	enc := NewJSONEncoder(JSONEncoderConfig{})
-	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
-		Appender: NewWriteAppender(io.Discard, enc),
-	})
-	defer close()
-	cw := NewContextWriter(w)
-	logger := NewLogger(cw)
+	enc := JSON().Build()
+	h, closeFn, err := NewRouter().
+		Route(enc, Output(LevelDebug, io.Discard)).
+		Build()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() { _ = closeFn() }()
+	cw := NewContextHandler(h)
+	logger := New(cw)
 
 	ctx := With(benchCtx, String("request_id", "abc-123"), String("user_id", "u42"))
 
@@ -60,11 +66,14 @@ func BenchmarkContextBag(b *testing.B) {
 type traceKeyBench struct{}
 
 func BenchmarkFieldSource(b *testing.B) {
-	enc := NewJSONEncoder(JSONEncoderConfig{})
-	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
-		Appender: NewWriteAppender(io.Discard, enc),
-	})
-	defer close()
+	enc := JSON().Build()
+	h, closeFn, err := NewRouter().
+		Route(enc, Output(LevelDebug, io.Discard)).
+		Build()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() { _ = closeFn() }()
 
 	src := FieldSource(func(ctx context.Context) []Field {
 		if v := ctx.Value(traceKeyBench{}); v != nil {
@@ -72,8 +81,8 @@ func BenchmarkFieldSource(b *testing.B) {
 		}
 		return nil
 	})
-	cw := NewContextWriter(w, src)
-	logger := NewLogger(cw)
+	cw := NewContextHandler(h, src)
+	logger := New(cw)
 
 	ctx := context.WithValue(benchCtx, traceKeyBench{}, "trace-abc")
 
@@ -97,8 +106,8 @@ func BenchmarkBagWith(b *testing.B) {
 // --- Logger.With ---
 
 func BenchmarkLoggerWith(b *testing.B) {
-	logger, close := benchLogger(LevelDebug, false)
-	defer close()
+	logger, closeFn := benchLogger(LevelDebug, false)
+	defer func() { _ = closeFn() }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -109,8 +118,8 @@ func BenchmarkLoggerWith(b *testing.B) {
 // --- LogDepth ---
 
 func BenchmarkLogDepth(b *testing.B) {
-	logger, close := benchLogger(LevelDebug, true)
-	defer close()
+	logger, closeFn := benchLogger(LevelDebug, true)
+	defer func() { _ = closeFn() }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -121,13 +130,16 @@ func BenchmarkLogDepth(b *testing.B) {
 // --- Realistic pipeline ---
 
 func BenchmarkRealisticPipeline(b *testing.B) {
-	enc := NewJSONEncoder(JSONEncoderConfig{})
-	w, close := NewChannelWriter(LevelDebug, ChannelWriterConfig{
-		Appender: NewWriteAppender(io.Discard, enc),
-	})
-	defer close()
-	cw := NewContextWriter(w)
-	logger := NewLogger(cw).WithCaller(true)
+	enc := JSON().Build()
+	h, closeFn, err := NewRouter().
+		Route(enc, Output(LevelDebug, io.Discard)).
+		Build()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() { _ = closeFn() }()
+	cw := NewContextHandler(h)
+	logger := New(cw).WithCaller(true)
 
 	ctx := With(benchCtx, String("request_id", "abc-123"))
 	ctx = NewContext(ctx, logger)

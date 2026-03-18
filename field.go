@@ -165,7 +165,7 @@ func Object(k string, v ObjectEncoder) Field {
 //	)
 //	// → {"msg":"request handled", "trace_id":"abc", "method":"GET", "status":200}
 func Inline(v ObjectEncoder) Field {
-	return Field{Type: FieldTypeInline, Any: v}
+	return Object("", v)
 }
 
 // Group returns a new Field that encodes the given fields as a nested
@@ -380,7 +380,6 @@ const (
 	// Interface-based (encoder callback in Any).
 	FieldTypeArray
 	FieldTypeObject
-	FieldTypeInline
 	FieldTypeGroup
 )
 
@@ -446,10 +445,10 @@ func (fd Field) Accept(v FieldEncoder) {
 	case FieldTypeArray:
 		v.EncodeFieldArray(fd.Key, fd.Any.(ArrayEncoder))
 	case FieldTypeObject:
-		v.EncodeFieldObject(fd.Key, fd.Any.(ObjectEncoder))
-	case FieldTypeInline:
-		if fd.Any != nil {
+		if fd.Key == "" {
 			_ = (fd.Any.(ObjectEncoder)).EncodeLogfObject(v)
+		} else {
+			v.EncodeFieldObject(fd.Key, fd.Any.(ObjectEncoder))
 		}
 	case FieldTypeGroup:
 		if fd.Any != nil {

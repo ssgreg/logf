@@ -1,7 +1,6 @@
 package logf
 
 import (
-	"context"
 	"io"
 	"os"
 	"syscall"
@@ -37,6 +36,7 @@ func WriterFromIO(w io.Writer) Writer {
 }
 
 type flusher interface{ Flush() error }
+type syncer interface{ Sync() error }
 
 type ioWriter struct {
 	io.Writer
@@ -72,7 +72,7 @@ func asSyncer(w io.Writer) syncer {
 	}
 	// Probe: if Sync fails with EINVAL or ENOTSUP the writer is bound
 	// to a special file (pipe, socket) that doesn't support fsync.
-	// Disable future syncs — same logic as NewWriteAppender.
+	// Disable future syncs.
 	if err := s.Sync(); err != nil {
 		if pathErr, ok := err.(*os.PathError); ok {
 			if errno, ok := pathErr.Err.(syscall.Errno); ok {
@@ -83,32 +83,4 @@ func asSyncer(w io.Writer) syncer {
 		}
 	}
 	return s
-}
-
-// NewWriter returns an Handler that encodes entries in the calling
-// goroutine. Encoding is fully parallel across goroutines — the Encoder
-// handles internal cloning and buffer pooling. The provided io.Writer
-// must be safe for concurrent use.
-func NewWriter(level Level, w io.Writer, enc Encoder) Handler {
-	return &pooledWriter{level: level, w: w, enc: enc}
-}
-
-type pooledWriter struct {
-	level Level
-	w     io.Writer
-	enc   Encoder
-}
-
-func (w *pooledWriter) Handle(_ context.Context, entry Entry) error {
-	buf, err := w.enc.Encode(entry)
-	if err != nil {
-		return err
-	}
-	_, err = w.w.Write(buf.Bytes())
-	buf.Free()
-	return err
-}
-
-func (w *pooledWriter) Enabled(_ context.Context, lvl Level) bool {
-	return w.level.Enabled(lvl)
 }

@@ -1,12 +1,15 @@
 package logf
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
 	"sync"
 	"testing"
+	"testing/slogtest"
 	"time"
 )
 
@@ -19,10 +22,7 @@ type entrySink struct {
 
 func newSink() *entrySink {
 	return &entrySink{
-		enc: NewJSONEncoder(JSONEncoderConfig{
-			DisableFieldTime:   true,
-			DisableFieldCaller: true,
-		}),
+		enc: JSON().DisableTime().DisableCaller().Build(),
 	}
 }
 
@@ -58,6 +58,37 @@ func (s *entrySink) lastJSON() string {
 type slogTestStringer struct{ s string }
 
 func (ts slogTestStringer) String() string { return ts.s }
+
+func TestSlogtest(t *testing.T) {
+	var buf bytes.Buffer
+	enc := JSON().
+		TimeKey("time").
+		MsgKey("msg").
+		LevelKey("level").
+		DisableCaller().
+		EncodeLevel(UpperCaseLevelEncoder).
+		Build()
+	h := NewSlogHandler(NewSyncHandler(LevelDebug, &buf, enc))
+
+	results := func() []map[string]any {
+		var ms []map[string]any
+		for _, line := range bytes.Split(buf.Bytes(), []byte("\n")) {
+			if len(line) == 0 {
+				continue
+			}
+			var m map[string]any
+			if err := json.Unmarshal(line, &m); err != nil {
+				t.Fatalf("unmarshal %q: %v", line, err)
+			}
+			ms = append(ms, m)
+		}
+		return ms
+	}
+
+	if err := slogtest.TestHandler(h, results); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestSlogHandlerJSON(t *testing.T) {
 	tests := []struct {
@@ -207,7 +238,7 @@ func TestSlogHandlerCaller(t *testing.T) {
 
 func TestSlogHandlerContext(t *testing.T) {
 	sink := newSink()
-	logger := slog.New(NewSlogHandler(NewContextWriter(sink)))
+	logger := slog.New(NewSlogHandler(NewContextHandler(sink)))
 
 	ctx := With(context.Background(), String("request_id", "abc-123"))
 	logger.InfoContext(ctx, "with-bag")

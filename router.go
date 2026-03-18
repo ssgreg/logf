@@ -61,19 +61,23 @@ func (b *RouterBuilder) Build() (Handler, func() error, error) {
 		if len(g.outputs) == 0 {
 			continue
 		}
+		if g.enc == nil {
+			return nil, nil, errors.New("logf: route has nil encoder")
+		}
 
 		eg := routerEncoderGroup{
 			enc:      g.enc,
-			minLevel: g.outputs[0].level,
+			broadestLevel: g.outputs[0].level,
 		}
 
 		for _, o := range g.outputs {
-			if o.level > eg.minLevel {
-				eg.minLevel = o.level
+			if o.level > eg.broadestLevel {
+				eg.broadestLevel = o.level
 			}
 			ro := &routerOutput{
-				level: o.level,
-				w:     o.w,
+				level:   o.level,
+				w:       o.w,
+				closeFn: o.closeFn,
 			}
 			eg.outputs = append(eg.outputs, ro)
 			r.allOutputs = append(r.allOutputs, ro)
@@ -82,11 +86,11 @@ func (b *RouterBuilder) Build() (Handler, func() error, error) {
 		r.groups = append(r.groups, eg)
 	}
 
-	// Compute global min level for fast Enabled check.
-	r.minLevel = r.groups[0].minLevel
+	// Compute the most permissive level across all groups for fast Enabled check.
+	r.broadestLevel = r.groups[0].broadestLevel
 	for _, g := range r.groups[1:] {
-		if g.minLevel > r.minLevel {
-			r.minLevel = g.minLevel
+		if g.broadestLevel > r.broadestLevel {
+			r.broadestLevel = g.broadestLevel
 		}
 	}
 
@@ -99,8 +103,9 @@ type encoderGroup struct {
 }
 
 type output struct {
-	level Level
-	w     Writer
+	level   Level
+	w       Writer
+	closeFn func() error // non-nil if the writer should be closed
 }
 
 // RouteOption configures a route within an encoder group.
@@ -125,28 +130,44 @@ func Output(level Level, w io.Writer) RouteOption {
 	}
 }
 
+// OutputCloser is like Output but the router's close function will call
+// Close on w after flushing. Use this to transfer ownership of a
+// SlabWriter (or any other resource) to the router:
+//
+//	sw := logf.NewSlabWriter(conn, 64*1024, 8)
+//	router, close, _ := logf.NewRouter().
+//	    Route(enc, logf.OutputCloser(logf.LevelDebug, sw)).
+//	    Build()
+//	defer close() // flushes and closes sw
+func OutputCloser(level Level, w io.WriteCloser) RouteOption {
+	return func(g *encoderGroup) {
+		g.outputs = append(g.outputs, output{level: level, w: WriterFromIO(w), closeFn: w.Close})
+	}
+}
+
 // router is the fan-out Handler built by RouterBuilder.
 type router struct {
 	groups     []routerEncoderGroup
 	allOutputs []*routerOutput
-	minLevel   Level
+	broadestLevel   Level
 	closed     sync.Once
 }
 
 type routerEncoderGroup struct {
 	enc      Encoder
 	outputs  []*routerOutput
-	minLevel Level
+	broadestLevel Level
 }
 
 // routerOutput writes directly from the caller goroutine.
 type routerOutput struct {
-	level Level
-	w     Writer
+	level   Level
+	w       Writer
+	closeFn func() error
 }
 
 func (r *router) Enabled(_ context.Context, lvl Level) bool {
-	return r.minLevel.Enabled(lvl)
+	return r.broadestLevel.Enabled(lvl)
 }
 
 func (r *router) Handle(_ context.Context, e Entry) error {
@@ -155,13 +176,14 @@ func (r *router) Handle(_ context.Context, e Entry) error {
 	for i := range r.groups {
 		g := &r.groups[i]
 
-		if !g.minLevel.Enabled(e.Level) {
+		if !g.broadestLevel.Enabled(e.Level) {
 			continue
 		}
 
 		buf, err := g.enc.Encode(e)
 		if err != nil {
-			return err
+			writeErr = errors.Join(writeErr, err)
+			continue
 		}
 		encoded := buf.Bytes()
 
@@ -187,6 +209,9 @@ func (r *router) close() error {
 		for _, o := range r.allOutputs {
 			err = errors.Join(err, o.w.Flush())
 			err = errors.Join(err, o.w.Sync())
+			if o.closeFn != nil {
+				err = errors.Join(err, o.closeFn())
+			}
 		}
 	})
 	return err
