@@ -192,7 +192,7 @@ func BenchmarkFileParallel_Logf_Slab64Kx4_Drop(b *testing.B) {
 	_ = closeFn()
 	_ = sw.Close()
 
-	b.ReportMetric(float64(sw.Dropped()), "drops")
+	b.ReportMetric(float64(sw.Stats().Dropped), "drops")
 }
 
 func BenchmarkFileParallel_Logf_Slab64Kx1(b *testing.B) {
@@ -258,5 +258,5 @@ func BenchmarkFileParallel_Logf_Slab64Kx2_Drop(b *testing.B) {
 	_ = closeFn()
 	_ = sw.Close()
 
-	b.ReportMetric(float64(sw.Dropped()), "drops")
+	b.ReportMetric(float64(sw.Stats().Dropped), "drops")
 }

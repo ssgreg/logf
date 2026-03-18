@@ -3,6 +3,7 @@ package logf
 import (
 	"os"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 )
@@ -416,3 +417,170 @@ func (w *slowWriter) Write(p []byte) (int, error) {
 }
 func (w *slowWriter) Flush() error { return nil }
 func (w *slowWriter) Sync() error  { return nil }
+
+// --- Fragmentation benchmarks ---
+
+// BenchmarkSlabBufferNoFragmentation: messages fit evenly into slabs (no wasted space).
+func BenchmarkSlabBufferNoFragmentation(b *testing.B) {
+	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	// 256 bytes fits 256 times into 64KB — zero fragmentation.
+	m := make([]byte, 256)
+
+	b.SetBytes(int64(len(m)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = slab.Write(m)
+	}
+	b.StopTimer()
+	_ = slab.Close()
+}
+
+// BenchmarkSlabBufferFragmentation50Pct: every message triggers early swap
+// because it doesn't fit in the remaining space (~50% slab utilization).
+func BenchmarkSlabBufferFragmentation50Pct(b *testing.B) {
+	// slabSize=512, msg=300 → first msg: 300 bytes written, 212 remain.
+	// second msg: 300 > 212 → early swap (212 bytes wasted = 41%).
+	// Repeated: every other write triggers a swap.
+	slab := NewSlabWriter(discardWriter{}, 512, 8)
+	m := make([]byte, 300)
+
+	b.SetBytes(int64(len(m)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = slab.Write(m)
+	}
+	b.StopTimer()
+	_ = slab.Close()
+}
+
+// BenchmarkSlabBufferFragmentationWorstCase: message = slabSize-1,
+// every write triggers early swap (only 1 byte used per slab on second write).
+func BenchmarkSlabBufferFragmentationWorstCase(b *testing.B) {
+	slabSize := 4096
+	slab := NewSlabWriter(discardWriter{}, slabSize, 8)
+	// msg = slabSize - 1: first write fills 4095, leaves 1 byte.
+	// second write: 4095 > 1 → early swap. ~50% utilization.
+	m := make([]byte, slabSize-1)
+
+	b.SetBytes(int64(len(m)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = slab.Write(m)
+	}
+	b.StopTimer()
+	_ = slab.Close()
+}
+
+// --- Parallel contention benchmarks (hot path stress) ---
+// These benchmarks use high goroutine counts to expose cache-line
+// bouncing and synchronization overhead invisible in single-threaded tests.
+
+// BenchmarkParallelConcurrentSlabDiscard20G: 20 goroutines → slab → discard.
+func BenchmarkParallelConcurrentSlabDiscard20G(b *testing.B) {
+	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+
+	b.SetBytes(int64(len(msg)))
+	b.SetParallelism(2) // GOMAXPROCS * 2 = ~20 goroutines on 10-core
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, _ = slab.Write(msg)
+		}
+	})
+	b.StopTimer()
+	_ = slab.Close()
+}
+
+// BenchmarkParallelConcurrentSlabTinySlab: N producers → tiny slab → discard.
+// Every Write triggers a slab swap (channel send + receive under mutex),
+// maximizing contention and exposing cache-line bouncing from atomic ops.
+func BenchmarkParallelConcurrentSlabTinySlab(b *testing.B) {
+	slab := NewSlabWriter(discardWriter{}, len(msg), 16) // slab = msg size
+
+	b.SetBytes(int64(len(msg)))
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, _ = slab.Write(msg)
+		}
+	})
+	b.StopTimer()
+	_ = slab.Close()
+}
+
+// BenchmarkParallelConcurrentSlabCachePressure: N producers → shared pool
+// work (simulates encoder) → slab → discard. The sync.Pool Get/Put and
+// buffer writes create cache pressure that amplifies atomic contention
+// inside slab.Write(). This is the pattern that caught the atomic.Int64
+// regression invisible in simpler benchmarks.
+func BenchmarkParallelConcurrentSlabCachePressure(b *testing.B) {
+	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	pool := &sync.Pool{New: func() any { b := make([]byte, 4096); return &b }}
+
+	b.SetBytes(int64(len(msg)))
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			bp := pool.Get().(*[]byte)
+			buf := *bp
+			copy(buf, msg) // simulate encode
+			_, _ = slab.Write(buf[:len(msg)])
+			pool.Put(bp)
+		}
+	})
+	b.StopTimer()
+	_ = slab.Close()
+}
+
+// BenchmarkParallelConcurrentSlabSlowIO20G: 20 goroutines → slab → slow writer.
+// Slow I/O increases mutex hold time in ioLoop, amplifying contention effects.
+func BenchmarkParallelConcurrentSlabSlowIO20G(b *testing.B) {
+	sw := &slowWriter{delay: 100 * time.Microsecond}
+	slab := NewSlabWriter(sw, 64*1024, 8)
+
+	b.SetBytes(int64(len(msg)))
+	b.SetParallelism(2)
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, _ = slab.Write(msg)
+		}
+	})
+	b.StopTimer()
+	_ = slab.Close()
+	b.ReportMetric(float64(b.N)/float64(sw.writes), "msgs/write")
+}
+
+// --- Oversized message benchmarks ---
+
+// BenchmarkSlabBufferOversized1Pct: 99% normal + 1% oversized messages.
+func BenchmarkSlabBufferOversized1Pct(b *testing.B) {
+	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	bigMsg := make([]byte, 128*1024) // 2× slabSize
+
+	b.SetBytes(int64(len(msg)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if i%100 == 0 {
+			_, _ = slab.Write(bigMsg)
+		} else {
+			_, _ = slab.Write(msg)
+		}
+	}
+	b.StopTimer()
+	_ = slab.Close()
+}
+
+// BenchmarkSlabBufferOversized100Pct: 100% oversized messages.
+func BenchmarkSlabBufferOversized100Pct(b *testing.B) {
+	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	bigMsg := make([]byte, 128*1024) // 2× slabSize
+
+	b.SetBytes(int64(len(bigMsg)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = slab.Write(bigMsg)
+	}
+	b.StopTimer()
+	_ = slab.Close()
+}
