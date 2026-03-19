@@ -1,9 +1,9 @@
 # logf
 
-[![GoDoc](https://godoc.org/github.com/ssgreg/logf?status.svg)](https://godoc.org/github.com/ssgreg/logf)
+[![Go Reference](https://pkg.go.dev/badge/github.com/ssgreg/logf/v2.svg)](https://pkg.go.dev/github.com/ssgreg/logf/v2)
 [![Build Status](https://github.com/ssgreg/logf/actions/workflows/go.yml/badge.svg)](https://github.com/ssgreg/logf/actions/workflows/go.yml)
-[![Go Report Status](https://goreportcard.com/badge/github.com/ssgreg/logf)](https://goreportcard.com/report/github.com/ssgreg/logf)
-[![Coverage Status](https://codecov.io/gh/ssgreg/logf/branch/master/graph/badge.svg)](https://codecov.io/gh/ssgreg/logf)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ssgreg/logf/v2)](https://goreportcard.com/report/github.com/ssgreg/logf/v2)
+[![codecov](https://codecov.io/gh/ssgreg/logf/branch/master/graph/badge.svg)](https://codecov.io/gh/ssgreg/logf)
 
 Structured logging for Go — context-aware, slog-native, fast.
 
