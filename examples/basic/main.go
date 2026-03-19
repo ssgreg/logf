@@ -11,6 +11,7 @@ import (
 
 func main() {
 	// Minimal setup: JSON to stderr, Debug level, caller enabled.
+	// For colored text output, use: logf.NewLogger().EncoderFrom(logf.Text()).Build()
 	logger := logf.NewLogger().Build()
 	ctx := context.Background()
 

@@ -107,6 +107,23 @@ func UpperCaseLevelEncoder(lvl Level, m TypeEncoder) {
 	m.EncodeTypeString(lvl.UpperCaseString())
 }
 
+// ShortTextLevelEncoder encodes Level as a 3-character uppercase string
+// (DBG, INF, WRN, ERR). Intended for text/console output.
+func ShortTextLevelEncoder(lvl Level, m TypeEncoder) {
+	switch lvl {
+	case LevelDebug:
+		m.EncodeTypeString("DBG")
+	case LevelInfo:
+		m.EncodeTypeString("INF")
+	case LevelWarn:
+		m.EncodeTypeString("WRN")
+	case LevelError:
+		m.EncodeTypeString("ERR")
+	default:
+		m.EncodeTypeString("UNK")
+	}
+}
+
 // NewMutableLevel creates an instance of MutableLevel with the given
 // starting level.
 func NewMutableLevel(l Level) *MutableLevel {

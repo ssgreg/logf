@@ -45,6 +45,12 @@ with the same key share one counter. Gives the user explicit control
 over what gets sampled together, unlike per-callsite (zap) or global
 counter (zerolog) approaches.
 
+### Test utilities (low)
+
+`logftest.NewHandler()` returning `(Handler, *Entries)` for capturing
+and asserting log output in tests. `DisabledLogger()` already works
+as a null logger. Add when users request it.
+
 ### Stack trace field (low)
 
 `Stack(key)` / `StackSkip(key, skip)` field constructor — capture current
