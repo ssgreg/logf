@@ -14,6 +14,7 @@ Structured logging for Go — context-aware, slog-native, fast.
 - **Router** — multi-destination fan-out with per-output level filtering and encoder groups
 - **Async buffered I/O** — SlabWriter with pre-allocated slab pool, zero per-message allocations
 - **WriterSlot** — placeholder writer for lazy destination initialization
+- **JSON and Text encoders** — `logf.JSON()` for production, `logf.Text()` for development (colored, human-readable)
 - **Builder API** — `logf.NewLogger().Level(logf.LevelInfo).Build()` for quick setup
 - **Zero-alloc hot path** — 0 allocs/op across all benchmarks
 
@@ -29,7 +30,11 @@ go get github.com/ssgreg/logf/v2
 // Minimal — JSON to stderr, debug level, caller enabled:
 logger := logf.NewLogger().Build()
 
-// Customized:
+// Development — colored text output:
+logger := logf.NewLogger().EncoderFrom(logf.Text()).Build()
+// Mar 19 14:04:02.167 [INF] request handled › method=GET status=200
+
+// Production — custom JSON encoder, stdout, context fields:
 logger := logf.NewLogger().
     Level(logf.LevelInfo).
     Output(os.Stdout).
@@ -279,17 +284,14 @@ outputs in that group. Different groups can use different formats:
 
 ```go
 jsonEnc := logf.JSON().Build()
-textEnc := logf.NewJSONEncoder(logf.JSONEncoderConfig{
-    FieldKeyTime: "time",
-    EncodeLevel:  logf.UpperCaseLevelEncoder,
-})
+textEnc := logf.Text().Build()
 
 router, close, _ := logf.NewRouter().
     Route(jsonEnc,
         logf.Output(logf.LevelDebug, fileSlab),     // JSON to file (async)
     ).
     Route(textEnc,
-        logf.Output(logf.LevelInfo, os.Stderr),     // text to console (sync)
+        logf.Output(logf.LevelInfo, os.Stderr),     // colored text to console (sync)
     ).
     Build()
 ```
@@ -409,6 +411,28 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for design details.
 ## Who uses logf
 
 - [Acronis](https://www.acronis.com) — global cybersecurity and data protection platform
+
+## Testing
+
+```go
+// Discard all logs (silent tests):
+logger := logf.DisabledLogger()
+
+// Capture logs to a buffer for assertions:
+var buf bytes.Buffer
+logger := logf.NewLogger().Output(&buf).Build()
+logger.Info(ctx, "hello")
+// buf.String() contains JSON output
+
+// Send logs to testing.T (visible with -v or on failure):
+type testWriter struct{ t testing.TB }
+func (w testWriter) Write(p []byte) (int, error) {
+    w.t.Helper()
+    w.t.Log(strings.TrimRight(string(p), "\n"))
+    return len(p), nil
+}
+logger := logf.NewLogger().Output(testWriter{t}).Build()
+```
 
 ## Log Rotation
 
