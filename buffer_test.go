@@ -124,3 +124,18 @@ func TestBufferAppendFunctions(t *testing.T) {
 	assert.Equal(t, []byte("true"), buf.Bytes())
 	buf.Reset()
 }
+
+func TestBufferTruncate(t *testing.T) {
+	buf := NewBufferWithCapacity(32)
+	buf.AppendString("hello world")
+	require.Equal(t, 11, buf.Len())
+
+	buf.Truncate(5)
+	assert.Equal(t, 5, buf.Len())
+	assert.Equal(t, "hello", buf.String())
+
+	// Truncate to zero.
+	buf.Truncate(0)
+	assert.Equal(t, 0, buf.Len())
+	assert.Equal(t, "", buf.String())
+}

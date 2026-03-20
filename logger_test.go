@@ -391,6 +391,39 @@ func TestNilContext(t *testing.T) {
 	assert.True(t, logger.Enabled(noCtx, LevelInfo))
 }
 
+func TestNopHandlerHandle(t *testing.T) {
+	h := nopHandler{}
+	err := h.Handle(context.Background(), Entry{Text: "should be discarded", Level: LevelError})
+	assert.NoError(t, err)
+	assert.False(t, h.Enabled(context.Background(), LevelError))
+}
+
+func TestLogDepth(t *testing.T) {
+	w := &testHandler{}
+	logger := New(w)
+
+	LogDepth(logger, ctx, 0, LevelError, "depth-test", String("k", "v"))
+
+	require.NotNil(t, w.Entry)
+	assert.Equal(t, "depth-test", w.Entry.Text)
+	assert.Equal(t, LevelError, w.Entry.Level)
+	require.Equal(t, 1, len(w.Entry.Fields))
+	assert.Equal(t, "k", w.Entry.Fields[0].Key)
+
+	// CallerPC should point to this test function.
+	assert.NotZero(t, w.Entry.CallerPC)
+	file, _ := callerFrame(w.Entry.CallerPC)
+	assert.Equal(t, "logf/logger_test.go", fileWithPackage(file))
+}
+
+func TestLogDepthFilteredByLevel(t *testing.T) {
+	w := newLeveledTestHandler(LevelError)
+	logger := New(w)
+
+	LogDepth(logger, ctx, 0, LevelDebug, "should-not-appear")
+	assert.Empty(t, w.Entries)
+}
+
 func TestContext(t *testing.T) {
 	// Check if no logger is associated with the Context — returns DisabledLogger.
 	assert.Equal(t, DisabledLogger(), FromContext(context.Background()))

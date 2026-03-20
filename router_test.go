@@ -293,6 +293,34 @@ func TestRouterAllDelivered(t *testing.T) {
 
 // --- Ordering ---
 
+// spyWriteCloser is a Writer + io.Closer for testing OutputCloser.
+type spyWriteCloser struct {
+	spyWriter
+	closeCalled bool
+}
+
+func (w *spyWriteCloser) Close() error {
+	w.closeCalled = true
+	return nil
+}
+
+func TestRouterOutputCloser(t *testing.T) {
+	spy := &spyWriteCloser{}
+	h, closeFn, err := NewRouter().
+		Route(&testEncoder{prefix: "J:"}, OutputCloser(LevelDebug, spy)).
+		Build()
+	require.NoError(t, err)
+
+	require.NoError(t, h.Handle(context.Background(), Entry{Text: "hello", Level: LevelInfo}))
+	err = closeFn()
+	require.NoError(t, err)
+
+	assert.Equal(t, "J:hello", spy.allData())
+	assert.True(t, spy.closeCalled, "Close should be called on the writer")
+	assert.Equal(t, 1, spy.flushCount())
+	assert.Equal(t, 1, spy.syncCount())
+}
+
 func TestRouterOrdering(t *testing.T) {
 	spy := &spyWriter{}
 	h, closeFn, err := NewRouter().

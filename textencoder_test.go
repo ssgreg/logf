@@ -369,3 +369,86 @@ func TestTextEncoder(t *testing.T) {
 		})
 	}
 }
+
+func TestTextEncoderBuilder(t *testing.T) {
+	enc := Text().NoColor().DisableTime().DisableLevel().DisableMsg().DisableName().DisableCaller().Build()
+	require.NotNil(t, enc)
+
+	e := Entry{
+		Text:       "hello",
+		Level:      LevelInfo,
+		LoggerName: "test",
+		Fields:     []Field{String("k", "v")},
+	}
+	b, err := enc.Encode(e)
+	require.NoError(t, err)
+	got := b.String()
+	b.Free()
+
+	// All standard fields disabled, only entry fields should appear.
+	assert.NotContains(t, got, "[INF]")
+	assert.NotContains(t, got, "hello")
+	assert.NotContains(t, got, "test:")
+	assert.Contains(t, got, "k=v")
+}
+
+func TestTextEncoderBuilderDefaults(t *testing.T) {
+	// Build with no options — should produce valid output with color.
+	enc := Text().Build()
+	b, err := enc.Encode(Entry{Text: "msg", Level: LevelWarn})
+	require.NoError(t, err)
+	got := b.String()
+	b.Free()
+
+	assert.Contains(t, got, "WRN")
+	assert.Contains(t, got, "msg")
+	assert.Contains(t, got, "\x1b[") // ANSI codes present
+}
+
+func TestTextEncoderBuilderCustomEncoders(t *testing.T) {
+	customTime := func(t time.Time, te TypeEncoder) {
+		te.EncodeTypeString("CUSTOM_TIME")
+	}
+	customDuration := func(d time.Duration, te TypeEncoder) {
+		te.EncodeTypeString("CUSTOM_DUR")
+	}
+	customLevel := func(l Level, te TypeEncoder) {
+		te.EncodeTypeString("LVL")
+	}
+	customCaller := func(pc uintptr, te TypeEncoder) {
+		te.EncodeTypeString("CUSTOM_CALLER")
+	}
+	customError := func(k string, err error, fe FieldEncoder) {
+		fe.EncodeFieldString(k, "CUSTOM_ERR:"+err.Error())
+	}
+
+	enc := Text().
+		NoColor().
+		EncodeTime(customTime).
+		EncodeDuration(customDuration).
+		EncodeLevel(customLevel).
+		EncodeCaller(customCaller).
+		EncodeError(customError).
+		Build()
+
+	e := Entry{
+		Text:     "test",
+		Level:    LevelError,
+		Time:     time.Now(),
+		CallerPC: CallerPC(0),
+		Fields: []Field{
+			Duration("d", time.Second),
+			NamedError("err", &verboseError{"oops", "detail"}),
+		},
+	}
+	b, err := enc.Encode(e)
+	require.NoError(t, err)
+	got := b.String()
+	b.Free()
+
+	assert.Contains(t, got, "CUSTOM_TIME")
+	assert.Contains(t, got, "LVL")
+	assert.Contains(t, got, "CUSTOM_DUR")
+	assert.Contains(t, got, "CUSTOM_CALLER")
+	assert.Contains(t, got, "CUSTOM_ERR:oops")
+}
