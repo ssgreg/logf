@@ -1,4 +1,4 @@
-# logf
+# › logf
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/ssgreg/logf/v2.svg)](https://pkg.go.dev/github.com/ssgreg/logf/v2)
 [![Build Status](https://github.com/ssgreg/logf/actions/workflows/go.yml/badge.svg)](https://github.com/ssgreg/logf/actions/workflows/go.yml)
@@ -7,48 +7,68 @@
 
 Structured logging for Go — context-aware, slog-native, fast.
 
-## Features
+## So you want to log things
 
-- **Context-aware fields** — `logf.With(ctx, fields...)` attaches fields to context, automatically included in every log entry
-- **Native slog bridge** — `logger.Slog()` returns a `*slog.Logger` sharing the same pipeline, fields, and name. Passes `testing/slogtest`
-- **Router** — multi-destination fan-out with per-output level filtering and encoder groups
-- **Async buffered I/O** — SlabWriter with pre-allocated slab pool, zero per-message allocations
-- **WriterSlot** — placeholder writer for lazy destination initialization
-- **JSON and Text encoders** — `logf.JSON()` for production, `logf.Text()` for development (colored, human-readable)
-- **Builder API** — `logf.NewLogger().Level(logf.LevelInfo).Build()` for quick setup
-- **Zero-alloc hot path** — 0 allocs/op across all benchmarks
+You already have `slog`. It works. It's in the standard library. Why would
+you need anything else?
 
-## Installation
+Well, most of the time you don't. But then one day your service starts
+handling 50K requests per second and you notice something funny: your
+p99 latency spikes every time the log collector hiccups. Or you realize
+that passing a logger through seventeen function arguments just to get
+a `request_id` in your database layer is... not great.
+
+That's where logf comes in. Think of it as slog's cool older sibling who
+went to systems programming school and came back with opinions about
+memory allocation.
+
+## What's in the box
+
+- **Context-aware fields** — attach fields to `context.Context`, they show up in every log entry magically. No more threading loggers through your entire call stack like some kind of dependency injection nightmare.
+- **Native slog bridge** — `logger.Slog()` gives you a real `*slog.Logger` that shares everything. Fields, name, pipeline. It's not a wrapper, it's the same logger wearing a different hat.
+- **Router** — send logs to multiple destinations. JSON to file, colored text to console, errors to alerting. Each destination gets its own encoder and level filter. A stalled Kibana doesn't block your stderr.
+- **SlabWriter** — async buffered I/O that copies your log into a pre-allocated slab in ~17 ns and moves on. A background goroutine handles the actual writing. Your HTTP handler never waits for disk.
+- **WriterSlot** — don't know where you're logging to yet? No problem. Start logging, connect the destination later. Early logs are buffered.
+- **JSON and Text encoders** — `logf.JSON()` for machines, `logf.Text()` for humans. The text encoder has colors, italics, and a `›` separator that makes your terminal look like it went to design school.
+- **Builder API** — one line to start, chain methods to customize. No config structs with 47 fields.
+- **Zero-alloc hot path** — the only allocation is Go's variadic `[]Field` slice. Everything else is pooled, pre-allocated, or stack-allocated.
+
+## Getting started
 
 ```bash
 go get github.com/ssgreg/logf/v2
 ```
 
-## Quick Start
+Two lines to logging:
 
 ```go
-// Minimal — JSON to stderr, debug level, caller enabled:
 logger := logf.NewLogger().Build()
+logger.Info(ctx, "hello, world", logf.String("from", "logf"))
+// → {"level":"info","ts":"2026-03-19T14:04:02Z","caller":"main.go:10","msg":"hello, world","from":"logf"}
+```
 
-// Development — colored text output:
+Want colors? Say no more:
+
+```go
 logger := logf.NewLogger().EncoderFrom(logf.Text()).Build()
-// Mar 19 14:04:02.167 [INF] request handled › method=GET status=200
+// Mar 19 14:04:02.167 [INF] hello, world › from=logf → main.go:10
+```
 
-// Production — custom JSON encoder, stdout, context fields:
+Going to production? Crank it up:
+
+```go
 logger := logf.NewLogger().
     Level(logf.LevelInfo).
     Output(os.Stdout).
-    EncoderFrom(logf.JSON().TimeKey("time")).
-    Context().
     Build()
 ```
 
-## Logging
+## Logging (the fun part)
 
 ```go
 ctx := context.Background()
 
-// Basic levels:
+// The classics:
 logger.Debug(ctx, "starting up")
 // → {"level":"debug","msg":"starting up"}
 
@@ -60,36 +80,51 @@ logger.Warn(ctx, "slow query", logf.Duration("elapsed", 2*time.Second))
 
 logger.Error(ctx, "connection failed", logf.Error(err))
 // → {"level":"error","msg":"connection failed","error":"dial tcp: timeout"}
+```
 
-// Accumulated fields (carried on every subsequent log):
+**Accumulated fields** — set once, included forever:
+
+```go
 reqLogger := logger.With(logf.String("request_id", "abc-123"))
 reqLogger.Info(ctx, "processing")
 // → {"level":"info","msg":"processing","request_id":"abc-123"}
 
-// Groups (nested JSON objects):
+reqLogger.Info(ctx, "done", logf.Int("items", 3))
+// → {"level":"info","msg":"done","request_id":"abc-123","items":3}
+```
+
+**Groups** — nest fields under a key:
+
+```go
 logger.Info(ctx, "done", logf.Group("http",
     logf.String("method", "GET"),
     logf.Int("status", 200),
 ))
 // → {"msg":"done","http":{"method":"GET","status":200}}
 
-// WithGroup — all subsequent fields nested under a key:
+// Or permanently with WithGroup:
 httpLogger := logger.WithGroup("http")
 httpLogger.Info(ctx, "req", logf.String("method", "GET"), logf.Int("status", 200))
 // → {"msg":"req","http":{"method":"GET","status":200}}
-
-// Named logger:
-dbLogger := logger.WithName("db")
-dbLogger.Info(ctx, "query")  // → {"logger":"db","msg":"query"}
 ```
 
-## Context-aware Fields
-
-Attach fields to `context.Context` — they appear in every log entry
-automatically, without passing a derived logger through the call stack.
+**Named loggers** — know who's talking:
 
 ```go
-// Middleware adds request fields to context:
+dbLogger := logger.WithName("db")
+dbLogger.Info(ctx, "connected")
+// → {"logger":"db","msg":"connected"}
+```
+
+## Context-aware fields
+
+Here's the thing about logging in real applications: you want `request_id`
+in every single log entry. With most loggers, that means passing a derived
+logger through every function. With logf, you put fields in the context
+and forget about them:
+
+```go
+// In your middleware — add fields once:
 func middleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         ctx := logf.With(r.Context(),
@@ -101,26 +136,25 @@ func middleware(next http.Handler) http.Handler {
     })
 }
 
-// Deep in the call stack — fields are included automatically:
+// Somewhere deep in the call stack — fields are just there:
 func handleOrder(ctx context.Context, orderID string) {
     logger.Info(ctx, "processing order", logf.String("order_id", orderID))
     // → {"msg":"processing order","request_id":"abc","method":"POST","path":"/orders","order_id":"123"}
 }
 ```
 
-Enable with `.Context()` in the builder, or wrap with `NewContextHandler`:
+Enable it with `.Context()` in the builder:
 
 ```go
-// Builder:
 logger := logf.NewLogger().Context().Build()
+```
 
-// Manual (for Router pipelines):
-handler := logf.NewContextHandler(router)
+Want to automatically extract trace IDs from OpenTelemetry spans?
+Write a `FieldSource` and pass it to `.Context()`:
 
-// With external field sources (e.g., OTel trace IDs).
-// The FieldSource function is called on every log entry — trace_id
-// appears automatically in all logs without any manual field passing:
-handler := logf.NewContextHandler(router, func(ctx context.Context) []logf.Field {
+```go
+// Define once:
+func otelTraceSource(ctx context.Context) []logf.Field {
     span := trace.SpanFromContext(ctx)
     if !span.SpanContext().IsValid() {
         return nil
@@ -128,176 +162,128 @@ handler := logf.NewContextHandler(router, func(ctx context.Context) []logf.Field
     return []logf.Field{
         logf.String("trace_id", span.SpanContext().TraceID().String()),
     }
-})
-// Now every logger.Info(ctx, "...") includes trace_id if the context
-// carries an active span — zero changes to application logging code.
+}
+
+// Plug it in:
+logger := logf.NewLogger().Context(otelTraceSource).Build()
 ```
 
-## logfc — Logger in Context
+That's it. From now on, whenever a context carries an active OTel span,
+`trace_id` shows up in every log entry. You didn't change a single
+logging call in your application.
 
-The `logfc` package stores the logger in `context.Context` and provides
-top-level logging functions. No need to pass `*logf.Logger` through
-function arguments:
+## logfc — when you don't want to pass the logger at all
+
+The `logfc` package puts the logger in the context. Not a global
+singleton — a real logger that picks up new fields as the request
+travels deeper through your code. Each layer adds its own details,
+and by the time you log something ten functions down, the entry
+carries the full story of how it got there:
 
 ```go
 import "github.com/ssgreg/logf/v2/logfc"
 
-// Store logger in context (typically in main or middleware):
+// In main or middleware:
 ctx = logfc.New(ctx, logger)
 
-// Log from anywhere — just pass ctx:
+// Anywhere else — no logger argument needed:
 logfc.Info(ctx, "order processed", logf.Int("items", 3))
-// → {"level":"info",..,"msg":"order processed","items":3}
 
-// Derive logger in context (adds fields for all downstream logs):
+// Add fields for everything downstream:
 ctx = logfc.With(ctx, logf.String("order_id", "ord-789"))
 logfc.Info(ctx, "payment complete")
-// → {"level":"info",..,"msg":"payment complete","order_id":"ord-789"}
+// → includes order_id automatically
 
-// Get the underlying logger when needed:
+// Need slog? Pull it out:
 slogger := logfc.Get(ctx).Slog()
 ```
 
-If no logger is in context, `logfc` uses `DisabledLogger` — all calls
-are no-ops with zero overhead.
+If no logger is in context, everything is a no-op. Zero overhead. No panics.
 
-## slog Integration
+## slog integration (they're best friends)
 
-`logger.Slog()` produces a fully integrated `*slog.Logger` — not a separate
-logger, but a view of the same pipeline. It inherits accumulated `.With()`
-fields, `.WithName()` identity, and the full Handler chain.
+`logger.Slog()` doesn't create a new logger. It returns a `*slog.Logger`
+that IS your logf logger, just with slog's API. Same fields, same name,
+same pipeline, same destination. Log with either one — the output is
+identical.
 
 ```go
-// logf logger with context support:
-logger := logf.NewLogger().Level(logf.LevelInfo).Context().Build()
-
-// Derive slog logger — same pipeline, same fields:
-slogger := logger.Slog()
-
-// Pre-accumulated fields carry over:
-dbLogger := logger.WithName("db").With(logf.String("component", "postgres"))
-dbSlog := dbLogger.Slog()
-dbSlog.Info("connected")
-// → {"logger":"db","msg":"connected","component":"postgres"}
+// These two produce the same output:
+logger.Info(ctx, "hello", logf.Int("n", 42))
+logger.Slog().InfoContext(ctx, "hello", "n", 42)
 ```
 
-### Third-party libraries
-
-Many libraries accept `*slog.Logger`. Pass `logger.Slog()` — they
-get the same encoder, destination, and async I/O as your application code:
+**Give it to your dependencies:**
 
 ```go
-// Give libraries a slog logger derived from your logf pipeline:
 db := sqlx.NewClient(sqlx.WithLogger(logger.Slog()))
 cache := redis.NewClient(redis.WithLogger(logger.Slog()))
-
-// Their logs go through your Router, SlabWriter, and encoder.
-// No separate log configuration per dependency.
+// Their logs go through YOUR pipeline. One config to rule them all.
 ```
 
-### logf solves slog's context problem
-
-`slog.InfoContext(ctx, ...)` accepts a context, but the built-in
-`slog.JSONHandler` and `slog.TextHandler` ignore it — the context
-is passed through but never used. logf's `ContextHandler` actually
-reads fields from it. This means `slog.InfoContext(ctx, "msg")`
-produces richer output through logf than through standard slog:
+**Here's the neat part** — slog has `InfoContext(ctx, ...)` but the
+built-in handlers completely ignore the context. logf actually reads
+fields from it:
 
 ```go
-// Standard slog — context is ignored:
+// Standard slog — context is decoration:
 slog.InfoContext(ctx, "order placed")
 // → {"msg":"order placed"}
 
-// slog through logf — context fields (see Context-aware Fields above) included:
+// slog through logf — context fields included:
 slog.InfoContext(ctx, "order placed")
 // → {"msg":"order placed","request_id":"abc-123","trace_id":"def-456"}
 ```
 
-No special slog middleware, no slog-context packages. Just
-`ContextHandler` in the pipeline.
-
-### Progressive enhancement
-
-Start with pure slog and add logf features incrementally —
-each step is independent, no big-bang migration:
+**Progressive enhancement** — start with slog, add logf features one at a time:
 
 ```go
-// Step 1: faster slog backend
+// Step 1: just a faster backend — JSON to stderr
+sync := logf.NewSyncHandler(logf.LevelInfo, os.Stderr, logf.JSON().Build())
+slog.SetDefault(slog.New(logf.NewSlogHandler(sync)))
+
+// Step 2: add context fields — existing slog calls magically gain request_id
 slog.SetDefault(slog.New(logf.NewSlogHandler(
-    logf.NewSyncHandler(logf.LevelInfo, os.Stderr, logf.JSON().Build()),
+    logf.NewContextHandler(sync),
 )))
 
-// Step 2: add context fields (existing slog calls gain request_id etc.)
-slog.SetDefault(slog.New(logf.NewSlogHandler(
-    logf.NewContextHandler(syncHandler),
-)))
-
-// Step 3: add async I/O for throughput
-slog.SetDefault(slog.New(logf.NewSlogHandler(
-    logf.NewContextHandler(router), // router → SlabWriter → file
-)))
+// Step 3: add async I/O — swap stderr for SlabWriter → file
+sw := logf.NewSlabWriter(file, 64*1024, 8)
+router, close, _ := logf.NewRouter().Route(logf.JSON().Build(), logf.Output(logf.LevelInfo, sw)).Build()
+slog.SetDefault(slog.New(logf.NewSlogHandler(logf.NewContextHandler(router))))
 
 // Step 4 (optional): switch hot paths to logf for typed fields
-logger := logf.New(handler)
+logger := logf.New(logf.NewContextHandler(router))
 logger.Info(ctx, "fast path", logf.Int("status", 200))
 ```
 
-### Mixed codebase
+## Router (the traffic cop)
 
-logf and slog can coexist in the same application. Both produce
-consistent output through the same pipeline:
-
-```go
-logger := logf.NewLogger().Level(logf.LevelInfo).Context().Build()
-
-// logf in your code:
-logger.Info(ctx, "handled", logf.Int("status", 200))
-
-// slog in a dependency:
-slogger := logger.Slog()
-slogger.InfoContext(ctx, "query executed", "rows", 42)
-
-// Both outputs include the same context fields (request_id, trace_id)
-// and go through the same encoder, router, and destination.
-```
-
-## Router (multi-destination)
-
-Route log entries to multiple destinations with independent encoders,
-level filters, and I/O strategies.
+One log entry, multiple destinations, each with its own rules:
 
 ```go
-enc := logf.JSON().Build()
-
-// Same encoder, different levels per output:
-router, close, _ := logf.NewRouter().
-    Route(enc,
-        logf.Output(logf.LevelDebug, fileWriter),   // all levels to file
-        logf.Output(logf.LevelError, alertWriter),   // errors only to alerting
-    ).
-    Build()
-defer close()
-```
-
-**Multiple encoder groups** — one Encode call per group, shared across
-outputs in that group. Different groups can use different formats:
-
-```go
+fileSlab := logf.NewSlabWriter(file, 64*1024, 8)
 jsonEnc := logf.JSON().Build()
 textEnc := logf.Text().Build()
 
 router, close, _ := logf.NewRouter().
     Route(jsonEnc,
-        logf.Output(logf.LevelDebug, fileSlab),     // JSON to file (async)
+        logf.OutputCloser(logf.LevelDebug, fileSlab), // everything to file (async)
+        logf.Output(logf.LevelError, alertWriter),    // errors to alerting
     ).
     Route(textEnc,
-        logf.Output(logf.LevelInfo, os.Stderr),     // colored text to console (sync)
+        logf.Output(logf.LevelInfo, os.Stderr),       // colored text to console (sync)
     ).
     Build()
+defer close() // flushes and closes fileSlab
 ```
 
-**Mixed sync/async** — direct write for console, SlabWriter for file.
-A stalled file does not block stderr output:
+The Router encodes once per encoder group. Two outputs sharing the same
+encoder? One encode call. Stalled network destination? The file output
+doesn't care — each writer is independent.
+
+**Mix sync and async** — because console output should be instant but
+file writes can be batched:
 
 ```go
 fileSlab := logf.NewSlabWriter(file, 64*1024, 8,
@@ -306,107 +292,88 @@ fileSlab := logf.NewSlabWriter(file, 64*1024, 8,
 
 router, close, _ := logf.NewRouter().
     Route(enc,
-        logf.Output(logf.LevelDebug, fileSlab),     // async to file
-        logf.Output(logf.LevelInfo, os.Stderr),     // sync to console
-    ).
-    Build()
-defer close()
-defer fileSlab.Close()
-
-// Or transfer SlabWriter ownership to Router with OutputCloser:
-router, close, _ := logf.NewRouter().
-    Route(enc,
-        logf.OutputCloser(logf.LevelDebug, fileSlab), // Router.close() closes fileSlab
-        logf.Output(logf.LevelInfo, os.Stderr),
+        logf.OutputCloser(logf.LevelDebug, fileSlab), // async, Router closes it
+        logf.Output(logf.LevelInfo, os.Stderr),       // sync, direct write
     ).
     Build()
 defer close() // flushes and closes fileSlab automatically
 ```
 
-## SlabWriter (async buffered I/O)
+## SlabWriter (the speed demon)
 
-Decouples the caller from I/O with pre-allocated slab buffers:
+Here's how it works: your goroutine copies log bytes into a pre-allocated
+slab buffer under a mutex (~17 ns memcpy). A background goroutine writes
+filled slabs to the destination. Your goroutine never touches the disk.
+Never blocks on the network. Just copies bytes and moves on.
 
 ```go
 sw := logf.NewSlabWriter(file, 64*1024, 8,
     logf.WithFlushInterval(100*time.Millisecond),
 )
 defer sw.Close()
-
-router, close, _ := logf.NewRouter().
-    Route(enc, logf.Output(logf.LevelDebug, sw)).
-    Build()
 ```
 
-- Caller pays ~17 ns (mutex + memcpy), never blocks on I/O
-- Slab pool absorbs I/O spikes without dropping messages
-- Message integrity: each message is fully delivered or fully dropped, never torn
+When the I/O goroutine can't keep up? The slab pool absorbs the spike.
+8 slabs × 64 KB = 512 KB of burst tolerance. At 10K msg/sec with
+256-byte messages, that's ~200 ms of I/O stall with zero caller impact.
 
-**Drop mode** — for destinations where dropping is better than blocking
-(e.g., metrics pipeline, non-critical remote collector):
+**Drop mode** — for when losing a log is better than blocking a request:
 
 ```go
 sw := logf.NewSlabWriter(conn, 64*1024, 8,
     logf.WithDropOnFull(),
     logf.WithFlushInterval(100*time.Millisecond),
-    logf.WithErrorWriter(os.Stderr), // log I/O errors to stderr
+    logf.WithErrorWriter(os.Stderr),
 )
 ```
 
-When the I/O goroutine can't keep up and all slabs are in flight,
-`Write` discards the current slab instead of blocking. The caller
-is never delayed — the slab is reused immediately.
-
-**Monitoring** — `Stats()` provides a snapshot for metrics scrapers:
+**Keep an eye on it:**
 
 ```go
 stats := sw.Stats()
+// stats.Dropped      — messages lost (dropOnFull mode)
+// stats.Written      — messages accepted
 // stats.QueuedSlabs  — slabs waiting for I/O
-// stats.FreeSlabs    — slabs available in pool
-// stats.Dropped      — total messages dropped (dropOnFull mode)
-// stats.Written      — total messages accepted
-// stats.WriteErrors  — total I/O errors
-
-// Example: expose as Prometheus metrics
-droppedGauge.Set(float64(stats.Dropped))
-queuedGauge.Set(float64(stats.QueuedSlabs))
+// stats.WriteErrors  — I/O failures
 ```
 
-See [docs/BUFFERING.md](docs/BUFFERING.md) for capacity planning and benchmarks.
+See [docs/BUFFERING.md](docs/BUFFERING.md) for capacity planning.
 
-## WriterSlot (lazy destination)
+## WriterSlot (the patient one)
 
-Connect a destination after logger creation — useful when the output
-is not available at startup:
+Sometimes you need a logger before you know where the logs are going.
+Config isn't parsed yet. The database connection isn't up. The cloud
+SDK hasn't initialized.
+
+WriterSlot lets you start logging immediately and connect the real
+destination later:
 
 ```go
 slot := logf.NewWriterSlot(logf.WithSlotBuffer(4096))
 logger := logf.NewLogger().Output(slot).Build()
 
-// Logger works immediately — writes are buffered.
-logger.Info(ctx, "starting up")
+logger.Info(ctx, "booting up")       // buffered
+logger.Info(ctx, "config loaded")    // buffered
 
-// Later, when destination is ready:
-slot.Set(file)
-// Buffered data is flushed, subsequent writes go directly to file.
+slot.Set(file)                       // buffer flushed, future writes go to file
+
+logger.Info(ctx, "ready to serve")   // written directly
 ```
 
-## Why logf
+## Why not just use slog?
 
-slog from the standard library is sufficient for most applications. logf
-targets scenarios where slog falls short:
+Honestly? For most apps, slog is fine. logf is for when:
 
-- **High-throughput logging** — encoding is parallel across goroutines,
-  writes are memcpy into pre-allocated slabs (~17 ns). ~2× faster than
-  slog under parallel file I/O.
-- **Unstable I/O** — slab pool decouples callers from I/O. Under
-  simulated slow disk, logf p99 = 71µs vs slog p99 = 2.5ms.
-- **Request-scoped fields via context** — slog passes context through
-  but built-in handlers ignore it. logf actually reads fields from it.
-- **Decoupled encoding and I/O** — Router encodes once and fans out to
-  multiple writers independently.
+- You're logging **a lot** (>100K entries/sec) and encoding is parallel
+  across goroutines with pre-allocated slabs (~17 ns per write)
+- Your I/O is **unreliable** (slab pool gives you p99 = 71µs vs
+  slog's p99 = 2.5ms under simulated slow disk)
+- You want **context fields** without the ceremony (slog passes context
+  through but never reads it)
+- You need **fan-out** to multiple destinations with independent
+  encoding and I/O strategies
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for design details.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the gory details.
 
 ## Who uses logf
 
@@ -415,16 +382,16 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for design details.
 ## Testing
 
 ```go
-// Discard all logs (silent tests):
+// Silent tests (discard everything):
 logger := logf.DisabledLogger()
 
-// Capture logs to a buffer for assertions:
+// Capture logs for assertions:
 var buf bytes.Buffer
 logger := logf.NewLogger().Output(&buf).Build()
 logger.Info(ctx, "hello")
-// buf.String() contains JSON output
+// buf.String() has your JSON
 
-// Send logs to testing.T (visible with -v or on failure):
+// Logs in test output (visible with -v or on failure):
 type testWriter struct{ t testing.TB }
 func (w testWriter) Write(p []byte) (int, error) {
     w.t.Helper()
@@ -434,9 +401,9 @@ func (w testWriter) Write(p []byte) (int, error) {
 logger := logf.NewLogger().Output(testWriter{t}).Build()
 ```
 
-## Log Rotation
+## Log rotation
 
-logf does not handle log rotation — use `lumberjack` or OS-level `logrotate`:
+logf doesn't rotate logs — that's what `lumberjack` and `logrotate` are for:
 
 ```go
 import "gopkg.in/natefinch/lumberjack.v2"
@@ -450,19 +417,15 @@ rotator := &lumberjack.Logger{
 sw := logf.NewSlabWriter(rotator, 64*1024, 8)
 ```
 
-## Caveats
+## The fine print
 
-- **One allocation per log call with fields.** `logger.Info(ctx, "msg", field1, field2)`
-  allocates a `[]Field` slice on the heap (Go variadic argument semantics).
-  This is the single `1 allocs/op` visible in benchmarks. Calls without
-  fields (`logger.Info(ctx, "msg")`) are zero-alloc.
+- **One allocation per log call with fields.** That's Go's variadic
+  `[]Field` slice. Calls without fields are zero-alloc.
+- **Oversized messages allocate (SlabWriter only).** Messages bigger than
+  `slabSize` get a dedicated buffer. Normal log entries (100–500 bytes)
+  with normal slabs (16–64 KB) never hit this.
 
-- **Oversized messages allocate (SlabWriter only).** When using SlabWriter,
-  messages larger than `slabSize` require `make([]byte, len(p))` + copy.
-  Typical log entries (100–500 bytes) with typical slab sizes (16–64 KB)
-  never hit this path. Sync handlers are not affected.
-
-## Documentation
+## Learn more
 
 - [Architecture & design philosophy](docs/ARCHITECTURE.md)
 - [Buffering strategies & capacity planning](docs/BUFFERING.md)

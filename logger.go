@@ -6,9 +6,10 @@ import (
 	"time"
 )
 
-// New returns a new Logger with the given Handler.
-// Level filtering is controlled by the handler's Enabled method.
-// For a builder-style API, use NewLogger() instead.
+// New returns a Logger wired to the given Handler. Level filtering is
+// controlled by the handler's Enabled method, so you can use any Handler
+// implementation — SyncHandler, Router, ContextHandler, or your own.
+// For a friendlier builder-style API, use NewLogger() instead.
 func New(w Handler) *Logger {
 	return &Logger{
 		w:         w,
@@ -16,16 +17,18 @@ func New(w Handler) *Logger {
 	}
 }
 
-// DisabledLogger returns a default instance of a Logger that logs nothing
-// as fast as possible.
+// DisabledLogger returns a Logger that silently discards everything as
+// fast as possible. Handy as a safe default when no logger is configured,
+// and it is what FromContext returns when there is no Logger in the context.
 func DisabledLogger() *Logger {
 	return defaultDisabledLogger
 }
 
-// Logger is the fast, asynchronous, structured logger.
-//
-// The Logger wraps Handler to check logging level and provide a bit of
-// syntactic sugar.
+// Logger is the main entry point for structured logging. It wraps a Handler,
+// checks levels before doing any work, and provides the familiar
+// Debug/Info/Warn/Error methods plus context-aware field accumulation via
+// With and WithGroup. Loggers are immutable — every With/WithName/WithGroup
+// call returns a new Logger, so they are safe to share across goroutines.
 type Logger struct {
 	w Handler
 
@@ -35,16 +38,18 @@ type Logger struct {
 	callerSkip int
 }
 
-// Enabled reports whether logging at the given level is enabled.
+// Enabled reports whether logging at the given level would actually produce
+// output. Use this to guard expensive argument preparation.
 func (l *Logger) Enabled(ctx context.Context, lvl Level) bool {
 	return l.w.Enabled(ctx, lvl)
 }
 
-// LogFunc allows to log a message with a bound level.
+// LogFunc is a logging function with a pre-bound level, used by AtLevel.
 type LogFunc func(context.Context, string, ...Field)
 
-// AtLevel calls the given fn if logging a message at the specified level
-// is enabled, passing a LogFunc with the bound level.
+// AtLevel calls fn only if the specified level is enabled, passing it a
+// LogFunc pre-bound to that level. This is perfect for guarding expensive
+// log preparation without a separate Enabled check.
 func (l *Logger) AtLevel(ctx context.Context, lvl Level, fn func(LogFunc)) {
 	if !l.w.Enabled(ctx, lvl) {
 		return
@@ -55,9 +60,9 @@ func (l *Logger) AtLevel(ctx context.Context, lvl Level, fn func(LogFunc)) {
 	})
 }
 
-// WithName returns a new Logger adding the given name to the calling one.
-// Name separator is a period.
-//
+// WithName returns a new Logger with the given name appended to the
+// existing name, separated by a period. Names appear in log output
+// as "parent.child" and are great for identifying subsystems.
 // Loggers have no name by default.
 func (l *Logger) WithName(n string) *Logger {
 	if n == "" {
@@ -74,7 +79,8 @@ func (l *Logger) WithName(n string) *Logger {
 	return cc
 }
 
-// WithCaller returns a new Logger with caller reporting enabled or disabled.
+// WithCaller returns a new Logger with caller reporting toggled on or off.
+// When enabled (the default), every log entry includes the source file and line.
 func (l *Logger) WithCaller(enabled bool) *Logger {
 	cc := l.clone()
 	cc.addCaller = enabled
@@ -82,8 +88,10 @@ func (l *Logger) WithCaller(enabled bool) *Logger {
 	return cc
 }
 
-// WithCallerSkip returns a new Logger with increased number of skipped
-// frames. It's usable to build a custom wrapper for the Logger.
+// WithCallerSkip returns a new Logger that skips additional stack frames
+// when capturing caller info. Use this when you wrap the Logger in your
+// own helper function so the reported caller points to your caller, not
+// your wrapper.
 func (l *Logger) WithCallerSkip(skip int) *Logger {
 	cc := l.clone()
 	cc.callerSkip = skip
@@ -91,7 +99,9 @@ func (l *Logger) WithCallerSkip(skip int) *Logger {
 	return cc
 }
 
-// With returns a new Logger with the given additional fields.
+// With returns a new Logger that includes the given fields in every
+// subsequent log entry. Fields are accumulated, not replaced — so
+// calling With multiple times builds up context over time.
 func (l *Logger) With(fs ...Field) *Logger {
 	cc := l.clone()
 	cc.bag = l.bag.With(fs...)
@@ -99,8 +109,9 @@ func (l *Logger) With(fs ...Field) *Logger {
 	return cc
 }
 
-// Slog returns a *slog.Logger that shares this Logger's writer, bag,
-// and name. Level filtering is delegated to the same Handler.
+// Slog returns a *slog.Logger backed by the same Handler, fields, and
+// name as this Logger. Use it when you need to hand a standard library
+// slog.Logger to code that does not know about logf.
 func (l *Logger) Slog() *slog.Logger {
 	return slog.New(&slogHandler{
 		w:         l.w,
@@ -110,10 +121,11 @@ func (l *Logger) Slog() *slog.Logger {
 	})
 }
 
-// WithGroup returns a new Logger that nests all subsequent fields
-// (from With and per-call) under the given group name.
-// Produces nested JSON objects: WithGroup("http") + Int("status", 200)
-// → {"http":{"status":200}}.
+// WithGroup returns a new Logger that nests all subsequent fields — both
+// from With and from per-call arguments — under the given group name.
+// In JSON output this produces nested objects:
+//
+//	WithGroup("http") + Int("status", 200) → {"http":{"status":200}}
 func (l *Logger) WithGroup(name string) *Logger {
 	if name == "" {
 		return l
@@ -125,8 +137,8 @@ func (l *Logger) WithGroup(name string) *Logger {
 	return cc
 }
 
-// Debug logs a debug message with the given text, optional fields and
-// fields passed to the Logger using With function.
+// Debug logs a message at LevelDebug. If debug logging is disabled, this
+// is a no-op — no fields are evaluated, no allocations happen.
 func (l *Logger) Debug(ctx context.Context, text string, fs ...Field) {
 	if !l.w.Enabled(ctx, LevelDebug) {
 		return
@@ -135,8 +147,8 @@ func (l *Logger) Debug(ctx context.Context, text string, fs ...Field) {
 	l.write(ctx, 1, LevelDebug, text, fs)
 }
 
-// Info logs an info message with the given text, optional fields and
-// fields passed to the Logger using With function.
+// Info logs a message at LevelInfo. This is the default "something
+// happened" level for normal operational events.
 func (l *Logger) Info(ctx context.Context, text string, fs ...Field) {
 	if !l.w.Enabled(ctx, LevelInfo) {
 		return
@@ -145,8 +157,8 @@ func (l *Logger) Info(ctx context.Context, text string, fs ...Field) {
 	l.write(ctx, 1, LevelInfo, text, fs)
 }
 
-// Warn logs a warning message with the given text, optional fields and
-// fields passed to the Logger using With function.
+// Warn logs a message at LevelWarn. Use this for situations that are
+// unexpected but not broken — things a human should probably look at.
 func (l *Logger) Warn(ctx context.Context, text string, fs ...Field) {
 	if !l.w.Enabled(ctx, LevelWarn) {
 		return
@@ -155,8 +167,8 @@ func (l *Logger) Warn(ctx context.Context, text string, fs ...Field) {
 	l.write(ctx, 1, LevelWarn, text, fs)
 }
 
-// Error logs an error message with the given text, optional fields and
-// fields passed to the Logger using With function.
+// Error logs a message at LevelError. Something went wrong and you want
+// everyone to know about it.
 func (l *Logger) Error(ctx context.Context, text string, fs ...Field) {
 	if !l.w.Enabled(ctx, LevelError) {
 		return
@@ -165,7 +177,8 @@ func (l *Logger) Error(ctx context.Context, text string, fs ...Field) {
 	l.write(ctx, 1, LevelError, text, fs)
 }
 
-// Log logs a message at the given level.
+// Log logs a message at an arbitrary level. Use this when the level is
+// determined at runtime; for the common cases prefer Debug/Info/Warn/Error.
 func (l *Logger) Log(ctx context.Context, lvl Level, text string, fs ...Field) {
 	if !l.w.Enabled(ctx, lvl) {
 		return
@@ -200,9 +213,10 @@ func (l *Logger) clone() *Logger {
 	}
 }
 
-// LogDepth logs using the given logger at the specified level, adding depth
-// extra frames to the caller skip count. It is intended for wrapper packages
-// like logfc to avoid Logger allocation on each call.
+// LogDepth logs at the given level, adding depth extra frames to the caller
+// skip count. It is a package-level function (not a method) so that wrapper
+// packages like logfc can log through an existing Logger without allocating
+// a new one on every call.
 func LogDepth(l *Logger, ctx context.Context, depth int, lvl Level, text string, fs ...Field) {
 	if !l.w.Enabled(ctx, lvl) {
 		return
@@ -211,13 +225,16 @@ func LogDepth(l *Logger, ctx context.Context, depth int, lvl Level, text string,
 	l.write(ctx, depth+1, lvl, text, fs)
 }
 
-// NewContext returns a new Context with the given Logger inside it.
+// NewContext returns a new Context carrying the given Logger. Retrieve it
+// later with FromContext. No more threading loggers through your entire
+// call stack like some kind of dependency injection nightmare.
 func NewContext(parent context.Context, logger *Logger) context.Context {
 	return context.WithValue(parent, contextKeyLogger{}, logger)
 }
 
-// FromContext returns the Logger associated with this context or
-// DisabledLogger() if no value is associated.
+// FromContext returns the Logger stored in the context by NewContext, or
+// a DisabledLogger if no Logger was stored. It is always safe to call —
+// you will never get nil.
 func FromContext(ctx context.Context) *Logger {
 	value := ctx.Value(contextKeyLogger{})
 	if value == nil {

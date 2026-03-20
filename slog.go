@@ -7,15 +7,14 @@ import (
 	"unsafe"
 )
 
-// NewSlogHandler returns a [slog.Handler] that writes log records
-// to the given [Handler].
+// NewSlogHandler returns a [slog.Handler] that bridges the standard library's
+// slog package to logf's pipeline. Use this when you want third-party code
+// that speaks slog to flow through your logf Handler, Encoder, and Writer
+// setup.
 //
-// Fields added with [slog.Logger.With] become [Entry.LoggerBag],
-// which the JSON encoder caches per unique Bag version.
-// Each call to WithAttrs allocates a new Bag automatically.
-//
-// The handler propagates context to [Handler.Handle],
-// so field bags attached via [With] are resolved by [NewContextHandler].
+// Fields added with [slog.Logger.With] become [Entry.LoggerBag] (cached by
+// the encoder). The handler propagates context to [Handler.Handle], so
+// field bags attached via [With] are resolved by [NewContextHandler].
 func NewSlogHandler(w Handler) slog.Handler {
 	return &slogHandler{w: w, addCaller: true}
 }

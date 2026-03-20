@@ -6,13 +6,16 @@ import (
 	"unsafe"
 )
 
-// TimeEncoder is the function type to encode the given Time.
+// TimeEncoder is a function that formats a time.Time into the log output
+// via the TypeEncoder. Swap it out to control timestamp format globally.
 type TimeEncoder func(time.Time, TypeEncoder)
 
-// DurationEncoder is the function type to encode the given Duration.
+// DurationEncoder is a function that formats a time.Duration into the log
+// output via the TypeEncoder.
 type DurationEncoder func(time.Duration, TypeEncoder)
 
-// RFC3339TimeEncoder encodes the given Time as a string using RFC3339 layout.
+// RFC3339TimeEncoder formats timestamps as RFC3339 strings (e.g.
+// "2006-01-02T15:04:05Z07:00"). This is the default for JSON output.
 func RFC3339TimeEncoder(t time.Time, e TypeEncoder) {
 	var timeBuf [64]byte
 	var b []byte
@@ -22,8 +25,8 @@ func RFC3339TimeEncoder(t time.Time, e TypeEncoder) {
 	runtime.KeepAlive(&b)
 }
 
-// RFC3339NanoTimeEncoder encodes the given Time as a string using
-// RFC3339Nano layout.
+// RFC3339NanoTimeEncoder formats timestamps as RFC3339 strings with
+// nanosecond precision (e.g. "2006-01-02T15:04:05.999999999Z07:00").
 func RFC3339NanoTimeEncoder(t time.Time, e TypeEncoder) {
 	var timeBuf [64]byte
 	var b []byte
@@ -33,7 +36,8 @@ func RFC3339NanoTimeEncoder(t time.Time, e TypeEncoder) {
 	runtime.KeepAlive(&b)
 }
 
-// LayoutTimeEncoder encodes the given Time as a string using custom layout.
+// LayoutTimeEncoder returns a TimeEncoder that formats timestamps using the
+// given Go time layout string (same format as time.Format).
 func LayoutTimeEncoder(layout string) TimeEncoder {
 	return func(t time.Time, m TypeEncoder) {
 		var timeBuf [64]byte
@@ -45,25 +49,26 @@ func LayoutTimeEncoder(layout string) TimeEncoder {
 	}
 }
 
-// UnixNanoTimeEncoder encodes the given Time as a Unix time, the number of
-// of nanoseconds elapsed since January 1, 1970 UTC.
+// UnixNanoTimeEncoder formats timestamps as integer nanoseconds since the
+// Unix epoch. Compact and machine-friendly, but not human-readable.
 func UnixNanoTimeEncoder(t time.Time, e TypeEncoder) {
 	e.EncodeTypeInt64(t.UnixNano())
 }
 
-// NanoDurationEncoder encodes the given Duration as a number of nanoseconds.
+// NanoDurationEncoder formats durations as integer nanoseconds.
 func NanoDurationEncoder(d time.Duration, e TypeEncoder) {
 	e.EncodeTypeInt64(int64(d))
 }
 
-// FloatSecondsDurationEncoder encodes the given Duration to a floating-point
-// number of seconds elapsed.
+// FloatSecondsDurationEncoder formats durations as floating-point seconds
+// (e.g. 1.5 for one and a half seconds).
 func FloatSecondsDurationEncoder(d time.Duration, e TypeEncoder) {
 	e.EncodeTypeFloat64(float64(d) / float64(time.Second))
 }
 
-// StringDurationEncoder encodes the given Duration as a human-readable
-// string (e.g. "4.5s", "300ms", "1h2m3s") without allocating.
+// StringDurationEncoder formats durations as human-readable strings like
+// "4.5s", "300ms", or "1h2m3s" — the same format as time.Duration.String()
+// but without allocating. This is the default.
 func StringDurationEncoder(d time.Duration, m TypeEncoder) {
 	var buf [32]byte
 	var b []byte

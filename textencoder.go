@@ -8,7 +8,10 @@ import (
 	"unsafe"
 )
 
-// TextEncoderConfig allows to configure the text Encoder.
+// TextEncoderConfig controls how the text encoder formats log entries —
+// colors, which fields to show, and how types like time, duration, and
+// errors are rendered. For a friendlier builder-style API, use Text()
+// instead.
 type TextEncoderConfig struct {
 	NoColor            bool
 	DisableFieldTime   bool
@@ -24,8 +27,9 @@ type TextEncoderConfig struct {
 	EncodeCaller   CallerEncoder
 }
 
-// WithDefaults returns the new config in which all uninitialized fields
-// are filled with their default values.
+// WithDefaults returns a copy of the config with all zero-value fields
+// replaced by sensible defaults (StampMilli timestamps, string durations,
+// short caller format, short level names, etc.).
 func (c TextEncoderConfig) WithDefaults() TextEncoderConfig {
 	if c.EncodeDuration == nil {
 		c.EncodeDuration = StringDurationEncoder
@@ -45,19 +49,22 @@ func (c TextEncoderConfig) WithDefaults() TextEncoderConfig {
 	return c
 }
 
-// NewTextEncoder creates a new text Encoder with the given config.
+// NewTextEncoder creates a text Encoder from a TextEncoderConfig struct.
+// For a friendlier builder-style API, use Text() instead.
 func NewTextEncoder(cfg TextEncoderConfig) Encoder {
 	return buildTextEncoder(cfg)
 }
 
-// Text returns a new TextEncoderBuilder with default settings.
-// Colors are enabled by default. Use NoColor() to disable, or
-// check the NO_COLOR environment variable (https://no-color.org):
+// Text returns a new TextEncoderBuilder — the recommended way to create a
+// human-readable text encoder with ANSI colors. Colors are on by default;
+// use NoColor() to disable them or check the NO_COLOR environment variable
+// (https://no-color.org):
 //
 //	enc := logf.Text().Build()
 //	enc := logf.Text().NoColor().Build()
 //
-// Respect NO_COLOR convention:
+// Respect the NO_COLOR convention:
+//
 //	b := logf.Text()
 //	if _, ok := os.LookupEnv("NO_COLOR"); ok {
 //	    b = b.NoColor()
@@ -66,67 +73,81 @@ func Text() *TextEncoderBuilder {
 	return &TextEncoderBuilder{}
 }
 
-// TextEncoderBuilder configures and builds a text Encoder.
+// TextEncoderBuilder configures and builds a text Encoder using a clean
+// builder-style API. Create one with Text(), chain methods to customize,
+// then call Build().
 type TextEncoderBuilder struct {
 	cfg TextEncoderConfig
 }
 
+// NoColor disables ANSI color escape sequences in the output.
+// Use this when writing to files or non-TTY destinations.
 func (b *TextEncoderBuilder) NoColor() *TextEncoderBuilder {
 	b.cfg.NoColor = true
 	return b
 }
 
+// DisableTime omits the timestamp from text output entirely.
 func (b *TextEncoderBuilder) DisableTime() *TextEncoderBuilder {
 	b.cfg.DisableFieldTime = true
 	return b
 }
 
+// DisableLevel omits the severity level from text output entirely.
 func (b *TextEncoderBuilder) DisableLevel() *TextEncoderBuilder {
 	b.cfg.DisableFieldLevel = true
 	return b
 }
 
+// DisableMsg omits the message text from text output entirely.
 func (b *TextEncoderBuilder) DisableMsg() *TextEncoderBuilder {
 	b.cfg.DisableFieldMsg = true
 	return b
 }
 
+// DisableName omits the logger name from text output entirely.
 func (b *TextEncoderBuilder) DisableName() *TextEncoderBuilder {
 	b.cfg.DisableFieldName = true
 	return b
 }
 
+// DisableCaller omits the caller location from text output entirely.
 func (b *TextEncoderBuilder) DisableCaller() *TextEncoderBuilder {
 	b.cfg.DisableFieldCaller = true
 	return b
 }
 
+// EncodeTime sets a custom TimeEncoder for formatting timestamps (default time.StampMilli).
 func (b *TextEncoderBuilder) EncodeTime(e TimeEncoder) *TextEncoderBuilder {
 	b.cfg.EncodeTime = e
 	return b
 }
 
+// EncodeDuration sets a custom DurationEncoder for formatting durations (default string representation).
 func (b *TextEncoderBuilder) EncodeDuration(e DurationEncoder) *TextEncoderBuilder {
 	b.cfg.EncodeDuration = e
 	return b
 }
 
+// EncodeLevel sets a custom LevelEncoder for formatting severity levels.
 func (b *TextEncoderBuilder) EncodeLevel(e LevelEncoder) *TextEncoderBuilder {
 	b.cfg.EncodeLevel = e
 	return b
 }
 
+// EncodeCaller sets a custom CallerEncoder for formatting caller locations (default short format).
 func (b *TextEncoderBuilder) EncodeCaller(e CallerEncoder) *TextEncoderBuilder {
 	b.cfg.EncodeCaller = e
 	return b
 }
 
+// EncodeError sets a custom ErrorEncoder for formatting error values.
 func (b *TextEncoderBuilder) EncodeError(e ErrorEncoder) *TextEncoderBuilder {
 	b.cfg.EncodeError = e
 	return b
 }
 
-// Build finalizes the configuration and returns a ready Encoder.
+// Build finalizes the configuration and returns a ready-to-use text Encoder.
 func (b *TextEncoderBuilder) Build() Encoder {
 	return buildTextEncoder(b.cfg)
 }

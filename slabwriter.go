@@ -14,8 +14,10 @@ const (
 	defaultSlabCount = 4
 )
 
-// SlabWriter is an async buffered writer that decouples the caller
-// from I/O by using a pool of pre-allocated linear byte slabs.
+// SlabWriter is an async buffered writer that keeps your logging goroutines
+// fast by decoupling them from slow I/O. It uses a pool of pre-allocated
+// linear byte slabs — producers memcpy into a slab, and a background
+// goroutine writes full slabs to the destination in big, efficient batches.
 //
 // Architecture:
 //
@@ -143,7 +145,9 @@ type SlabWriter struct {
 	writeErrors   atomic.Int64  // total write errors (ioLoop only)
 }
 
-// SlabStats contains runtime statistics for monitoring.
+// SlabStats is a snapshot of SlabWriter runtime statistics. Pull it from
+// Stats() and feed it to your metrics system to keep an eye on queue
+// depth, drop rates, and write errors.
 type SlabStats struct {
 	QueuedSlabs int   // slabs waiting for I/O
 	FreeSlabs   int   // slabs available in pool
@@ -153,32 +157,37 @@ type SlabStats struct {
 	WriteErrors int64 // total write errors
 }
 
-// SlabOption configures a SlabWriter.
+// SlabOption configures a SlabWriter at creation time. Pass options to
+// NewSlabWriter to customize flush behavior, drop policy, and error
+// reporting.
 type SlabOption func(*SlabWriter)
 
-// WithFlushInterval sets the idle flush interval. When no new data
-// arrives for this duration, the partial slab is flushed to the
-// destination. Default is 0 (no idle flush).
+// WithFlushInterval sets how long the SlabWriter waits for new data
+// before flushing a partial slab. Without this, a quiet period could
+// leave recent log entries sitting in the buffer. Default is 0 (no
+// idle flush — data only goes out when a slab fills up or Close is
+// called).
 func WithFlushInterval(d time.Duration) SlabOption {
 	return func(sw *SlabWriter) {
 		sw.flushInterval = d
 	}
 }
 
-// WithDropOnFull makes Write non-blocking: when the I/O goroutine
-// cannot keep up and all slabs are in flight, the current slab's
-// data is dropped instead of blocking the caller. The total number
-// of dropped messages is available via Dropped.
+// WithDropOnFull makes Write non-blocking: if the I/O goroutine cannot
+// keep up and all slabs are in flight, the current slab's data is
+// silently dropped instead of blocking the caller. Use this when you
+// would rather lose log messages than add latency to your hot path.
+// Monitor dropped messages via Stats().Dropped.
 func WithDropOnFull() SlabOption {
 	return func(sw *SlabWriter) {
 		sw.dropOnFull = true
 	}
 }
 
-// WithErrorWriter sets a writer for I/O error reports. When the
-// background goroutine fails to write a slab to the destination, it
-// formats the error and writes it to w. By default errors are
-// silently discarded. Typical usage: WithErrorWriter(os.Stderr).
+// WithErrorWriter sets where I/O errors are reported. When the background
+// goroutine fails to write a slab, it formats the error and writes it
+// to w. By default errors are silently discarded — pass os.Stderr here
+// if you want to know about write failures.
 func WithErrorWriter(w io.Writer) SlabOption {
 	return func(sw *SlabWriter) {
 		sw.errW = w
@@ -186,8 +195,9 @@ func WithErrorWriter(w io.Writer) SlabOption {
 }
 
 // NewSlabWriter creates a SlabWriter that buffers writes into pre-allocated
-// slabs and flushes them to w via a background I/O goroutine. Close must
-// be called to flush remaining data and stop the goroutine.
+// slabs and flushes them to w via a background I/O goroutine. You must
+// call Close when you are done to flush remaining data and stop the
+// goroutine — a defer sw.Close() right after creation is the way to go.
 func NewSlabWriter(w io.Writer, slabSize, slabCount int, opts ...SlabOption) *SlabWriter {
 	if slabSize <= 0 {
 		slabSize = defaultSlabSize
@@ -218,12 +228,10 @@ func NewSlabWriter(w io.Writer, slabSize, slabCount int, opts ...SlabOption) *Sl
 	return sb
 }
 
-// Write copies p into the current slab. Each message is guaranteed to
-// be either fully written or fully dropped (see Message integrity above).
-//
-// If p does not fit in the remaining slab space, an early swap is
-// performed so the message lands in a fresh slab. If p is larger than
-// slabSize, a dedicated oversized buffer is allocated.
+// Write copies p into the current slab. Every message is guaranteed to be
+// either fully written or fully dropped — never partially torn. If the
+// message does not fit in the remaining slab space, an early swap puts it
+// in a fresh slab. Messages larger than slabSize get a dedicated buffer.
 //
 // Write is safe for concurrent use. It must not be called after Close.
 func (sb *SlabWriter) Write(p []byte) (int, error) {
@@ -257,9 +265,10 @@ func (sb *SlabWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Flush enqueues the current partial slab for writing by the I/O
-// goroutine. It does not wait for the write to complete. For a
-// durable flush, use Close. It must not be called after Close.
+// Flush enqueues the current partial slab for writing by the background
+// I/O goroutine. It returns immediately without waiting for the write to
+// complete — if you need a durable flush, use Close instead. Must not be
+// called after Close.
 func (sb *SlabWriter) Flush() error {
 	sb.mu.Lock()
 	if sb.pos > 0 {
@@ -269,14 +278,15 @@ func (sb *SlabWriter) Flush() error {
 	return nil
 }
 
-// Sync is a no-op. The underlying writer's Sync is called on Close.
+// Sync is a no-op on SlabWriter — the real Sync on the underlying writer
+// happens during Close.
 func (sb *SlabWriter) Sync() error {
 	return nil
 }
 
-// Close flushes remaining data, stops the I/O goroutine, and calls
-// Flush and Sync on the underlying Writer. It is safe to call
-// multiple times; subsequent calls return the same error.
+// Close flushes remaining data, drains the queue, stops the background
+// I/O goroutine, and calls Flush + Sync on the underlying Writer. Safe
+// to call multiple times — subsequent calls return the same error.
 func (sb *SlabWriter) Close() error {
 	sb.closeOnce.Do(func() {
 		sb.mu.Lock()
@@ -292,10 +302,8 @@ func (sb *SlabWriter) Close() error {
 	return sb.closeErr
 }
 
-// Stats returns a snapshot of runtime statistics. Safe to call
-// concurrently from a metrics scraper. Briefly locks mu to read
-// the written counter (plain int64, not atomic — atomic.Add inside
-// mutex causes cache-line bouncing under parallel load, +22% regression).
+// Stats returns a point-in-time snapshot of runtime statistics. Safe to
+// call concurrently from a metrics scraper or health check endpoint.
 func (sb *SlabWriter) Stats() SlabStats {
 	sb.mu.Lock()
 	written := sb.written

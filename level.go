@@ -7,28 +7,32 @@ import (
 	"sync/atomic"
 )
 
-// Level defines severity level of a log message.
+// Level represents the severity of a log message. Higher numeric values
+// mean more verbose output — LevelDebug (3) lets everything through,
+// while LevelError (0) only lets errors pass.
 type Level int8
 
 // Severity levels.
 const (
-	// LevelError allows to log errors only.
+	// LevelError logs errors only — the quietest setting.
 	LevelError Level = iota
-	// LevelWarn allows to log errors and warnings.
+	// LevelWarn logs errors and warnings.
 	LevelWarn
-	// LevelInfo is the default logging level. Allows to log errors, warnings and infos.
+	// LevelInfo logs errors, warnings, and informational messages. This is
+	// the typical production setting.
 	LevelInfo
-	// LevelDebug allows to log messages with all severity levels.
+	// LevelDebug logs everything — all severity levels pass through.
 	LevelDebug
 )
 
-// Enabled returns true if the given level is allowed within the current level.
+// Enabled reports whether a message at level o would be logged under this
+// level threshold. For example, LevelInfo.Enabled(LevelDebug) is false.
 func (l Level) Enabled(o Level) bool {
 	return l >= o
 }
 
-// String implements fmt.Stringer.
-// String returns a lower-case string representation of the Level.
+// String returns a lower-case string representation of the Level
+// ("debug", "info", "warn", "error").
 func (l Level) String() string {
 	switch l {
 	case LevelDebug:
@@ -44,7 +48,8 @@ func (l Level) String() string {
 	}
 }
 
-// UpperCaseString returns an upper-case string representation of the Level.
+// UpperCaseString returns an upper-case string representation of the Level
+// ("DEBUG", "INFO", "WARN", "ERROR").
 func (l Level) UpperCaseString() string {
 	switch l {
 	case LevelDebug:
@@ -60,12 +65,13 @@ func (l Level) UpperCaseString() string {
 	}
 }
 
-// MarshalText marshals the Level to text.
+// MarshalText marshals the Level to its lower-case text representation.
 func (l Level) MarshalText() ([]byte, error) {
 	return []byte(l.String()), nil
 }
 
-// UnmarshalText unmarshals the Level from text.
+// UnmarshalText parses a level string (case-insensitive) and sets the Level.
+// Returns an error for unrecognized values.
 func (l *Level) UnmarshalText(text []byte) error {
 	s := string(text)
 	lvl, ok := LevelFromString(s)
@@ -78,7 +84,8 @@ func (l *Level) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// LevelFromString creates the new Level with the given string.
+// LevelFromString parses a level name (case-insensitive) and returns the
+// corresponding Level. Returns false if the name is not recognized.
 func LevelFromString(lvl string) (Level, bool) {
 	switch strings.ToLower(lvl) {
 	case "debug":
@@ -94,21 +101,25 @@ func LevelFromString(lvl string) (Level, bool) {
 	return LevelError, false
 }
 
-// LevelEncoder is the function type to encode Level.
+// LevelEncoder is a function that formats a Level into the log output via
+// TypeEncoder. Swap it out to control how levels appear in your logs.
 type LevelEncoder func(Level, TypeEncoder)
 
-// DefaultLevelEncoder implements LevelEncoder by calling Level itself.
+// DefaultLevelEncoder formats levels as lower-case strings ("debug",
+// "info", "warn", "error"). This is the default for JSON output.
 func DefaultLevelEncoder(lvl Level, m TypeEncoder) {
 	m.EncodeTypeString(lvl.String())
 }
 
-// UpperCaseLevelEncoder implements LevelEncoder by calling Level itself.
+// UpperCaseLevelEncoder formats levels as upper-case strings ("DEBUG",
+// "INFO", "WARN", "ERROR").
 func UpperCaseLevelEncoder(lvl Level, m TypeEncoder) {
 	m.EncodeTypeString(lvl.UpperCaseString())
 }
 
-// ShortTextLevelEncoder encodes Level as a 3-character uppercase string
-// (DBG, INF, WRN, ERR). Intended for text/console output.
+// ShortTextLevelEncoder formats levels as compact 3-character uppercase
+// strings (DBG, INF, WRN, ERR). This is the default for text/console
+// output where horizontal space is precious.
 func ShortTextLevelEncoder(lvl Level, m TypeEncoder) {
 	switch lvl {
 	case LevelDebug:
@@ -124,31 +135,34 @@ func ShortTextLevelEncoder(lvl Level, m TypeEncoder) {
 	}
 }
 
-// NewMutableLevel creates an instance of MutableLevel with the given
-// starting level.
+// NewMutableLevel creates a MutableLevel starting at the given level.
+// Pass it where a Level is expected and call Set later to change the
+// threshold at runtime without restarting.
 func NewMutableLevel(l Level) *MutableLevel {
 	return &MutableLevel{level: uint32(l)}
 }
 
-// MutableLevel allows to switch the logging level atomically.
-//
-// The logger does not allow to change logging level in runtime by itself.
+// MutableLevel is a concurrency-safe level that can be changed at runtime
+// without rebuilding the Logger. Perfect for admin endpoints that toggle
+// debug logging on a live system — just call Set and every subsequent
+// log call picks up the new level atomically.
 type MutableLevel struct {
 	level uint32
 }
 
-// Enabled reports whether the given level is enabled at the current
-// mutable level.
+// Enabled reports whether the given level is enabled at the current mutable
+// level. Safe for concurrent use.
 func (l *MutableLevel) Enabled(_ context.Context, lvl Level) bool {
 	return l.Level().Enabled(lvl)
 }
 
-// Level returns the current logging level.
+// Level returns the current logging level atomically.
 func (l *MutableLevel) Level() Level {
 	return (Level)(atomic.LoadUint32(&l.level))
 }
 
-// Set switches the current logging level to the given one.
+// Set atomically switches the logging level. All subsequent log calls
+// will use the new threshold.
 func (l *MutableLevel) Set(o Level) {
 	atomic.StoreUint32(&l.level, uint32(o))
 }

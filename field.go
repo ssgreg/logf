@@ -8,7 +8,7 @@ import (
 	"unsafe"
 )
 
-// Bool returns a new Field with the given key and bool.
+// Bool returns a Field that carries a boolean value under the given key.
 func Bool(k string, v bool) Field {
 	var tmp int64
 	if v {
@@ -18,87 +18,88 @@ func Bool(k string, v bool) Field {
 	return Field{Key: k, Type: FieldTypeBool, Val: tmp}
 }
 
-// Int returns a new Field with the given key and int.
+// Int returns a Field that carries an int value under the given key.
 func Int(k string, v int) Field {
 	return Field{Key: k, Type: FieldTypeInt64, Val: int64(v)}
 }
 
-// Int64 returns a new Field with the given key and int64.
+// Int64 returns a Field that carries an int64 value under the given key.
 func Int64(k string, v int64) Field {
 	return Field{Key: k, Type: FieldTypeInt64, Val: v}
 }
 
-// Int32 returns a new Field with the given key and int32.
+// Int32 returns a Field that carries an int32 value under the given key.
 func Int32(k string, v int32) Field {
 	return Field{Key: k, Type: FieldTypeInt64, Val: int64(v)}
 }
 
-// Int16 returns a new Field with the given key and int16.
+// Int16 returns a Field that carries an int16 value under the given key.
 func Int16(k string, v int16) Field {
 	return Field{Key: k, Type: FieldTypeInt64, Val: int64(v)}
 }
 
-// Int8 returns a new Field with the given key and int.8
+// Int8 returns a Field that carries an int8 value under the given key.
 func Int8(k string, v int8) Field {
 	return Field{Key: k, Type: FieldTypeInt64, Val: int64(v)}
 }
 
-// Uint returns a new Field with the given key and uint.
+// Uint returns a Field that carries a uint value under the given key.
 func Uint(k string, v uint) Field {
 	return Field{Key: k, Type: FieldTypeUint64, Val: int64(v)}
 }
 
-// Uint64 returns a new Field with the given key and uint64.
+// Uint64 returns a Field that carries a uint64 value under the given key.
 func Uint64(k string, v uint64) Field {
 	return Field{Key: k, Type: FieldTypeUint64, Val: int64(v)}
 }
 
-// Uint32 returns a new Field with the given key and uint32.
+// Uint32 returns a Field that carries a uint32 value under the given key.
 func Uint32(k string, v uint32) Field {
 	return Field{Key: k, Type: FieldTypeUint64, Val: int64(v)}
 }
 
-// Uint16 returns a new Field with the given key and uint16.
+// Uint16 returns a Field that carries a uint16 value under the given key.
 func Uint16(k string, v uint16) Field {
 	return Field{Key: k, Type: FieldTypeUint64, Val: int64(v)}
 }
 
-// Uint8 returns a new Field with the given key and uint8.
+// Uint8 returns a Field that carries a uint8 value under the given key.
 func Uint8(k string, v uint8) Field {
 	return Field{Key: k, Type: FieldTypeUint64, Val: int64(v)}
 }
 
-// Float64 returns a new Field with the given key and float64.
+// Float64 returns a Field that carries a float64 value under the given key.
 func Float64(k string, v float64) Field {
 	return Field{Key: k, Type: FieldTypeFloat64, Val: int64(math.Float64bits(v))}
 }
 
-// Float32 returns a new Field with the given key and float32.
+// Float32 returns a Field that carries a float32 value under the given key.
 func Float32(k string, v float32) Field {
 	return Field{Key: k, Type: FieldTypeFloat64, Val: int64(math.Float64bits(float64(v)))}
 }
 
-// Duration returns a new Field with the given key and time.Duration.
+// Duration returns a Field that carries a time.Duration value under the given key.
 func Duration(k string, v time.Duration) Field {
 	return Field{Key: k, Type: FieldTypeDuration, Val: int64(v)}
 }
 
-// Bytes returns a new Field with the given key and slice of bytes.
+// Bytes returns a Field that carries a []byte value under the given key.
+// The bytes are base64-encoded in JSON output.
 func Bytes(k string, v []byte) Field {
 	return Field{Key: k, Type: FieldTypeBytes, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
-// String returns a new Field with the given key and string.
+// String returns a Field that carries a string value under the given key.
 func String(k string, v string) Field {
 	return Field{Key: k, Type: FieldTypeBytesToString, Ptr: unsafe.Pointer(unsafe.StringData(v)), Val: int64(len(v))}
 }
 
-// Strings returns a new Field with the given key and slice of strings.
+// Strings returns a Field that carries a []string value under the given key.
 func Strings(k string, v []string) Field {
 	return Field{Key: k, Type: FieldTypeBytesToStrings, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
-// Ints returns a new Field with the given key and slice of ints.
+// Ints returns a Field that carries a []int value under the given key.
 func Ints(k string, v []int) Field {
 	if unsafe.Sizeof(int(0)) == unsafe.Sizeof(int64(0)) {
 		return Field{Key: k, Type: FieldTypeBytesToInts64, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
@@ -111,32 +112,33 @@ func Ints(k string, v []int) Field {
 	return Field{Key: k, Type: FieldTypeBytesToInts64, Ptr: unsafe.Pointer(unsafe.SliceData(s)), Val: int64(len(s))}
 }
 
-// Ints64 returns a new Field with the given key and slice of 64-bit ints.
+// Ints64 returns a Field that carries a []int64 value under the given key.
 func Ints64(k string, v []int64) Field {
 	return Field{Key: k, Type: FieldTypeBytesToInts64, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
-// Floats64 returns a new Field with the given key and slice of 64-bit floats.
+// Floats64 returns a Field that carries a []float64 value under the given key.
 func Floats64(k string, v []float64) Field {
 	return Field{Key: k, Type: FieldTypeBytesToFloats64, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
-// Durations returns a new Field with the given key and slice of time.Duration.
+// Durations returns a Field that carries a []time.Duration value under the given key.
 func Durations(k string, v []time.Duration) Field {
 	return Field{Key: k, Type: FieldTypeBytesToDurations, Ptr: unsafe.Pointer(unsafe.SliceData(v)), Val: int64(len(v))}
 }
 
-// NamedError returns a new Field with the given key and error.
+// NamedError returns a Field that carries an error value under the given key.
 func NamedError(k string, v error) Field {
 	return Field{Key: k, Type: FieldTypeError, Any: v}
 }
 
-// Error returns a new Field with the given error. Key is 'error'.
+// Error returns a Field that carries an error under the key "error".
+// It is shorthand for NamedError("error", v).
 func Error(v error) Field {
 	return NamedError("error", v)
 }
 
-// Time returns a new Field with the given key and time.Time.
+// Time returns a Field that carries a time.Time value under the given key.
 func Time(k string, v time.Time) Field {
 	if v.IsZero() {
 		return Field{Key: k, Type: FieldTypeTime}
@@ -144,18 +146,21 @@ func Time(k string, v time.Time) Field {
 	return Field{Key: k, Type: FieldTypeTime, Val: v.UnixNano(), Any: v.Location()}
 }
 
-// Array returns a new Field with the given key and ArrayEncoder.
+// Array returns a Field that carries a custom array value under the given key.
+// The ArrayEncoder's EncodeLogfArray method is called at encoding time.
 func Array(k string, v ArrayEncoder) Field {
 	return Field{Key: k, Type: FieldTypeArray, Any: v}
 }
 
-// Object returns a new Field with the given key and ObjectEncoder.
+// Object returns a Field that carries a custom object value under the given key.
+// The ObjectEncoder's EncodeLogfObject method is called at encoding time.
 func Object(k string, v ObjectEncoder) Field {
 	return Field{Key: k, Type: FieldTypeObject, Any: v}
 }
 
-// Inline returns a new Field that encodes the given ObjectEncoder's fields
-// directly into the parent object, without a wrapping key.
+// Inline returns a Field that splices the ObjectEncoder's fields directly
+// into the parent object — no wrapping key, no nesting. Perfect for
+// flattening a struct's fields into the log entry.
 //
 // Example:
 //
@@ -168,8 +173,9 @@ func Inline(v ObjectEncoder) Field {
 	return Object("", v)
 }
 
-// Group returns a new Field that encodes the given fields as a nested
-// object under the given key.
+// Group returns a Field that nests the given fields as a sub-object
+// under the given key. Think of it as an inline WithGroup for a single
+// log call.
 //
 // Example:
 //
@@ -181,7 +187,8 @@ func Group(k string, fs ...Field) Field {
 	return Field{Key: k, Type: FieldTypeGroup, Any: fs}
 }
 
-// Stringer returns a new Field with the given key and Stringer.
+// Stringer returns a Field that calls v.String() and logs the result as
+// a string under the given key. Nil values are logged as "nil".
 func Stringer(k string, v fmt.Stringer) Field {
 	if v == nil {
 		return String(k, "nil")
@@ -190,29 +197,32 @@ func Stringer(k string, v fmt.Stringer) Field {
 	return String(k, v.String())
 }
 
-// Formatter returns a new Field with the given key, verb and interface to
-// format.
+// Formatter returns a Field that formats the value with fmt.Sprintf using
+// the given verb and stores the result as a string.
 func Formatter(k string, verb string, v interface{}) Field {
 	return String(k, fmt.Sprintf(verb, v))
 }
 
-// FormatterV returns a new Field with the given key and interface to format.
-// It uses the predefined verb "%#v" (a Go-syntax representation of the value).
+// FormatterV returns a Field that formats the value with "%#v" (Go-syntax
+// representation) and stores the result as a string under the given key.
 func FormatterV(k string, v interface{}) Field {
 	return Formatter(k, "%#v", v)
 }
 
-// ByteString returns a new Field with the given key and []byte that is
-// interpreted as a UTF-8 string (not base64-encoded like Bytes).
+// ByteString returns a Field that interprets the []byte as a UTF-8 string
+// (not base64-encoded like Bytes). Use this when you have text data in a
+// byte slice and want it logged as a readable string.
 func ByteString(k string, v []byte) Field {
 	return String(k, unsafe.String(unsafe.SliceData(v), len(v)))
 }
 
-// Any returns a new Filed with the given key and value of any type. Is tries
-// to choose the best way to represent key-value pair as a Field.
+// Any returns a Field for an arbitrary value, picking the most efficient
+// typed representation it can via a type switch. It handles all the
+// common Go types (scalars, pointers, slices, time, errors, Stringer)
+// and falls back to reflection for named types.
 //
-// Note that Any may not choose the most efficient typed method for every type.
-// Use specific Field methods for better performance.
+// For hot paths, prefer the specific constructors (String, Int, etc.) —
+// they avoid the type switch overhead entirely.
 func Any(k string, v interface{}) Field {
 	switch rv := v.(type) {
 	// Scalars.
@@ -352,7 +362,8 @@ func Any(k string, v interface{}) Field {
 	return Field{Key: k, Type: FieldTypeAny, Any: v}
 }
 
-// FieldType specifies how to handle Field data.
+// FieldType tells the encoder how to interpret the data packed inside a Field.
+// Each type corresponds to a specific encoding path in the FieldEncoder.
 type FieldType byte
 
 // Set of FileType values.
@@ -383,7 +394,10 @@ const (
 	FieldTypeGroup
 )
 
-// Field hold data of a specific field.
+// Field is the fundamental key-value unit in logf's structured logging.
+// Every Bool(), String(), Int(), etc. call creates one of these. Fields
+// are designed to be small (56 bytes) and allocation-free for scalar
+// types — the value is packed inline rather than boxed into an interface.
 //
 // Layout (56 bytes):
 //
@@ -400,8 +414,9 @@ type Field struct {
 	Val  int64
 }
 
-// Accept interprets Field data according to FieldType and calls appropriate
-// FieldEncoder function.
+// Accept dispatches the Field to the appropriate FieldEncoder method based
+// on its FieldType. This is the bridge between the type-erased Field
+// storage and the strongly-typed encoder interface.
 func (fd Field) Accept(v FieldEncoder) {
 	switch fd.Type {
 	case FieldTypeAny:
