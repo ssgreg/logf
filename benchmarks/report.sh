@@ -26,7 +26,7 @@ RAW="$RESULTS_DIR/raw-${TIMESTAMP}.txt"
 
 # All known loggers and scenarios.
 ALL_APIS="Logf|Slog|SlogLogf|Zap|Zerolog|Logrus"
-ALL_SCENARIOS='DisabledLevel|NoFields|TwoScalars$|TwoScalarsInGroup|SixScalars|SixHeavy|ErrorField|WithPerCall_NoFields|WithPerCall_TwoScalars|WithCached_NoFields|WithCached_TwoScalars|WithBoth_TwoScalars|WithGroupCached_TwoScalars|Caller_TwoScalars|With$|WithOnTop|WithGroup$|Async_NoFields|Async_TwoScalars|Async_SixScalars|AsyncParallel_NoFields|AsyncParallel_TwoScalars|AsyncParallel_WithCached_TwoScalars'
+ALL_SCENARIOS='DisabledLevel|NoFields|TwoScalars$|TwoScalarsInGroup|SixScalars|SixHeavy|ErrorField|WithPerCall_NoFields|WithPerCall_TwoScalars|WithCached_NoFields|WithCached_TwoScalars|WithBoth_TwoScalars|WithGroupCached_TwoScalars|Caller_TwoScalars|With$|WithOnTop|WithGroup$|Router_NoFields|RouterSlab_NoFields|Async_NoFields|Async_TwoScalars|Async_SixScalars|AsyncParallel_NoFields|AsyncParallel_TwoScalars|AsyncParallel_WithCached_TwoScalars'
 
 # Optional filters: $2 = loggers (comma-sep), $3 = scenarios (comma-sep).
 APIS="${2:-}"
@@ -64,6 +64,8 @@ resolve_scenario() {
         with|a1)                           echo 'With$' ;;
         withontop|a2)                      echo WithOnTop ;;
         withgroup|a3)                      echo 'WithGroup$' ;;
+        router_nofields|router)            echo Router_NoFields ;;
+        routerslab_nofields|routerslab)   echo RouterSlab_NoFields ;;
         async_nofields)                    echo Async_NoFields ;;
         async_twoscalars)                  echo Async_TwoScalars ;;
         async_sixscalars)                  echo Async_SixScalars ;;
@@ -114,7 +116,7 @@ BEGIN {
     # ── Scenario display order and labels ──
     # key = benchmark suffix, value = table label
     # To rename a scenario in the table, change the value here.
-    split("DisabledLevel,NoFields,TwoScalars,TwoScalarsInGroup,SixScalars,SixHeavy,ErrorField,WithPerCall_NoFields,WithPerCall_TwoScalars,WithCached_NoFields,WithCached_TwoScalars,WithBoth_TwoScalars,WithGroupCached_TwoScalars,Caller_TwoScalars,With,WithOnTop,WithGroup,Async_NoFields,Async_TwoScalars,Async_SixScalars,AsyncParallel_NoFields,AsyncParallel_TwoScalars,AsyncParallel_WithCached_TwoScalars", order, ",")
+    split("DisabledLevel,NoFields,TwoScalars,TwoScalarsInGroup,SixScalars,SixHeavy,ErrorField,WithPerCall_NoFields,WithPerCall_TwoScalars,WithCached_NoFields,WithCached_TwoScalars,WithBoth_TwoScalars,WithGroupCached_TwoScalars,Caller_TwoScalars,With,WithOnTop,WithGroup,Router_NoFields,RouterSlab_NoFields,Async_NoFields,Async_TwoScalars,Async_SixScalars,AsyncParallel_NoFields,AsyncParallel_TwoScalars,AsyncParallel_WithCached_TwoScalars", order, ",")
     for (i in order) order_idx[order[i]] = i
 
     sc_label["DisabledLevel"]              = "Disabled level (DisabledLevel)"
@@ -131,6 +133,9 @@ BEGIN {
     sc_label["WithBoth_TwoScalars"]        = "With/both + 2s (WithBoth_TwoScalars)"
     sc_label["WithGroupCached_TwoScalars"] = "WithGroup + 2s (WithGroupCached_TwoScalars)"
     sc_label["Caller_TwoScalars"]          = "Caller + 2s (Caller_TwoScalars)"
+
+    sc_label["Router_NoFields"]            = "Router (Router_NoFields)"
+    sc_label["RouterSlab_NoFields"]        = "Router+Slab (RouterSlab_NoFields)"
 
     sc_label["With"]                                   = "A1: With (With)"
     sc_label["WithOnTop"]                              = "A2: WithOnTop (WithOnTop)"

@@ -75,7 +75,7 @@ const (
 //	16 slabs × 64 KB:  absorbs a  ~80 ms spike
 //
 // Memory cost is slabCount × slabSize, plus one extra slabSize when
-// WithFlushInterval is enabled (reusable buffer for idle flush).
+// FlushInterval is enabled (reusable buffer for idle flush).
 // Typical configurations:
 //
 //	 4 ×  4 KB =  16 KB  (default, lightweight)
@@ -83,7 +83,7 @@ const (
 //	16 × 64 KB =   1 MB  (high throughput + long spike tolerance)
 //
 // When all slabs are in flight and the pool is empty, Write blocks
-// until a slab is recycled. With WithDropOnFull, Write never blocks:
+// until a slab is recycled. With DropOnFull, Write never blocks:
 // if the I/O goroutine cannot keep up, the current slab's data is
 // silently discarded and the slab is reused. Use Dropped to monitor
 // the total number of messages lost.
@@ -157,48 +157,78 @@ type SlabStats struct {
 	WriteErrors int64 // total write errors
 }
 
-// SlabOption configures a SlabWriter at creation time. Pass options to
-// NewSlabWriter to customize flush behavior, drop policy, and error
-// reporting.
-type SlabOption func(*SlabWriter)
+// SlabWriterBuilder accumulates configuration for a SlabWriter. Create
+// one with NewSlabWriter, set options via chained method calls, and
+// finalize with Build.
+type SlabWriterBuilder struct {
+	w             io.Writer
+	slabSize      int
+	slabCount     int
+	flushInterval time.Duration
+	dropOnFull    bool
+	errW          io.Writer
+}
 
-// WithFlushInterval sets how long the SlabWriter waits for new data
+// NewSlabWriter returns a builder for a SlabWriter that will write to w.
+// Call Build to create the SlabWriter. Default slab size is 4 KB and
+// default slab count is 4.
+func NewSlabWriter(w io.Writer) *SlabWriterBuilder {
+	return &SlabWriterBuilder{
+		w:         w,
+		slabSize:  defaultSlabSize,
+		slabCount: defaultSlabCount,
+	}
+}
+
+// SlabSize sets the size of each slab buffer in bytes. Larger slabs
+// mean fewer I/O calls but more memory. Default is 4 KB.
+func (b *SlabWriterBuilder) SlabSize(n int) *SlabWriterBuilder {
+	b.slabSize = n
+	return b
+}
+
+// SlabCount sets the number of slab buffers in the pool. More slabs
+// give better burst tolerance but use more memory. Default is 4.
+func (b *SlabWriterBuilder) SlabCount(n int) *SlabWriterBuilder {
+	b.slabCount = n
+	return b
+}
+
+// FlushInterval sets how long the SlabWriter waits for new data
 // before flushing a partial slab. Without this, a quiet period could
 // leave recent log entries sitting in the buffer. Default is 0 (no
 // idle flush — data only goes out when a slab fills up or Close is
 // called).
-func WithFlushInterval(d time.Duration) SlabOption {
-	return func(sw *SlabWriter) {
-		sw.flushInterval = d
-	}
+func (b *SlabWriterBuilder) FlushInterval(d time.Duration) *SlabWriterBuilder {
+	b.flushInterval = d
+	return b
 }
 
-// WithDropOnFull makes Write non-blocking: if the I/O goroutine cannot
+// DropOnFull makes Write non-blocking: if the I/O goroutine cannot
 // keep up and all slabs are in flight, the current slab's data is
 // silently dropped instead of blocking the caller. Use this when you
 // would rather lose log messages than add latency to your hot path.
 // Monitor dropped messages via Stats().Dropped.
-func WithDropOnFull() SlabOption {
-	return func(sw *SlabWriter) {
-		sw.dropOnFull = true
-	}
+func (b *SlabWriterBuilder) DropOnFull() *SlabWriterBuilder {
+	b.dropOnFull = true
+	return b
 }
 
-// WithErrorWriter sets where I/O errors are reported. When the background
+// ErrorWriter sets where I/O errors are reported. When the background
 // goroutine fails to write a slab, it formats the error and writes it
 // to w. By default errors are silently discarded — pass os.Stderr here
 // if you want to know about write failures.
-func WithErrorWriter(w io.Writer) SlabOption {
-	return func(sw *SlabWriter) {
-		sw.errW = w
-	}
+func (b *SlabWriterBuilder) ErrorWriter(w io.Writer) *SlabWriterBuilder {
+	b.errW = w
+	return b
 }
 
-// NewSlabWriter creates a SlabWriter that buffers writes into pre-allocated
-// slabs and flushes them to w via a background I/O goroutine. You must
-// call Close when you are done to flush remaining data and stop the
+// Build creates and starts the SlabWriter. You must call Close when you
+// are done to flush remaining data and stop the background I/O
 // goroutine — a defer sw.Close() right after creation is the way to go.
-func NewSlabWriter(w io.Writer, slabSize, slabCount int, opts ...SlabOption) *SlabWriter {
+func (b *SlabWriterBuilder) Build() *SlabWriter {
+	slabSize := b.slabSize
+	slabCount := b.slabCount
 	if slabSize <= 0 {
 		slabSize = defaultSlabSize
 	}
@@ -206,15 +236,15 @@ func NewSlabWriter(w io.Writer, slabSize, slabCount int, opts ...SlabOption) *Sl
 		slabCount = defaultSlabCount
 	}
 	sb := &SlabWriter{
-		slabSize: slabSize,
-		pool:     make(chan []byte, slabCount),
-		full:     make(chan []byte, slabCount+1), // +1 for occasional oversized message
-		w:        WriterFromIO(w),
-		stop:     make(chan struct{}),
-		done:     make(chan struct{}),
-	}
-	for _, opt := range opts {
-		opt(sb)
+		slabSize:      slabSize,
+		pool:          make(chan []byte, slabCount),
+		full:          make(chan []byte, slabCount+1), // +1 for occasional oversized message
+		w:             WriterFromIO(b.w),
+		stop:          make(chan struct{}),
+		done:          make(chan struct{}),
+		flushInterval: b.flushInterval,
+		dropOnFull:    b.dropOnFull,
+		errW:          b.errW,
 	}
 	if sb.flushInterval > 0 {
 		sb.flushBuf = make([]byte, slabSize)

@@ -1,0 +1,81 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/ssgreg/logf/benchmarks
+cpu: Apple M1 Pro
+BenchmarkFileParallel_Zap_NoBuffer-10            	  238684	      4938 ns/op	    1185 B/op	       7 allocs/op
+BenchmarkFileParallel_Zap_NoBuffer-10            	  251614	      4980 ns/op	    1185 B/op	       7 allocs/op
+BenchmarkFileParallel_Zap_NoBuffer-10            	  225744	      4908 ns/op	    1185 B/op	       7 allocs/op
+BenchmarkFileParallel_Zap_NoBuffer-10            	  236990	      4834 ns/op	    1185 B/op	       7 allocs/op
+BenchmarkFileParallel_Zap_NoBuffer-10            	  254820	      4803 ns/op	    1185 B/op	       7 allocs/op
+BenchmarkFileParallel_Zap_Buffer256KB-10         	 1000000	      1203 ns/op	    1187 B/op	       7 allocs/op
+BenchmarkFileParallel_Zap_Buffer256KB-10         	 1000000	      1044 ns/op	    1187 B/op	       7 allocs/op
+BenchmarkFileParallel_Zap_Buffer256KB-10         	 1000000	      1063 ns/op	    1187 B/op	       7 allocs/op
+BenchmarkFileParallel_Zap_Buffer256KB-10         	 1000000	      1095 ns/op	    1187 B/op	       7 allocs/op
+BenchmarkFileParallel_Zap_Buffer256KB-10         	 1000000	      1097 ns/op	    1187 B/op	       7 allocs/op
+BenchmarkFileParallel_Logf_NoBuffer-10           	  287268	      4083 ns/op	     352 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_NoBuffer-10           	  289238	      4156 ns/op	     352 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_NoBuffer-10           	  287101	      4513 ns/op	     352 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_NoBuffer-10           	  272079	      4290 ns/op	     352 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_NoBuffer-10           	  292364	      4063 ns/op	     352 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab128Kx2-10         	 1537845	       792.6 ns/op	         0 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab128Kx2-10         	 1374451	       835.8 ns/op	         0 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab128Kx2-10         	 1628359	       750.5 ns/op	         0 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab128Kx2-10         	 1637356	       749.6 ns/op	         0 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab128Kx2-10         	 1607654	       744.5 ns/op	         0 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab128Kx2_Drop-10    	 1646870	       733.3 ns/op	     76122 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab128Kx2_Drop-10    	 1533907	       762.4 ns/op	     93978 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab128Kx2_Drop-10    	 1646188	       753.7 ns/op	     91795 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab128Kx2_Drop-10    	 1617756	       739.4 ns/op	     63842 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab128Kx2_Drop-10    	 1638816	       740.8 ns/op	     62524 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab64Kx1-10          	 1483914	       804.4 ns/op	         0 drops	     352 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab64Kx1-10          	 1498537	       934.5 ns/op	         0 drops	     352 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab64Kx1-10          	 1477285	       817.2 ns/op	         0 drops	     352 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab64Kx1-10          	 1511635	       836.8 ns/op	         0 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab64Kx1-10          	 1525558	       810.3 ns/op	         0 drops	     352 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab64Kx2_Drop-10     	 1630816	       746.9 ns/op	    100339 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab64Kx2_Drop-10     	 1618923	       743.8 ns/op	     98547 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab64Kx2_Drop-10     	 1622718	       741.1 ns/op	     88786 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab64Kx2_Drop-10     	 1588773	       752.6 ns/op	    116406 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Logf_Slab64Kx2_Drop-10     	 1593330	       741.2 ns/op	     88008 drops	     353 B/op	       1 allocs/op
+BenchmarkFileParallel_Slog_NoBuffer-10           	  155560	      7464 ns/op	    1074 B/op	      17 allocs/op
+BenchmarkFileParallel_Slog_NoBuffer-10           	  163288	      8453 ns/op	    1074 B/op	      17 allocs/op
+BenchmarkFileParallel_Slog_NoBuffer-10           	  152446	      7651 ns/op	    1074 B/op	      17 allocs/op
+BenchmarkFileParallel_Slog_NoBuffer-10           	  166490	      7252 ns/op	    1074 B/op	      17 allocs/op
+BenchmarkFileParallel_Slog_NoBuffer-10           	  158180	      7308 ns/op	    1074 B/op	      17 allocs/op
+BenchmarkFileParallel_Slog_Buffer256KB-10        	  627367	      1963 ns/op	    1076 B/op	      17 allocs/op
+BenchmarkFileParallel_Slog_Buffer256KB-10        	  642465	      1812 ns/op	    1076 B/op	      17 allocs/op
+BenchmarkFileParallel_Slog_Buffer256KB-10        	  656916	      1840 ns/op	    1076 B/op	      17 allocs/op
+BenchmarkFileParallel_Slog_Buffer256KB-10        	  622634	      1822 ns/op	    1076 B/op	      17 allocs/op
+BenchmarkFileParallel_Slog_Buffer256KB-10        	  637339	      1986 ns/op	    1076 B/op	      17 allocs/op
+BenchmarkFileParallel_SlogLogf_NoBuffer-10       	  133422	      8805 ns/op	    1339 B/op	      16 allocs/op
+BenchmarkFileParallel_SlogLogf_NoBuffer-10       	  142287	      8217 ns/op	    1338 B/op	      16 allocs/op
+BenchmarkFileParallel_SlogLogf_NoBuffer-10       	  137526	      8211 ns/op	    1338 B/op	      16 allocs/op
+BenchmarkFileParallel_SlogLogf_NoBuffer-10       	  143646	      7961 ns/op	    1338 B/op	      16 allocs/op
+BenchmarkFileParallel_SlogLogf_NoBuffer-10       	  144105	      7989 ns/op	    1338 B/op	      16 allocs/op
+BenchmarkFileParallel_SlogLogf_Slab-10           	  716680	      2204 ns/op	    1345 B/op	      16 allocs/op
+BenchmarkFileParallel_SlogLogf_Slab-10           	  639339	      1819 ns/op	    1346 B/op	      16 allocs/op
+BenchmarkFileParallel_SlogLogf_Slab-10           	  711776	      1734 ns/op	    1346 B/op	      16 allocs/op
+BenchmarkFileParallel_SlogLogf_Slab-10           	  643003	      1695 ns/op	    1346 B/op	      16 allocs/op
+BenchmarkFileParallel_SlogLogf_Slab-10           	  705159	      1694 ns/op	    1345 B/op	      16 allocs/op
+BenchmarkFileParallel_Zerolog_NoBuffer-10        	  215930	      5519 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFileParallel_Zerolog_NoBuffer-10        	  215708	      5535 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFileParallel_Zerolog_NoBuffer-10        	  202027	      5414 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFileParallel_Zerolog_NoBuffer-10        	  187462	      5641 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFileParallel_Zerolog_NoBuffer-10        	  215924	      5392 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFileParallel_Zerolog_Buffer256KB-10     	 1000000	      1204 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFileParallel_Zerolog_Buffer256KB-10     	  984224	      1104 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFileParallel_Zerolog_Buffer256KB-10     	 1000000	      1131 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFileParallel_Zerolog_Buffer256KB-10     	  998311	      1112 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFileParallel_Zerolog_Buffer256KB-10     	  962668	      1098 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFileParallel_Logrus_NoBuffer-10         	  171514	      6831 ns/op	    3150 B/op	      46 allocs/op
+BenchmarkFileParallel_Logrus_NoBuffer-10         	  173140	      7134 ns/op	    3151 B/op	      46 allocs/op
+BenchmarkFileParallel_Logrus_NoBuffer-10         	  157364	      6928 ns/op	    3150 B/op	      46 allocs/op
+BenchmarkFileParallel_Logrus_NoBuffer-10         	  171423	      6774 ns/op	    3150 B/op	      46 allocs/op
+BenchmarkFileParallel_Logrus_NoBuffer-10         	  173169	      6698 ns/op	    3149 B/op	      46 allocs/op
+BenchmarkFileParallel_Logrus_Buffer256KB-10      	  494617	      2529 ns/op	    3163 B/op	      46 allocs/op
+BenchmarkFileParallel_Logrus_Buffer256KB-10      	  479235	      2467 ns/op	    3163 B/op	      46 allocs/op
+BenchmarkFileParallel_Logrus_Buffer256KB-10      	  455304	      2488 ns/op	    3163 B/op	      46 allocs/op
+BenchmarkFileParallel_Logrus_Buffer256KB-10      	  491713	      2452 ns/op	    3163 B/op	      46 allocs/op
+BenchmarkFileParallel_Logrus_Buffer256KB-10      	  500673	      2415 ns/op	    3163 B/op	      46 allocs/op
+PASS
+ok  	github.com/ssgreg/logf/benchmarks	111.499s

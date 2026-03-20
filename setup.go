@@ -23,7 +23,7 @@ import (
 //	    Context().
 //	    Build()
 func NewLogger() *LoggerBuilder {
-	return &LoggerBuilder{}
+	return &LoggerBuilder{level: LevelDebug}
 }
 
 // LoggerBuilder accumulates options and builds a Logger with a sync

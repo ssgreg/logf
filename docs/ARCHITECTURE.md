@@ -43,7 +43,7 @@ Logger ──→ ContextHandler ──→ Router ──→ Encoder₁ ──→ 
 - **Router** = synchronous fan-out Handler. One Encode per encoder group,
   direct Write to each output.
 - **SlabWriter** = pre-allocated slab pool + background I/O goroutine.
-  `WithDropOnFull()` for non-blocking mode.
+  `DropOnFull()` for non-blocking mode.
 
 ## Bag — cached field chain
 

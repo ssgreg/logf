@@ -204,71 +204,13 @@ func BenchmarkLogf_Router_NoFields(b *testing.B) {
 	})
 }
 
-func BenchmarkLogf_Router_TwoScalars(b *testing.B) {
-	logger, close := newLogfRouter()
-	defer close()
-	b.RunParallel(func(pb *testing.PB) {
-		ctx := context.Background()
-		for pb.Next() {
-			logger.Info(ctx, "request handled", logfTwoScalars()...)
-		}
-	})
-}
-
-func BenchmarkLogf_Router_SixScalars(b *testing.B) {
-	logger, close := newLogfRouter()
-	defer close()
-	b.RunParallel(func(pb *testing.PB) {
-		ctx := context.Background()
-		for pb.Next() {
-			logger.Info(ctx, "request handled", logfSixScalars()...)
-		}
-	})
-}
-
-func BenchmarkLogf_Router_WithCached_TwoScalars(b *testing.B) {
-	logger, close := newLogfRouter()
-	defer close()
-	logger2 := logger.With(logfTwoScalars()...)
-	b.RunParallel(func(pb *testing.PB) {
-		ctx := context.Background()
-		for pb.Next() {
-			logger2.Info(ctx, "request handled", logfTwoScalars()...)
-		}
-	})
-}
-
-// --- Router direct (no slab, parallel) ---
-
-func BenchmarkLogf_RouterDirect_NoFields(b *testing.B) {
-	logger, close := newLogfRouter()
+func BenchmarkLogf_RouterSlab_NoFields(b *testing.B) {
+	logger, close := newLogfRouterSlab()
 	defer close()
 	b.RunParallel(func(pb *testing.PB) {
 		ctx := context.Background()
 		for pb.Next() {
 			logger.Info(ctx, "request handled")
-		}
-	})
-}
-
-func BenchmarkLogf_RouterDirect_TwoScalars(b *testing.B) {
-	logger, close := newLogfRouter()
-	defer close()
-	b.RunParallel(func(pb *testing.PB) {
-		ctx := context.Background()
-		for pb.Next() {
-			logger.Info(ctx, "request handled", logfTwoScalars()...)
-		}
-	})
-}
-
-func BenchmarkLogf_RouterDirect_SixScalars(b *testing.B) {
-	logger, close := newLogfRouter()
-	defer close()
-	b.RunParallel(func(pb *testing.PB) {
-		ctx := context.Background()
-		for pb.Next() {
-			logger.Info(ctx, "request handled", logfSixScalars()...)
 		}
 	})
 }

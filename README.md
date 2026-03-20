@@ -248,7 +248,7 @@ slog.SetDefault(slog.New(logf.NewSlogHandler(
 )))
 
 // Step 3: add async I/O — swap stderr for SlabWriter → file
-sw := logf.NewSlabWriter(file, 64*1024, 8)
+sw := logf.NewSlabWriter(file).SlabSize(64*1024).SlabCount(8).Build()
 router, close, _ := logf.NewRouter().Route(logf.JSON().Build(), logf.Output(logf.LevelInfo, sw)).Build()
 slog.SetDefault(slog.New(logf.NewSlogHandler(logf.NewContextHandler(router))))
 
@@ -262,7 +262,7 @@ logger.Info(ctx, "fast path", logf.Int("status", 200))
 One log entry, multiple destinations, each with its own rules:
 
 ```go
-fileSlab := logf.NewSlabWriter(file, 64*1024, 8)
+fileSlab := logf.NewSlabWriter(file).SlabSize(64*1024).SlabCount(8).Build()
 jsonEnc := logf.JSON().Build()
 textEnc := logf.Text().Build()
 
@@ -286,9 +286,11 @@ doesn't care — each writer is independent.
 file writes can be batched:
 
 ```go
-fileSlab := logf.NewSlabWriter(file, 64*1024, 8,
-    logf.WithFlushInterval(100*time.Millisecond),
-)
+fileSlab := logf.NewSlabWriter(file).
+    SlabSize(64*1024).
+    SlabCount(8).
+    FlushInterval(100*time.Millisecond).
+    Build()
 
 router, close, _ := logf.NewRouter().
     Route(enc,
@@ -307,9 +309,11 @@ filled slabs to the destination. Your goroutine never touches the disk.
 Never blocks on the network. Just copies bytes and moves on.
 
 ```go
-sw := logf.NewSlabWriter(file, 64*1024, 8,
-    logf.WithFlushInterval(100*time.Millisecond),
-)
+sw := logf.NewSlabWriter(file).
+    SlabSize(64*1024).
+    SlabCount(8).
+    FlushInterval(100*time.Millisecond).
+    Build()
 defer sw.Close()
 ```
 
@@ -320,11 +324,13 @@ When the I/O goroutine can't keep up? The slab pool absorbs the spike.
 **Drop mode** — for when losing a log is better than blocking a request:
 
 ```go
-sw := logf.NewSlabWriter(conn, 64*1024, 8,
-    logf.WithDropOnFull(),
-    logf.WithFlushInterval(100*time.Millisecond),
-    logf.WithErrorWriter(os.Stderr),
-)
+sw := logf.NewSlabWriter(conn).
+    SlabSize(64*1024).
+    SlabCount(8).
+    DropOnFull().
+    FlushInterval(100*time.Millisecond).
+    ErrorWriter(os.Stderr).
+    Build()
 ```
 
 **Keep an eye on it:**
@@ -414,10 +420,91 @@ rotator := &lumberjack.Logger{
     MaxBackups: 3,
     MaxAge:     28,
 }
-sw := logf.NewSlabWriter(rotator, 64*1024, 8)
+sw := logf.NewSlabWriter(rotator).SlabSize(64*1024).SlabCount(8).Build()
 ```
 
-## The fine print
+## Performance
+
+Parallel benchmarks on Apple M1 Pro, Go 1.24, `count=5`.
+Full results and methodology in [benchmarks/](benchmarks/).
+
+### Latency (ns/op, lower is better)
+
+| Scenario | logf | slog | slog+logf | zap | zerolog | logrus |
+|---|---:|---:|---:|---:|---:|---:|
+| No fields | 43 | 221 | 53 | 50 | 26 | 500 |
+| 2 scalars | 94 | 237 | 133 | 126 | 32 | 820 |
+| 6 fields (bytes, time, object…) | 257 | 722 | 836 | 611 | 147 | 1937 |
+| With() per call | 200 | 363 | 254 | 579 | 196 | 812 |
+| Caller + 2 scalars | 232 | 471 | 246 | 339 | 232 | — |
+| With() (no log call) | 60 | 343 | 227 | 456 | 68 | 226 |
+| WithGroup() (no log call) | 21 | 98 | 67 | 430 | — | — |
+
+### Allocations (B/op / allocs)
+
+| Scenario | logf | slog | slog+logf | zap | zerolog | logrus |
+|---|---:|---:|---:|---:|---:|---:|
+| No fields | 0 | 0 | 0 | 0 | 0 | 836 / 16 |
+| 2 scalars | 112 / 1 | 0 | 112 / 1 | 128 / 1 | 0 | 1413 / 23 |
+| 6 fields | 355 / 1 | 1046 / 13 | 710 / 5 | 1188 / 7 | 0 | 3220 / 46 |
+| With() per call | 177 / 2 | 352 / 8 | 371 / 6 | 1427 / 6 | 512 / 1 | 1413 / 23 |
+| With() | 176 / 2 | 352 / 8 | 368 / 6 | 1425 / 6 | 0 | 416 / 3 |
+| WithGroup() | 64 / 1 | 184 / 4 | 128 / 3 | 1361 / 6 | — | — |
+
+**The highlights:**
+
+- **Faster than zap** on most scenarios. `With()` is 7.6× faster
+  (60 ns vs 456 ns), `WithGroup()` is 20× faster (21 ns vs 430 ns).
+  These are the "new logger per request" operations — they happen a lot.
+- **2–5× faster than slog** across the board. slog shows 0 allocs on
+  small field counts (inline buffer), but pays for it in latency.
+- **6 fields: 257 ns** — zap needs 611 ns, slog needs 722 ns.
+  logf keeps 1 alloc where slog does 13.
+- **slog+logf** — keep the standard `slog.Logger` API, get 2–4× faster
+  than stock slog. Caller lookup is nearly free: 246 ns vs slog's 471 ns.
+  The one weak spot is 6 fields (836 ns) — slog's `any`-based
+  attrs force reflection that logf's typed fields avoid.
+- **zerolog is faster** (zero-alloc by design), but you pay for it:
+  no multi-destination routing, no context-aware fields, no slog
+  compatibility, no async I/O, and a fluent API where a forgotten
+  `.Msg()` silently drops the entry.
+- **Router: 36 ns** for a log call routed to io.Discard — encoding,
+  level check, and dispatch included.
+- **SlabWriter: 0 allocs, async I/O.** Your goroutine does a memcpy and
+  moves on. Background I/O handles the rest.
+
+### Real file I/O (parallel, 6 fields)
+
+The benchmarks above use `io.Discard`. Here's what happens with a real
+file and a realistic payload (bytes, time, []int, []string, duration,
+object) — where SlabWriter's async architecture actually matters:
+
+| Config | ns/op | B/op | allocs |
+|---|---:|---:|---:|
+| logf + SlabWriter | 744 | 353 | 1 |
+| zerolog + bufio 256KB | 1098 | 0 | 0 |
+| zap + BufferedWriteSyncer | 1097 | 1187 | 7 |
+| slog + bufio 256KB | 1986 | 1076 | 17 |
+
+All loggers use 256KB of buffering. With real I/O and realistic fields,
+logf is **32% faster than zerolog and zap** — the typed encoder advantage
+grows as field count and complexity increase.
+
+**Under I/O pressure** (5% of writes stall for 5ms — think slow network,
+overloaded disk):
+
+| Logger | p50 | p99 | p999 |
+|---|---:|---:|---:|
+| logf (SlabWriter) | 833 ns | 43 µs | 163 µs |
+| zap (buffered) | 917 ns | 56 µs | 180 µs |
+| zerolog (unbuffered) | 7.5 µs | 5.9 ms | 10.2 ms |
+| slog (unbuffered) | 14 µs | 17.9 ms | 24 ms |
+
+Sync loggers block on every stalled write. logf copies bytes into a slab
+and moves on — the background goroutine deals with the slow destination.
+Your HTTP handler never notices.
+
+### The fine print
 
 - **One allocation per log call with fields.** That's Go's variadic
   `[]Field` slice. Calls without fields are zero-alloc.

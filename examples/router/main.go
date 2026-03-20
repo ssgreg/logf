@@ -19,9 +19,11 @@ func main() {
 	defer file.Close()
 
 	// Async buffered writer for the file destination.
-	fileSlab := logf.NewSlabWriter(file, 64*1024, 8,
-		logf.WithFlushInterval(100*time.Millisecond),
-	)
+	fileSlab := logf.NewSlabWriter(file).
+		SlabSize(64 * 1024).
+		SlabCount(8).
+		FlushInterval(100 * time.Millisecond).
+		Build()
 
 	// JSON encoder for file (full detail).
 	fileEnc := logf.JSON().

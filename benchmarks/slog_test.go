@@ -53,6 +53,17 @@ func slogTwoScalarsArgs() []any {
 	return []any{"method", "GET", "status", 200}
 }
 
+func slogSixHeavyArgs() []any {
+	return []any{
+		"body", string(heavyBytes),
+		"timestamp", heavyTime,
+		"ids", heavyInts64,
+		"tags", heavyStrings,
+		"latency", heavyDuration,
+		slog.Group("user", slog.Int("id", 123), slog.String("name", "alice")),
+	}
+}
+
 // B0: DisabledLevel
 func BenchmarkSlog_DisabledLevel(b *testing.B) {
 	logger := newSlogDiscardInfo()

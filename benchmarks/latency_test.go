@@ -49,39 +49,27 @@ func reportLatency(t *testing.T, name string, samples []time.Duration) {
 }
 
 func TestLatencyDistribution(t *testing.T) {
-	f, err := os.CreateTemp("", "latency-bench-*.log")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	t.Logf("Writing %d log entries per logger to %s", latencySamples, f.Name())
+	t.Logf("Parallel latency: %d goroutines, %d samples total, file I/O", runtime.NumCPU(), latencySamples)
 	t.Logf("")
 
-	// --- logf async (router + slab writer) ---
+	// --- logf async (router + slab writer, 128K×2 = 256KB) ---
 	{
 		ff, _ := os.CreateTemp("", "latency-logf-*.log")
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
 		enc := logf.JSON().Build()
-		sw := logf.NewSlabWriter(ff, 64*1024, 8)
+		sw := logf.NewSlabWriter(ff).SlabSize(128*1024).SlabCount(2).Build()
 		defer sw.Close()
 		h, cl, _ := logf.NewRouter().
 			Route(enc, logf.Output(logf.LevelDebug, sw)).
 			Build()
 		defer cl()
 		logger := logf.New(h).WithCaller(false)
-		ctx := context.Background()
 
-		samples := make([]time.Duration, latencySamples)
-		runtime.GC()
-		for i := 0; i < latencySamples; i++ {
-			start := time.Now()
-			logger.Info(ctx, "request handled")
-			samples[i] = time.Since(start)
-		}
+		samples := collectParallelLatency(func() {
+			logger.Info(context.Background(), "request handled")
+		})
 		reportLatency(t, "logf async (slab)", samples)
 	}
 
@@ -94,15 +82,10 @@ func TestLatencyDistribution(t *testing.T) {
 		enc := logf.JSON().Build()
 		w := logf.NewSyncHandler(logf.LevelDebug, ff, enc)
 		logger := logf.New(w).WithCaller(false)
-		ctx := context.Background()
 
-		samples := make([]time.Duration, latencySamples)
-		runtime.GC()
-		for i := 0; i < latencySamples; i++ {
-			start := time.Now()
-			logger.Info(ctx, "request handled")
-			samples[i] = time.Since(start)
-		}
+		samples := collectParallelLatency(func() {
+			logger.Info(context.Background(), "request handled")
+		})
 		reportLatency(t, "logf sync (pooled writer)", samples)
 	}
 
@@ -118,13 +101,9 @@ func TestLatencyDistribution(t *testing.T) {
 		enc := zapcore.NewJSONEncoder(ec)
 		logger := zap.New(zapcore.NewCore(enc, zapcore.AddSync(ff), zap.DebugLevel))
 
-		samples := make([]time.Duration, latencySamples)
-		runtime.GC()
-		for i := 0; i < latencySamples; i++ {
-			start := time.Now()
+		samples := collectParallelLatency(func() {
 			logger.Info("request handled")
-			samples[i] = time.Since(start)
-		}
+		})
 		reportLatency(t, "zap (sync, unbuffered)", samples)
 	}
 
@@ -142,13 +121,9 @@ func TestLatencyDistribution(t *testing.T) {
 		defer bws.Stop()
 		logger := zap.New(zapcore.NewCore(enc, bws, zap.DebugLevel))
 
-		samples := make([]time.Duration, latencySamples)
-		runtime.GC()
-		for i := 0; i < latencySamples; i++ {
-			start := time.Now()
+		samples := collectParallelLatency(func() {
 			logger.Info("request handled")
-			samples[i] = time.Since(start)
-		}
+		})
 		reportLatency(t, "zap (sync, buffered)", samples)
 	}
 
@@ -160,13 +135,9 @@ func TestLatencyDistribution(t *testing.T) {
 
 		logger := zerolog.New(ff).With().Timestamp().Logger()
 
-		samples := make([]time.Duration, latencySamples)
-		runtime.GC()
-		for i := 0; i < latencySamples; i++ {
-			start := time.Now()
+		samples := collectParallelLatency(func() {
 			logger.Info().Msg("request handled")
-			samples[i] = time.Since(start)
-		}
+		})
 		reportLatency(t, "zerolog (sync, unbuffered)", samples)
 	}
 
@@ -176,17 +147,13 @@ func TestLatencyDistribution(t *testing.T) {
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		lbw := &lockedBufWriter{bw: bufio.NewWriterSize(ff, 4096)}
+		lbw := &lockedBufWriter{bw: bufio.NewWriterSize(ff, 256*1024)}
 		defer lbw.Flush()
 		logger := zerolog.New(lbw).With().Timestamp().Logger()
 
-		samples := make([]time.Duration, latencySamples)
-		runtime.GC()
-		for i := 0; i < latencySamples; i++ {
-			start := time.Now()
+		samples := collectParallelLatency(func() {
 			logger.Info().Msg("request handled")
-			samples[i] = time.Since(start)
-		}
+		})
 		reportLatency(t, "zerolog (sync, buffered)", samples)
 	}
 
@@ -198,13 +165,9 @@ func TestLatencyDistribution(t *testing.T) {
 
 		logger := slog.New(slog.NewJSONHandler(ff, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-		samples := make([]time.Duration, latencySamples)
-		runtime.GC()
-		for i := 0; i < latencySamples; i++ {
-			start := time.Now()
+		samples := collectParallelLatency(func() {
 			logger.Info("request handled")
-			samples[i] = time.Since(start)
-		}
+		})
 		reportLatency(t, "slog (sync, unbuffered)", samples)
 	}
 
@@ -214,21 +177,38 @@ func TestLatencyDistribution(t *testing.T) {
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		bw := bufio.NewWriterSize(ff, 4096)
+		bw := bufio.NewWriterSize(ff, 256*1024)
 		defer bw.Flush()
 		logger := slog.New(slog.NewJSONHandler(bw, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-		samples := make([]time.Duration, latencySamples)
-		runtime.GC()
-		for i := 0; i < latencySamples; i++ {
-			start := time.Now()
+		samples := collectParallelLatency(func() {
 			logger.Info("request handled")
-			samples[i] = time.Since(start)
-		}
+		})
 		reportLatency(t, "slog (sync, buffered)", samples)
 	}
 
-	// --- logrus ---
+	// --- slog+logf (slab) ---
+	{
+		ff, _ := os.CreateTemp("", "latency-sloglogf-*.log")
+		defer os.Remove(ff.Name())
+		defer ff.Close()
+
+		enc := logf.JSON().Build()
+		sw := logf.NewSlabWriter(ff).SlabSize(128*1024).SlabCount(2).Build()
+		defer sw.Close()
+		h, cl, _ := logf.NewRouter().
+			Route(enc, logf.Output(logf.LevelDebug, sw)).
+			Build()
+		defer cl()
+		logger := logf.New(h).WithCaller(false).Slog()
+
+		samples := collectParallelLatency(func() {
+			logger.Info("request handled")
+		})
+		reportLatency(t, "slog+logf (slab)", samples)
+	}
+
+	// --- logrus (sync, unbuffered) ---
 	{
 		ff, _ := os.CreateTemp("", "latency-logrus-*.log")
 		defer os.Remove(ff.Name())
@@ -241,14 +221,31 @@ func TestLatencyDistribution(t *testing.T) {
 			Level:     logrus.DebugLevel,
 		}
 
-		samples := make([]time.Duration, latencySamples)
-		runtime.GC()
-		for i := 0; i < latencySamples; i++ {
-			start := time.Now()
+		samples := collectParallelLatency(func() {
 			logger.Info("request handled")
-			samples[i] = time.Since(start)
-		}
+		})
 		reportLatency(t, "logrus (sync, unbuffered)", samples)
+	}
+
+	// --- logrus (sync, buffered) ---
+	{
+		ff, _ := os.CreateTemp("", "latency-logrusbuf-*.log")
+		defer os.Remove(ff.Name())
+		defer ff.Close()
+
+		lbw := &lockedBufWriter{bw: bufio.NewWriterSize(ff, 256*1024)}
+		defer lbw.Flush()
+		logger := &logrus.Logger{
+			Out:       lbw,
+			Formatter: new(logrus.JSONFormatter),
+			Hooks:     make(logrus.LevelHooks),
+			Level:     logrus.DebugLevel,
+		}
+
+		samples := collectParallelLatency(func() {
+			logger.Info("request handled")
+		})
+		reportLatency(t, "logrus (sync, buffered)", samples)
 	}
 }
 
@@ -275,19 +272,19 @@ func (s *slowWriter) Write(p []byte) (int, error) {
 }
 
 func TestSlowIOLatency(t *testing.T) {
-	t.Logf("Simulating slow I/O: 2%% of writes sleep 1ms")
+	t.Logf("Simulating slow I/O: 5%% of writes sleep 5ms")
 	t.Logf("Parallel: %d goroutines, %d samples total", runtime.NumCPU(), latencySamples)
 	t.Logf("")
 
-	// --- logf async (slab) ---
+	// --- logf async (slab 32K×8 = 256KB, optimized for burst tolerance) ---
 	{
 		ff, _ := os.CreateTemp("", "slowio-logf-*.log")
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		slow := &slowWriter{w: ff, slowPct: 0.02, delay: 1 * time.Millisecond}
+		slow := &slowWriter{w: ff, slowPct: 0.05, delay: 5 * time.Millisecond}
 		enc := logf.JSON().Build()
-		sw := logf.NewSlabWriter(slow, 64*1024, 8)
+		sw := logf.NewSlabWriter(slow).SlabSize(32*1024).SlabCount(8).Build()
 		defer sw.Close()
 		h, cl, _ := logf.NewRouter().
 			Route(enc, logf.Output(logf.LevelDebug, sw)).
@@ -307,7 +304,7 @@ func TestSlowIOLatency(t *testing.T) {
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		sw := &slowWriter{w: ff, slowPct: 0.02, delay: 1 * time.Millisecond}
+		sw := &slowWriter{w: ff, slowPct: 0.05, delay: 5 * time.Millisecond}
 		ec := zap.NewProductionEncoderConfig()
 		ec.EncodeDuration = zapcore.NanosDurationEncoder
 		ec.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -326,7 +323,7 @@ func TestSlowIOLatency(t *testing.T) {
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		sw := &slowWriter{w: ff, slowPct: 0.02, delay: 1 * time.Millisecond}
+		sw := &slowWriter{w: ff, slowPct: 0.05, delay: 5 * time.Millisecond}
 		ec := zap.NewProductionEncoderConfig()
 		ec.EncodeDuration = zapcore.NanosDurationEncoder
 		ec.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -347,7 +344,7 @@ func TestSlowIOLatency(t *testing.T) {
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		sw := &slowWriter{w: ff, slowPct: 0.02, delay: 1 * time.Millisecond}
+		sw := &slowWriter{w: ff, slowPct: 0.05, delay: 5 * time.Millisecond}
 		logger := zerolog.New(sw).With().Timestamp().Logger()
 
 		samples := collectParallelLatency(func() {
@@ -362,7 +359,7 @@ func TestSlowIOLatency(t *testing.T) {
 		defer os.Remove(ff.Name())
 		defer ff.Close()
 
-		sw := &slowWriter{w: ff, slowPct: 0.02, delay: 1 * time.Millisecond}
+		sw := &slowWriter{w: ff, slowPct: 0.05, delay: 5 * time.Millisecond}
 		logger := slog.New(slog.NewJSONHandler(sw, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 		samples := collectParallelLatency(func() {
@@ -410,7 +407,7 @@ func collectParallelLatency(logFn func()) []time.Duration {
 
 func TestGoroutineScalability(t *testing.T) {
 	goroutineCounts := []int{1, 2, 4, 8, 16, 32, 64}
-	const totalOps = 200000
+	const totalOps = 1000000
 
 	t.Logf("Throughput (logs/sec) by goroutine count, %d total ops, file I/O", totalOps)
 	t.Logf("")
@@ -427,7 +424,7 @@ func TestGoroutineScalability(t *testing.T) {
 		for gi, numG := range goroutineCounts {
 			ff, _ := os.CreateTemp("", "scale-logf-*.log")
 			enc := logf.JSON().Build()
-			sw := logf.NewSlabWriter(ff, 64*1024, 8)
+			sw := logf.NewSlabWriter(ff).SlabSize(32*1024).SlabCount(8).Build()
 			h, cl, _ := logf.NewRouter().
 				Route(enc, logf.Output(logf.LevelDebug, sw)).
 				Build()
@@ -523,7 +520,7 @@ func TestGoroutineScalability(t *testing.T) {
 		results := make([]float64, len(goroutineCounts))
 		for gi, numG := range goroutineCounts {
 			ff, _ := os.CreateTemp("", "scale-zerologbuf-*.log")
-			lbw := &lockedBufWriter{bw: bufio.NewWriterSize(ff, 4096)}
+			lbw := &lockedBufWriter{bw: bufio.NewWriterSize(ff, 256*1024)}
 			logger := zerolog.New(lbw).With().Timestamp().Logger()
 
 			results[gi] = measureThroughput(numG, totalOps, func() {

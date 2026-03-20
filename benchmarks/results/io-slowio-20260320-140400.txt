@@ -1,0 +1,12 @@
+=== RUN   TestSlowIOLatency
+    latency_test.go:275: Simulating slow I/O: 5% of writes sleep 5ms
+    latency_test.go:276: Parallel: 10 goroutines, 50000 samples total
+    latency_test.go:277: 
+    latency_test.go:41: logf async (slab)                    p50=  833ns  p90= 1.75µs  p99=42.709µs  p999=163.167µs  max=38.112292ms
+    latency_test.go:41: zap (sync, unbuffered)               p50=8.667µs  p90=48.792µs  p99=5.852958ms  p999=10.952084ms  max=23.02025ms
+    latency_test.go:41: zap (sync, buffered)                 p50=  917ns  p90=2.417µs  p99=56.458µs  p999=179.709µs  max=21.638167ms
+    latency_test.go:41: zerolog (sync, unbuffered)           p50=  7.5µs  p90=18.625µs  p99=5.853125ms  p999=10.222459ms  max=14.922541ms
+    latency_test.go:41: slog (sync, unbuffered)              p50=14.042µs  p90=11.419917ms  p99=17.855292ms  p999=23.986459ms  max=35.221375ms
+--- PASS: TestSlowIOLatency (18.16s)
+PASS
+ok  	github.com/ssgreg/logf/benchmarks	18.446s

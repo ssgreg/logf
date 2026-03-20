@@ -32,7 +32,7 @@ Best for: local files, debug mode, tests.
 ## 2. SlabWriter — async batched I/O
 
 ```go
-sw := logf.NewSlabWriter(conn, 64*1024, 8, logf.WithFlushInterval(100*time.Millisecond))
+sw := logf.NewSlabWriter(conn).SlabSize(64*1024).SlabCount(8).FlushInterval(100*time.Millisecond).Build()
 defer sw.Close()
 h, close, _ := logf.NewRouter().
     Route(enc, logf.Output(logf.LevelDebug, sw)).
@@ -129,16 +129,16 @@ Total memory = `slabCount × slabSize`. If the budget is tight, reduce
 
 ```go
 // Local file, moderate rate — 512 KB, absorbs 200 ms at 10K msg/s
-sw := logf.NewSlabWriter(file, 64*1024, 8)
+sw := logf.NewSlabWriter(file).SlabSize(64*1024).SlabCount(8).Build()
 
 // Network (Kibana), high rate — 1 MB, absorbs 80 ms at 50K msg/s
-sw := logf.NewSlabWriter(conn, 64*1024, 16, logf.WithFlushInterval(100*time.Millisecond))
+sw := logf.NewSlabWriter(conn).SlabSize(64*1024).SlabCount(16).FlushInterval(100*time.Millisecond).Build()
 
 // Low-memory sidecar — 64 KB total, absorbs 25 ms at 10K msg/s
-sw := logf.NewSlabWriter(conn, 16*1024, 4, logf.WithFlushInterval(50*time.Millisecond))
+sw := logf.NewSlabWriter(conn).SlabSize(16*1024).SlabCount(4).FlushInterval(50*time.Millisecond).Build()
 
 // High-throughput pipeline — 2 MB, absorbs 100 ms at 100K msg/s of 200 B msgs
-sw := logf.NewSlabWriter(conn, 256*1024, 8, logf.WithFlushInterval(100*time.Millisecond))
+sw := logf.NewSlabWriter(conn).SlabSize(256*1024).SlabCount(8).FlushInterval(100*time.Millisecond).Build()
 ```
 
 ## Why SlabWriter beats per-message channels
