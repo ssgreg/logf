@@ -40,7 +40,11 @@ type Logger struct {
 
 // Enabled reports whether logging at the given level would actually produce
 // output. Use this to guard expensive argument preparation.
+// A nil ctx is treated as context.Background().
 func (l *Logger) Enabled(ctx context.Context, lvl Level) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return l.w.Enabled(ctx, lvl)
 }
 
@@ -50,7 +54,11 @@ type LogFunc func(context.Context, string, ...Field)
 // AtLevel calls fn only if the specified level is enabled, passing it a
 // LogFunc pre-bound to that level. This is perfect for guarding expensive
 // log preparation without a separate Enabled check.
+// A nil ctx is treated as context.Background().
 func (l *Logger) AtLevel(ctx context.Context, lvl Level, fn func(LogFunc)) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if !l.w.Enabled(ctx, lvl) {
 		return
 	}
@@ -139,7 +147,11 @@ func (l *Logger) WithGroup(name string) *Logger {
 
 // Debug logs a message at LevelDebug. If debug logging is disabled, this
 // is a no-op — no fields are evaluated, no allocations happen.
+// A nil ctx is treated as context.Background().
 func (l *Logger) Debug(ctx context.Context, text string, fs ...Field) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if !l.w.Enabled(ctx, LevelDebug) {
 		return
 	}
@@ -149,7 +161,11 @@ func (l *Logger) Debug(ctx context.Context, text string, fs ...Field) {
 
 // Info logs a message at LevelInfo. This is the default "something
 // happened" level for normal operational events.
+// A nil ctx is treated as context.Background().
 func (l *Logger) Info(ctx context.Context, text string, fs ...Field) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if !l.w.Enabled(ctx, LevelInfo) {
 		return
 	}
@@ -159,7 +175,11 @@ func (l *Logger) Info(ctx context.Context, text string, fs ...Field) {
 
 // Warn logs a message at LevelWarn. Use this for situations that are
 // unexpected but not broken — things a human should probably look at.
+// A nil ctx is treated as context.Background().
 func (l *Logger) Warn(ctx context.Context, text string, fs ...Field) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if !l.w.Enabled(ctx, LevelWarn) {
 		return
 	}
@@ -169,7 +189,11 @@ func (l *Logger) Warn(ctx context.Context, text string, fs ...Field) {
 
 // Error logs a message at LevelError. Something went wrong and you want
 // everyone to know about it.
+// A nil ctx is treated as context.Background().
 func (l *Logger) Error(ctx context.Context, text string, fs ...Field) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if !l.w.Enabled(ctx, LevelError) {
 		return
 	}
@@ -179,12 +203,60 @@ func (l *Logger) Error(ctx context.Context, text string, fs ...Field) {
 
 // Log logs a message at an arbitrary level. Use this when the level is
 // determined at runtime; for the common cases prefer Debug/Info/Warn/Error.
+// A nil ctx is treated as context.Background().
 func (l *Logger) Log(ctx context.Context, lvl Level, text string, fs ...Field) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if !l.w.Enabled(ctx, lvl) {
 		return
 	}
 
 	l.write(ctx, 1, lvl, text, fs)
+}
+
+// Debugx is like Debug but without a context parameter.
+// Equivalent to Debug(context.Background(), text, fs...).
+func (l *Logger) Debugx(text string, fs ...Field) {
+	ctx := context.Background()
+	if !l.w.Enabled(ctx, LevelDebug) {
+		return
+	}
+
+	l.write(ctx, 1, LevelDebug, text, fs)
+}
+
+// Infox is like Info but without a context parameter.
+// Equivalent to Info(context.Background(), text, fs...).
+func (l *Logger) Infox(text string, fs ...Field) {
+	ctx := context.Background()
+	if !l.w.Enabled(ctx, LevelInfo) {
+		return
+	}
+
+	l.write(ctx, 1, LevelInfo, text, fs)
+}
+
+// Warnx is like Warn but without a context parameter.
+// Equivalent to Warn(context.Background(), text, fs...).
+func (l *Logger) Warnx(text string, fs ...Field) {
+	ctx := context.Background()
+	if !l.w.Enabled(ctx, LevelWarn) {
+		return
+	}
+
+	l.write(ctx, 1, LevelWarn, text, fs)
+}
+
+// Errorx is like Error but without a context parameter.
+// Equivalent to Error(context.Background(), text, fs...).
+func (l *Logger) Errorx(text string, fs ...Field) {
+	ctx := context.Background()
+	if !l.w.Enabled(ctx, LevelError) {
+		return
+	}
+
+	l.write(ctx, 1, LevelError, text, fs)
 }
 
 func (l *Logger) write(ctx context.Context, extraSkip int, lv Level, text string, fs []Field) {
