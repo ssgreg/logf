@@ -6,8 +6,9 @@ import (
 	"sync/atomic"
 )
 
-// NewWriterSlot returns a new WriterSlot. By default, writes before
-// Set are silently dropped.
+// NewWriterSlot returns a new WriterSlot ready for use. Before Set is
+// called, writes are either silently dropped or buffered (if you pass
+// WithSlotBuffer).
 func NewWriterSlot(opts ...WriterSlotOption) *WriterSlot {
 	s := &WriterSlot{}
 	for _, opt := range opts {
@@ -16,20 +17,23 @@ func NewWriterSlot(opts ...WriterSlotOption) *WriterSlot {
 	return s
 }
 
-// WriterSlot is a placeholder Writer that can be connected to a real
-// writer later via Set. Before Set is called, writes are either dropped
-// or buffered (if WithSlotBuffer was used).
+// WriterSlot is a placeholder Writer you can wire into a Logger now and
+// connect to a real destination later via Set. This solves the
+// chicken-and-egg problem where you need a Logger at startup but the
+// actual output (file, network, etc.) is not ready yet.
 //
-// WriterSlot implements Writer (io.Writer + Flush + Sync) and is safe
-// for concurrent use. Use it when the destination is not available at
-// logger creation time:
+// Before Set is called, writes are either dropped or buffered (if
+// WithSlotBuffer was used). After Set, all writes go straight to the
+// real writer with no extra overhead.
 //
 //	slot := logf.NewWriterSlot()
 //	logger := logf.NewLogger().Output(slot).Build()
 //	// ... later, when destination is ready:
 //	slot.Set(file)
 //
-// Set is NOT safe for concurrent calls — call it from a single goroutine.
+// WriterSlot is safe for concurrent Write/Flush/Sync calls.
+// Set itself is NOT safe for concurrent calls — call it from a single
+// goroutine.
 type WriterSlot struct {
 	w       atomic.Pointer[writerRef]
 	flushed atomic.Bool
@@ -41,13 +45,13 @@ type WriterSlot struct {
 // writerRef wraps Writer to avoid double indirection through atomic.Pointer.
 type writerRef struct{ w Writer }
 
-// WriterSlotOption configures a WriterSlot.
+// WriterSlotOption configures a WriterSlot at creation time.
 type WriterSlotOption func(*WriterSlot)
 
-// WithSlotBuffer enables buffering of writes before Set is called.
-// Up to size bytes are kept in memory. Writes that do not fit entirely
-// are dropped (no partial writes). The buffer is flushed to the real
-// writer on the first Write after Set.
+// WithSlotBuffer enables buffering of early writes before Set is called,
+// keeping up to size bytes in memory so you do not lose startup logs.
+// Writes that do not fit entirely are dropped (no partial writes). The
+// buffer is flushed to the real writer on the first Write after Set.
 func WithSlotBuffer(size int) WriterSlotOption {
 	return func(s *WriterSlot) {
 		if size > 0 {
@@ -57,8 +61,8 @@ func WithSlotBuffer(size int) WriterSlotOption {
 	}
 }
 
-// Write writes p to the underlying writer if Set has been called.
-// Before Set, data is buffered (if configured) or dropped.
+// Write writes p to the real writer if Set has been called. Before Set,
+// data is buffered (if WithSlotBuffer was used) or silently dropped.
 func (s *WriterSlot) Write(p []byte) (int, error) {
 	if ref := s.w.Load(); ref != nil {
 		if s.bufSize > 0 && !s.flushed.Load() {
@@ -102,7 +106,7 @@ func (s *WriterSlot) flushPending(w Writer) {
 	s.mu.Unlock()
 }
 
-// Flush delegates to the underlying writer's Flush. No-op before Set.
+// Flush delegates to the real writer's Flush. No-op before Set.
 func (s *WriterSlot) Flush() error {
 	if ref := s.w.Load(); ref != nil {
 		return ref.w.Flush()
@@ -110,7 +114,7 @@ func (s *WriterSlot) Flush() error {
 	return nil
 }
 
-// Sync delegates to the underlying writer's Sync. No-op before Set.
+// Sync delegates to the real writer's Sync. No-op before Set.
 func (s *WriterSlot) Sync() error {
 	if ref := s.w.Load(); ref != nil {
 		return ref.w.Sync()
@@ -118,12 +122,12 @@ func (s *WriterSlot) Sync() error {
 	return nil
 }
 
-// Set connects the slot to a real writer. The buffered data (if any)
-// will be flushed on the first Write call after Set — this preserves
-// temporal ordering without blocking Set itself.
+// Set connects the slot to a real writer. Any buffered data will be
+// flushed on the next Write call, preserving temporal ordering without
+// blocking Set itself. The writer is automatically wrapped via
+// WriterFromIO if needed.
 //
-// The writer is wrapped via WriterFromIO if needed.
-// Set is NOT safe for concurrent calls.
+// Set is NOT safe for concurrent calls — call it from a single goroutine.
 func (s *WriterSlot) Set(w io.Writer) {
 	prev := s.w.Swap(&writerRef{WriterFromIO(w)})
 	if prev != nil {

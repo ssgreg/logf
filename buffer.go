@@ -14,32 +14,35 @@ var _bufferPool = sync.Pool{New: func() any {
 	return NewBufferWithCapacity(PageSize)
 }}
 
-// GetBuffer returns a *Buffer from the pool. The caller must call
-// Buffer.Free when done to return it to the pool.
+// GetBuffer grabs a *Buffer from the pool, reset and ready to use. When
+// you are done, call Buffer.Free to return it — this keeps allocations
+// close to zero on the hot path.
 func GetBuffer() *Buffer {
 	buf := _bufferPool.Get().(*Buffer)
 	buf.Reset()
 	return buf
 }
 
-// Free returns the Buffer to the pool. The Buffer must not be used after
-// calling Free.
+// Free returns the Buffer to the pool for reuse. The Buffer must not be
+// accessed after calling Free.
 func (b *Buffer) Free() {
 	_bufferPool.Put(b)
 }
 
-// NewBuffer creates the new instance of Buffer with default capacity.
+// NewBuffer creates a new Buffer with the default 4 KB capacity.
 func NewBuffer() *Buffer {
 	return NewBufferWithCapacity(PageSize)
 }
 
-// NewBufferWithCapacity creates the new instance of Buffer with the given
-// capacity.
+// NewBufferWithCapacity creates a new Buffer pre-allocated to the given
+// number of bytes.
 func NewBufferWithCapacity(capacity int) *Buffer {
 	return &Buffer{make([]byte, 0, capacity)}
 }
 
-// Buffer is a helping wrapper for byte slice.
+// Buffer is a lightweight byte buffer used throughout the encoder pipeline.
+// It wraps a []byte with append-oriented methods and integrates with
+// sync.Pool via GetBuffer/Free for allocation-free encoding.
 type Buffer struct {
 	Data []byte
 }
@@ -56,8 +59,8 @@ func (b *Buffer) String() string {
 	return string(b.Bytes())
 }
 
-// EnsureSize ensures that the Buffer is able to append 's' bytes without
-// a further realloc.
+// EnsureSize guarantees that at least s bytes can be appended without a
+// reallocation.
 func (b *Buffer) EnsureSize(s int) {
 	if cap(b.Data)-len(b.Data) < s {
 		tmpLen := len(b.Data)
@@ -67,8 +70,8 @@ func (b *Buffer) EnsureSize(s int) {
 	}
 }
 
-// ExtendBytes extends the Buffer with the given size and returns a slice
-// to the extended part of the Buffer.
+// ExtendBytes grows the Buffer by s bytes and returns a slice pointing to
+// the newly added region. Useful for in-place encoding (e.g., base64).
 func (b *Buffer) ExtendBytes(s int) []byte {
 	b.EnsureSize(s)
 	n := len(b.Data)
@@ -102,8 +105,8 @@ func (b *Buffer) Reset() {
 	b.Data = b.Data[:0]
 }
 
-// Back returns the last byte of the underlying byte slice. A caller is in
-// charge of checking that the Buffer is not empty.
+// Back returns the last byte in the Buffer. The caller must ensure the
+// Buffer is not empty.
 func (b *Buffer) Back() byte {
 	return b.Data[len(b.Data)-1]
 }
@@ -123,13 +126,13 @@ func (b *Buffer) Cap() int {
 	return cap(b.Data)
 }
 
-// AppendUint appends the string form in the base 10 of the given unsigned
-// integer.
+// AppendUint appends the base-10 string representation of the given
+// unsigned integer.
 func (b *Buffer) AppendUint(n uint64) {
 	b.Data = strconv.AppendUint(b.Data, n, 10)
 }
 
-// AppendInt appends the string form in the base 10 of the given integer.
+// AppendInt appends the base-10 string representation of the given integer.
 func (b *Buffer) AppendInt(n int64) {
 	b.Data = strconv.AppendInt(b.Data, n, 10)
 }
