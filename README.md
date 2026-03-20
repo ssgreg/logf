@@ -423,6 +423,18 @@ rotator := &lumberjack.Logger{
 sw := logf.NewSlabWriter(rotator).SlabSize(64*1024).SlabCount(8).Build()
 ```
 
+### Viewing JSON logs
+
+JSON is great for machines but hard on the eyes. [hl](https://github.com/pamburus/hl)
+is a log viewer that renders JSON logs with colors, field highlighting, and
+filtering — similar to logf's text encoder but for any JSON log file:
+
+```bash
+hl app.log                     # colored, human-readable
+hl app.log -f 'level == error' # filter by level
+tail -f app.log | hl           # live streaming
+```
+
 ## Performance
 
 Parallel benchmarks on Apple M1 Pro, Go 1.24, `count=5`.
