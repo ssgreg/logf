@@ -1,0 +1,17 @@
+=== RUN   TestLatencyDistribution
+    latency_test.go:52: Parallel latency: 10 goroutines, 50000 samples total, file I/O
+    latency_test.go:53: 
+    latency_test.go:41: logf async (slab)                    p50=  791ns  p90=1.917µs  p99=42.959µs  p999=115.5µs  max=8.035542ms
+    latency_test.go:41: logf sync (pooled writer)            p50=2.417µs  p90=7.292µs  p99=684.75µs  p999=1.411042ms  max=3.636834ms
+    latency_test.go:41: zap (sync, unbuffered)               p50=2.584µs  p90=60.75µs  p99=671.25µs  p999=1.445959ms  max=2.983917ms
+    latency_test.go:41: zap (sync, buffered)                 p50=  708ns  p90= 3.25µs  p99=   68µs  p999=195.125µs  max=1.555625ms
+    latency_test.go:41: zerolog (sync, unbuffered)           p50=2.333µs  p90=10.542µs  p99=620.5µs  p999=1.23775ms  max=2.253833ms
+    latency_test.go:41: zerolog (sync, buffered)             p50=  334ns  p90=1.583µs  p99=62.042µs  p999=171.167µs  max=547.625µs
+    latency_test.go:41: slog (sync, unbuffered)              p50=2.625µs  p90=    6µs  p99=498.5µs  p999=818.334µs  max=3.668542ms
+    latency_test.go:41: slog (sync, buffered)                p50=  916ns  p90=6.208µs  p99=67.542µs  p999=169.958µs  max=963.458µs
+    latency_test.go:41: slog+logf (slab)                     p50=  875ns  p90=5.666µs  p99=63.958µs  p999=145.291µs  max=288.875µs
+    latency_test.go:41: logrus (sync, unbuffered)            p50=3.292µs  p90=186.416µs  p99=369.583µs  p999=611.667µs  max=1.001125ms
+    latency_test.go:41: logrus (sync, buffered)              p50=1.709µs  p90=20.667µs  p99=130.084µs  p999=340.292µs  max=815.083µs
+--- PASS: TestLatencyDistribution (1.07s)
+PASS
+ok  	github.com/ssgreg/logf/benchmarks	1.459s

@@ -38,7 +38,6 @@ func (a benchArray) EncodeLogfArray(enc logf.TypeEncoder) error {
 	return nil
 }
 
-
 // --- benchStringer implements fmt.Stringer for Stringer/Any(Stringer) benchmarks ---
 
 type benchStringer struct {
@@ -121,12 +120,12 @@ func newLogfRouter() (*logf.Logger, func()) {
 	if err != nil {
 		panic(err)
 	}
-	return logf.New(h).WithCaller(false), func() { closeFn() }
+	return logf.New(h).WithCaller(false), func() { _ = closeFn() }
 }
 
 func newLogfRouterSlab() (*logf.Logger, func()) {
 	enc := logf.JSON().EncodeTime(logf.RFC3339NanoTimeEncoder).EncodeDuration(logf.NanoDurationEncoder).Build()
-	sw := logf.NewSlabWriter(io.Discard, 64*1024, 8)
+	sw := logf.NewSlabWriter(io.Discard).SlabSize(128 * 1024).SlabCount(2).Build()
 	h, closeFn, err := logf.NewRouter().
 		Route(enc, logf.Output(logf.LevelDebug, sw)).
 		Build()
@@ -138,7 +137,6 @@ func newLogfRouterSlab() (*logf.Logger, func()) {
 		sw.Close()
 	}
 }
-
 
 // --- lockedBufWriter — thread-safe buffered writer (used by zerolog in latency tests) ---
 

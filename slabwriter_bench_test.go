@@ -19,7 +19,7 @@ var msg = make([]byte, 200) // typical log message size
 
 // BenchmarkSlabBuffer measures throughput: producer → slab buffer → I/O goroutine → discard.
 func BenchmarkSlabBuffer(b *testing.B) {
-	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(64*1024).SlabCount(8).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -60,7 +60,7 @@ func BenchmarkChannel(b *testing.B) {
 // BenchmarkParallelSlabBufferSlowIO: N producers → channel → slab buffer → slow writer.
 func BenchmarkParallelSlabBufferSlowIO(b *testing.B) {
 	sw := &slowWriter{delay: 100 * time.Microsecond}
-	slab := NewSlabWriter(sw, 64*1024, 8)
+	slab := NewSlabWriter(sw).SlabSize(64*1024).SlabCount(8).Build()
 	ch := make(chan []byte, runtime.NumCPU()*2)
 	done := make(chan struct{})
 	go func() {
@@ -113,7 +113,7 @@ func BenchmarkParallelChannelSlowIO(b *testing.B) {
 
 func BenchmarkBurstSlabBuffer(b *testing.B) {
 	sw := &slowWriter{delay: 10 * time.Microsecond, perByte: time.Nanosecond}
-	slab := NewSlabWriter(sw, 64*1024, 8)
+	slab := NewSlabWriter(sw).SlabSize(64*1024).SlabCount(8).Build()
 	ch := make(chan []byte, 20)
 	done := make(chan struct{})
 	go func() {
@@ -144,7 +144,7 @@ func BenchmarkFileSlabBuffer(b *testing.B) {
 	}
 	defer os.Remove(f.Name())
 	defer f.Close()
-	slab := NewSlabWriter(f, 64*1024, 8)
+	slab := NewSlabWriter(f).SlabSize(64*1024).SlabCount(8).Build()
 	ch := make(chan []byte, 20)
 	done := make(chan struct{})
 	go func() {
@@ -169,7 +169,7 @@ func BenchmarkFileSlabBuffer(b *testing.B) {
 
 // BenchmarkConcurrentSlabBuffer: single producer → concurrent slab → I/O goroutine → discard.
 func BenchmarkConcurrentSlabBuffer(b *testing.B) {
-	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(64*1024).SlabCount(8).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -182,7 +182,7 @@ func BenchmarkConcurrentSlabBuffer(b *testing.B) {
 
 // BenchmarkParallelConcurrentSlabDiscard: N producers → concurrent slab → discard (no I/O cost).
 func BenchmarkParallelConcurrentSlabDiscard(b *testing.B) {
-	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(64*1024).SlabCount(8).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -197,7 +197,7 @@ func BenchmarkParallelConcurrentSlabDiscard(b *testing.B) {
 
 // BenchmarkParallelChannelSlabDiscard: N producers → channel → slab → discard (no I/O cost).
 func BenchmarkParallelChannelSlabDiscard(b *testing.B) {
-	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(64*1024).SlabCount(8).Build()
 	ch := make(chan []byte, runtime.NumCPU()*2)
 	if cap(ch) < 4 {
 		ch = make(chan []byte, 4)
@@ -228,7 +228,7 @@ func BenchmarkParallelChannelSlabDiscard(b *testing.B) {
 // BenchmarkParallelConcurrentSlabSlowIO: N producers → concurrent slab → slow writer.
 func BenchmarkParallelConcurrentSlabSlowIO(b *testing.B) {
 	sw := &slowWriter{delay: 100 * time.Microsecond}
-	slab := NewSlabWriter(sw, 64*1024, 8)
+	slab := NewSlabWriter(sw).SlabSize(64*1024).SlabCount(8).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -245,7 +245,7 @@ func BenchmarkParallelConcurrentSlabSlowIO(b *testing.B) {
 // BenchmarkBurstConcurrentSlab: single producer → concurrent slab → proportional I/O.
 func BenchmarkBurstConcurrentSlab(b *testing.B) {
 	sw := &slowWriter{delay: 10 * time.Microsecond, perByte: time.Nanosecond}
-	slab := NewSlabWriter(sw, 64*1024, 8)
+	slab := NewSlabWriter(sw).SlabSize(64*1024).SlabCount(8).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -265,7 +265,7 @@ func BenchmarkFileConcurrentSlab(b *testing.B) {
 	}
 	defer os.Remove(f.Name())
 	defer f.Close()
-	slab := NewSlabWriter(f, 64*1024, 8)
+	slab := NewSlabWriter(f).SlabSize(64*1024).SlabCount(8).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -281,7 +281,7 @@ func BenchmarkFileConcurrentSlab(b *testing.B) {
 // BenchmarkParallelBurstConcurrentSlab: N producers → concurrent slab → proportional slow writer.
 func BenchmarkParallelBurstConcurrentSlab(b *testing.B) {
 	sw := &slowWriter{delay: 10 * time.Microsecond, perByte: time.Nanosecond}
-	slab := NewSlabWriter(sw, 64*1024, 8)
+	slab := NewSlabWriter(sw).SlabSize(64*1024).SlabCount(8).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -305,7 +305,7 @@ func BenchmarkParallelFileConcurrentSlab(b *testing.B) {
 	}
 	defer os.Remove(f.Name())
 	defer f.Close()
-	slab := NewSlabWriter(f, 64*1024, 8)
+	slab := NewSlabWriter(f).SlabSize(64*1024).SlabCount(8).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -326,7 +326,7 @@ func BenchmarkParallelFileConcurrentSlabFlush(b *testing.B) {
 	}
 	defer os.Remove(f.Name())
 	defer f.Close()
-	slab := NewSlabWriter(f, 64*1024, 8, WithFlushInterval(100*time.Millisecond))
+	slab := NewSlabWriter(f).SlabSize(64*1024).SlabCount(8).FlushInterval(100*time.Millisecond).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -347,7 +347,7 @@ func BenchmarkParallelFileConcurrentSlabSmall(b *testing.B) {
 	}
 	defer os.Remove(f.Name())
 	defer f.Close()
-	slab := NewSlabWriter(f, 32*1024, 2)
+	slab := NewSlabWriter(f).SlabSize(32*1024).SlabCount(2).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -368,7 +368,7 @@ func BenchmarkParallelFileChannelSlab(b *testing.B) {
 	}
 	defer os.Remove(f.Name())
 	defer f.Close()
-	slab := NewSlabWriter(f, 64*1024, 8)
+	slab := NewSlabWriter(f).SlabSize(64*1024).SlabCount(8).Build()
 	ch := make(chan []byte, runtime.NumCPU()*2)
 	if cap(ch) < 4 {
 		ch = make(chan []byte, 4)
@@ -422,7 +422,7 @@ func (w *slowWriter) Sync() error  { return nil }
 
 // BenchmarkSlabBufferNoFragmentation: messages fit evenly into slabs (no wasted space).
 func BenchmarkSlabBufferNoFragmentation(b *testing.B) {
-	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(64*1024).SlabCount(8).Build()
 	// 256 bytes fits 256 times into 64KB — zero fragmentation.
 	m := make([]byte, 256)
 
@@ -441,7 +441,7 @@ func BenchmarkSlabBufferFragmentation50Pct(b *testing.B) {
 	// slabSize=512, msg=300 → first msg: 300 bytes written, 212 remain.
 	// second msg: 300 > 212 → early swap (212 bytes wasted = 41%).
 	// Repeated: every other write triggers a swap.
-	slab := NewSlabWriter(discardWriter{}, 512, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(512).SlabCount(8).Build()
 	m := make([]byte, 300)
 
 	b.SetBytes(int64(len(m)))
@@ -457,7 +457,7 @@ func BenchmarkSlabBufferFragmentation50Pct(b *testing.B) {
 // every write triggers early swap (only 1 byte used per slab on second write).
 func BenchmarkSlabBufferFragmentationWorstCase(b *testing.B) {
 	slabSize := 4096
-	slab := NewSlabWriter(discardWriter{}, slabSize, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(slabSize).SlabCount(8).Build()
 	// msg = slabSize - 1: first write fills 4095, leaves 1 byte.
 	// second write: 4095 > 1 → early swap. ~50% utilization.
 	m := make([]byte, slabSize-1)
@@ -477,7 +477,7 @@ func BenchmarkSlabBufferFragmentationWorstCase(b *testing.B) {
 
 // BenchmarkParallelConcurrentSlabDiscard20G: 20 goroutines → slab → discard.
 func BenchmarkParallelConcurrentSlabDiscard20G(b *testing.B) {
-	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(64*1024).SlabCount(8).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.SetParallelism(2) // GOMAXPROCS * 2 = ~20 goroutines on 10-core
@@ -495,7 +495,7 @@ func BenchmarkParallelConcurrentSlabDiscard20G(b *testing.B) {
 // Every Write triggers a slab swap (channel send + receive under mutex),
 // maximizing contention and exposing cache-line bouncing from atomic ops.
 func BenchmarkParallelConcurrentSlabTinySlab(b *testing.B) {
-	slab := NewSlabWriter(discardWriter{}, len(msg), 16) // slab = msg size
+	slab := NewSlabWriter(discardWriter{}).SlabSize(len(msg)).SlabCount(16).Build() // slab = msg size
 
 	b.SetBytes(int64(len(msg)))
 	b.ResetTimer()
@@ -514,7 +514,7 @@ func BenchmarkParallelConcurrentSlabTinySlab(b *testing.B) {
 // inside slab.Write(). This is the pattern that caught the atomic.Int64
 // regression invisible in simpler benchmarks.
 func BenchmarkParallelConcurrentSlabCachePressure(b *testing.B) {
-	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(64*1024).SlabCount(8).Build()
 	pool := &sync.Pool{New: func() any { b := make([]byte, 4096); return &b }}
 
 	b.SetBytes(int64(len(msg)))
@@ -536,7 +536,7 @@ func BenchmarkParallelConcurrentSlabCachePressure(b *testing.B) {
 // Slow I/O increases mutex hold time in ioLoop, amplifying contention effects.
 func BenchmarkParallelConcurrentSlabSlowIO20G(b *testing.B) {
 	sw := &slowWriter{delay: 100 * time.Microsecond}
-	slab := NewSlabWriter(sw, 64*1024, 8)
+	slab := NewSlabWriter(sw).SlabSize(64*1024).SlabCount(8).Build()
 
 	b.SetBytes(int64(len(msg)))
 	b.SetParallelism(2)
@@ -555,7 +555,7 @@ func BenchmarkParallelConcurrentSlabSlowIO20G(b *testing.B) {
 
 // BenchmarkSlabBufferOversized1Pct: 99% normal + 1% oversized messages.
 func BenchmarkSlabBufferOversized1Pct(b *testing.B) {
-	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(64*1024).SlabCount(8).Build()
 	bigMsg := make([]byte, 128*1024) // 2× slabSize
 
 	b.SetBytes(int64(len(msg)))
@@ -573,7 +573,7 @@ func BenchmarkSlabBufferOversized1Pct(b *testing.B) {
 
 // BenchmarkSlabBufferOversized100Pct: 100% oversized messages.
 func BenchmarkSlabBufferOversized100Pct(b *testing.B) {
-	slab := NewSlabWriter(discardWriter{}, 64*1024, 8)
+	slab := NewSlabWriter(discardWriter{}).SlabSize(64*1024).SlabCount(8).Build()
 	bigMsg := make([]byte, 128*1024) // 2× slabSize
 
 	b.SetBytes(int64(len(bigMsg)))

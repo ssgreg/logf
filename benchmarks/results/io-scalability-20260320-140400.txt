@@ -1,0 +1,13 @@
+=== RUN   TestGoroutineScalability
+    latency_test.go:412: Throughput (logs/sec) by goroutine count, 1000000 total ops, file I/O
+    latency_test.go:413: 
+    latency_test.go:419: Logger                               1G       2G       4G       8G      16G      32G      64G
+    latency_test.go:568: logf async (slab)                  3.8M     5.1M     5.4M     3.6M     4.0M     3.9M     4.0M
+    latency_test.go:568: zap (unbuffered)                   442K     325K     339K     307K     332K     328K     302K
+    latency_test.go:568: zap (buffered)                     2.9M     4.2M     5.2M     3.0M     3.0M     3.2M     3.2M
+    latency_test.go:568: zerolog (unbuffered)               492K     372K     308K     363K     364K     302K     351K
+    latency_test.go:568: slog (unbuffered)                  424K     334K     307K     330K     340K     324K     328K
+    latency_test.go:568: zerolog (buffered)                 5.6M     6.8M     5.5M     4.0M     4.1M     4.0M     4.0M
+--- PASS: TestGoroutineScalability (66.77s)
+PASS
+ok  	github.com/ssgreg/logf/benchmarks	67.062s

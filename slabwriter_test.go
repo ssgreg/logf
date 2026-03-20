@@ -59,7 +59,7 @@ func (w *collectWriter) allData() string {
 
 func TestSlabBufferBasicWrite(t *testing.T) {
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 1024, 4)
+	sb := NewSlabWriter(cw).SlabSize(1024).SlabCount(4).Build()
 	_, _ = sb.Write([]byte("hello"))
 	_ = sb.Close()
 	assert.Equal(t, "hello", cw.allData())
@@ -67,7 +67,7 @@ func TestSlabBufferBasicWrite(t *testing.T) {
 
 func TestSlabBufferMultipleWrites(t *testing.T) {
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 1024, 4)
+	sb := NewSlabWriter(cw).SlabSize(1024).SlabCount(4).Build()
 	_, _ = sb.Write([]byte("aaa"))
 	_, _ = sb.Write([]byte("bbb"))
 	_, _ = sb.Write([]byte("ccc"))
@@ -78,7 +78,7 @@ func TestSlabBufferMultipleWrites(t *testing.T) {
 func TestSlabBufferSlabSwap(t *testing.T) {
 	cw := &collectWriter{}
 	// Tiny slabs: 8 bytes each, 4 slabs.
-	sb := NewSlabWriter(cw, 8, 4)
+	sb := NewSlabWriter(cw).SlabSize(8).SlabCount(4).Build()
 	// Each write is 5 bytes → fits in one slab, next write triggers swap.
 	_, _ = sb.Write([]byte("aaaaa"))
 	_, _ = sb.Write([]byte("bbbbb"))
@@ -90,7 +90,7 @@ func TestSlabBufferSlabSwap(t *testing.T) {
 func TestSlabBufferWriteLargerThanSlab(t *testing.T) {
 	cw := &collectWriter{}
 	// Slab is 8 bytes, message is 20 bytes → spans multiple slabs.
-	sb := NewSlabWriter(cw, 8, 4)
+	sb := NewSlabWriter(cw).SlabSize(8).SlabCount(4).Build()
 	_, _ = sb.Write([]byte("12345678901234567890"))
 	_ = sb.Close()
 	assert.Equal(t, "12345678901234567890", cw.allData())
@@ -98,7 +98,7 @@ func TestSlabBufferWriteLargerThanSlab(t *testing.T) {
 
 func TestSlabBufferRequestFlush(t *testing.T) {
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 1024, 4)
+	sb := NewSlabWriter(cw).SlabSize(1024).SlabCount(4).Build()
 	_, _ = sb.Write([]byte("data"))
 	_ = sb.Flush()
 	_ = sb.Close()
@@ -112,7 +112,7 @@ func TestSlabBufferRequestFlush(t *testing.T) {
 
 func TestSlabBufferCloseFlushesAndSyncs(t *testing.T) {
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 1024, 4)
+	sb := NewSlabWriter(cw).SlabSize(1024).SlabCount(4).Build()
 	_, _ = sb.Write([]byte("x"))
 	_ = sb.Close()
 
@@ -124,7 +124,7 @@ func TestSlabBufferCloseFlushesAndSyncs(t *testing.T) {
 
 func TestSlabBufferEmptyClose(t *testing.T) {
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 1024, 4)
+	sb := NewSlabWriter(cw).SlabSize(1024).SlabCount(4).Build()
 	_ = sb.Close()
 
 	cw.mu.Lock()
@@ -136,7 +136,7 @@ func TestSlabBufferEmptyClose(t *testing.T) {
 
 func TestSlabBufferOrderPreserved(t *testing.T) {
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 64, 4)
+	sb := NewSlabWriter(cw).SlabSize(64).SlabCount(4).Build()
 	for i := 0; i < 100; i++ {
 		_, _ = sb.Write([]byte{byte('0' + i%10)})
 	}
@@ -151,7 +151,7 @@ func TestSlabBufferOrderPreserved(t *testing.T) {
 
 func TestSlabBufferHighThroughput(t *testing.T) {
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 4096, 8)
+	sb := NewSlabWriter(cw).SlabSize(4096).SlabCount(8).Build()
 	msg := make([]byte, 200)
 	for i := range msg {
 		msg[i] = 'A'
@@ -168,7 +168,7 @@ func TestSlabBufferHighThroughput(t *testing.T) {
 func TestSlabBufferDefaultParams(t *testing.T) {
 	cw := &collectWriter{}
 	// Zero values → defaults applied.
-	sb := NewSlabWriter(cw, 0, 0)
+	sb := NewSlabWriter(cw).SlabSize(0).SlabCount(0).Build()
 	_, _ = sb.Write([]byte("test"))
 	_ = sb.Close()
 	assert.Equal(t, "test", cw.allData())
@@ -179,7 +179,7 @@ func TestSlabWriterDropOnFull(t *testing.T) {
 	// slabCount=2: one current + one in pool → full channel capacity 2.
 	// After filling both, the next swap must drop.
 	sw := &slowWriter{delay: 50 * time.Millisecond}
-	sb := NewSlabWriter(sw, 8, 2, WithDropOnFull())
+	sb := NewSlabWriter(sw).SlabSize(8).SlabCount(2).DropOnFull().Build()
 
 	// Fill slab 1 (8 bytes) → swap: goes to full (ioLoop picks it up, blocks on slow write).
 	_, _ = sb.Write([]byte("aaaaaaaa"))
@@ -197,7 +197,7 @@ func TestSlabWriterDropOnFullCounter(t *testing.T) {
 	// Block ioLoop completely by using a writer that never returns.
 	blocked := make(chan struct{})
 	bw := &blockingWriter{ch: blocked}
-	sb := NewSlabWriter(bw, 16, 2, WithDropOnFull())
+	sb := NewSlabWriter(bw).SlabSize(16).SlabCount(2).DropOnFull().Build()
 
 	// Write 1 (16 bytes): fills slab, no swap yet.
 	_, _ = sb.Write(make([]byte, 16))
@@ -227,7 +227,7 @@ func TestSlabWriterDropCountsCurrentMessage(t *testing.T) {
 	blocked := make(chan struct{})
 	bw := &blockingWriter{ch: blocked}
 	// slabSize=8, slabCount=2. One message fills one slab exactly.
-	sb := NewSlabWriter(bw, 8, 2, WithDropOnFull())
+	sb := NewSlabWriter(bw).SlabSize(8).SlabCount(2).DropOnFull().Build()
 
 	// Write 1 (8 bytes): fills slab. No swap yet (checked on next Write).
 	_, _ = sb.Write(make([]byte, 8))
@@ -259,7 +259,7 @@ func TestSlabWriterDropOnFullNoTornWrite(t *testing.T) {
 	blocked := make(chan struct{})
 	bw := &blockingWriter{ch: blocked}
 	// slabSize=8, slabCount=2. Message of 16 bytes spans 2 slabs.
-	sb := NewSlabWriter(bw, 8, 2, WithDropOnFull())
+	sb := NewSlabWriter(bw).SlabSize(8).SlabCount(2).DropOnFull().Build()
 
 	// Write 1 (8 bytes): fills slab, no swap yet.
 	_, _ = sb.Write(make([]byte, 8))
@@ -286,7 +286,7 @@ func TestSlabWriterMessagesAlwaysComplete(t *testing.T) {
 	// writes, even under high contention with early swaps.
 	cw := &collectWriter{}
 	// Small slabs to force frequent early swaps.
-	sb := NewSlabWriter(cw, 64, 4)
+	sb := NewSlabWriter(cw).SlabSize(64).SlabCount(4).Build()
 
 	msgs := []string{
 		"aaaa-msg-01-end\n", // 16 bytes
@@ -315,7 +315,7 @@ func TestSlabWriterMessagesAlwaysComplete(t *testing.T) {
 func TestSlabWriterOversizedMessageComplete(t *testing.T) {
 	// Oversized messages (> slabSize) must arrive complete at destination.
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 16, 4) // tiny slabs
+	sb := NewSlabWriter(cw).SlabSize(16).SlabCount(4).Build() // tiny slabs
 
 	small := "small\n"
 	big := "this-is-a-big-message-that-exceeds-slab-size\n" // 46 bytes > 16
@@ -332,7 +332,7 @@ func TestSlabWriterOversizedMessageComplete(t *testing.T) {
 
 func TestSlabWriterNoDropWhenKeepingUp(t *testing.T) {
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 1024, 4, WithDropOnFull())
+	sb := NewSlabWriter(cw).SlabSize(1024).SlabCount(4).DropOnFull().Build()
 
 	for i := 0; i < 100; i++ {
 		_, _ = sb.Write([]byte("msg"))
@@ -347,7 +347,7 @@ func TestSlabWriterDropOnFullNonBlocking(t *testing.T) {
 	// Verify Write never blocks even with a completely stuck destination.
 	blocked := make(chan struct{})
 	bw := &blockingWriter{ch: blocked}
-	sb := NewSlabWriter(bw, 8, 2, WithDropOnFull())
+	sb := NewSlabWriter(bw).SlabSize(8).SlabCount(2).DropOnFull().Build()
 
 	done := make(chan struct{})
 	go func() {
@@ -361,7 +361,7 @@ func TestSlabWriterDropOnFullNonBlocking(t *testing.T) {
 	case <-done:
 		// Producer finished without blocking — correct.
 	case <-time.After(1 * time.Second):
-		t.Fatal("producer blocked for >1s — WithDropOnFull should prevent this")
+		t.Fatal("producer blocked for >1s — DropOnFull should prevent this")
 	}
 
 	assert.Greater(t, sb.Stats().Dropped, int64(0))
@@ -382,7 +382,7 @@ func TestSlabWriterFlushPartialNoDeadlock(t *testing.T) {
 	// Setup: slabCount=2 forces frequent pool exhaustion; flushInterval=1µs
 	// makes the timer fire on nearly every ioLoop iteration.
 	cw := &collectWriter{}
-	sw := NewSlabWriter(cw, 16, 2, WithFlushInterval(time.Microsecond))
+	sw := NewSlabWriter(cw).SlabSize(16).SlabCount(2).FlushInterval(time.Microsecond).Build()
 
 	done := make(chan struct{})
 	go func() {
@@ -416,9 +416,8 @@ func (panicOnWrite) Write([]byte) (int, error) { panic("errW exploded") }
 func TestSlabWriterErrWriterPanicDoesNotCrashIoLoop(t *testing.T) {
 	// Setup: destination panics on Write, errW also panics when
 	// reportError tries to log the error. This should NOT crash ioLoop.
-	sw := NewSlabWriter(panicWriter{}, 64, 2,
-		WithErrorWriter(panicOnWrite{}),
-	)
+	sw := NewSlabWriter(panicWriter{}).SlabSize(64).SlabCount(2).
+		ErrorWriter(panicOnWrite{}).Build()
 
 	// Write enough to fill a slab and trigger ioLoop processing.
 	_, _ = sw.Write(make([]byte, 64))
@@ -439,7 +438,7 @@ func TestSlabWriterEarlySwapKeepsMessageIntact(t *testing.T) {
 	// Message fits in slabSize but not in remaining space.
 	// Early swap should keep it in one slab.
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 16, 4)
+	sb := NewSlabWriter(cw).SlabSize(16).SlabCount(4).Build()
 
 	// Fill 12 bytes of slab. 4 bytes remain.
 	_, _ = sb.Write([]byte("aaaaaaaaaaaa")) // 12 bytes
@@ -453,7 +452,7 @@ func TestSlabWriterEarlySwapKeepsMessageIntact(t *testing.T) {
 func TestSlabWriterOversizedWrite(t *testing.T) {
 	// Message larger than slabSize uses dedicated oversized slab.
 	cw := &collectWriter{}
-	sb := NewSlabWriter(cw, 8, 4)
+	sb := NewSlabWriter(cw).SlabSize(8).SlabCount(4).Build()
 
 	_, _ = sb.Write([]byte("before"))
 	_, _ = sb.Write([]byte("oversized-message-larger-than-slab")) // 34 bytes > 8
@@ -467,7 +466,7 @@ func TestSlabWriterOversizedDropOnFull(t *testing.T) {
 	// Oversized message with dropOnFull — entire message dropped atomically.
 	blocked := make(chan struct{})
 	bw := &blockingWriter{ch: blocked}
-	sb := NewSlabWriter(bw, 8, 2, WithDropOnFull())
+	sb := NewSlabWriter(bw).SlabSize(8).SlabCount(2).DropOnFull().Build()
 
 	// Fill and send first slab, ioLoop blocks.
 	_, _ = sb.Write(make([]byte, 8))
@@ -488,7 +487,7 @@ func TestSlabWriterEarlySwapDropOnFull(t *testing.T) {
 	// Early swap with dropOnFull — entire message dropped.
 	blocked := make(chan struct{})
 	bw := &blockingWriter{ch: blocked}
-	sb := NewSlabWriter(bw, 16, 2, WithDropOnFull())
+	sb := NewSlabWriter(bw).SlabSize(16).SlabCount(2).DropOnFull().Build()
 
 	_, _ = sb.Write(make([]byte, 12)) // 12 bytes, 4 remain
 	// Swap succeeds, ioLoop picks up and blocks.

@@ -126,7 +126,7 @@ type RouteOption func(*encoderGroup)
 // For async I/O with batching and spike tolerance, wrap the writer in
 // a SlabWriter before passing it to Output:
 //
-//	sw := logf.NewSlabWriter(conn, 64*1024, 8, logf.WithFlushInterval(100*time.Millisecond))
+//	sw := logf.NewSlabWriter(conn).SlabSize(64*1024).SlabCount(8).FlushInterval(100*time.Millisecond).Build()
 //	defer sw.Close()
 //	router, close, _ := logf.NewRouter().
 //	    Route(enc, logf.Output(logf.LevelDebug, sw)).
@@ -142,7 +142,7 @@ func Output(level Level, w io.Writer) RouteOption {
 // flushing. Perfect for SlabWriters and other resources you want the
 // router to manage:
 //
-//	sw := logf.NewSlabWriter(conn, 64*1024, 8)
+//	sw := logf.NewSlabWriter(conn).SlabSize(64*1024).SlabCount(8).Build()
 //	router, close, _ := logf.NewRouter().
 //	    Route(enc, logf.OutputCloser(logf.LevelDebug, sw)).
 //	    Build()
