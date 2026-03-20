@@ -19,7 +19,7 @@ func main() {
 	// First output shown in full; subsequent outputs omit "ts" and "caller" for brevity.
 
 	logger.Debug(ctx, "starting up")
-	// → {"level":"debug","ts":"2025-01-15T12:00:00Z","caller":"basic/main.go:21","msg":"starting up"}
+	// → {"level":"debug","ts":"2025-01-15T12:00:00Z","msg":"starting up","caller":"basic/main.go:21"}
 
 	logger.Info(ctx, "request handled", logf.String("method", "GET"), logf.Int("status", 200))
 	// → {"level":"info",..,"msg":"request handled","method":"GET","status":200}

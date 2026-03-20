@@ -44,7 +44,7 @@ Two lines to logging:
 ```go
 logger := logf.NewLogger().Build()
 logger.Info(ctx, "hello, world", logf.String("from", "logf"))
-// → {"level":"info","ts":"2026-03-19T14:04:02Z","caller":"main.go:10","msg":"hello, world","from":"logf"}
+// → {"level":"info","ts":"2026-03-19T14:04:02Z","msg":"hello, world","caller":"main.go:10","from":"logf"}
 ```
 
 Want colors? Say no more:
