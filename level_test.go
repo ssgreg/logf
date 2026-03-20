@@ -152,6 +152,25 @@ func TestLevelUnmarshal(t *testing.T) {
 	assert.Equal(t, LevelWarn, v.Level)
 }
 
+func TestLevelMarshalText(t *testing.T) {
+	cases := []struct {
+		level  Level
+		golden string
+	}{
+		{LevelError, "error"},
+		{LevelWarn, "warn"},
+		{LevelInfo, "info"},
+		{LevelDebug, "debug"},
+		{Level(42), "unknown"},
+	}
+
+	for _, cs := range cases {
+		text, err := cs.level.MarshalText()
+		assert.NoError(t, err)
+		assert.Equal(t, cs.golden, string(text), "MarshalText for level %d", int(cs.level))
+	}
+}
+
 func TestLevelUnmarshalInvalid(t *testing.T) {
 	v := struct {
 		Level Level `json:"level"`

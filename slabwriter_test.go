@@ -57,6 +57,14 @@ func (w *collectWriter) allData() string {
 	return s
 }
 
+func TestSlabWriterSync(t *testing.T) {
+	cw := &collectWriter{}
+	sb := NewSlabWriter(cw).Build()
+	// Sync is a no-op, should return nil.
+	assert.NoError(t, sb.Sync())
+	_ = sb.Close()
+}
+
 func TestSlabBufferBasicWrite(t *testing.T) {
 	cw := &collectWriter{}
 	sb := NewSlabWriter(cw).SlabSize(1024).SlabCount(4).Build()

@@ -451,3 +451,132 @@ func TestEncodeNoopEncoderFallback(t *testing.T) {
 	b.Free()
 }
 
+func TestJSONEncoderBuilderKeys(t *testing.T) {
+	enc := JSON().
+		NameKey("logger_name").
+		CallerKey("source").
+		TimeKey("timestamp").
+		LevelKey("severity").
+		MsgKey("message").
+		Build()
+
+	e := Entry{
+		Text:       "hello",
+		Level:      LevelInfo,
+		Time:       time.Unix(1234567890, 0),
+		LoggerName: "myapp",
+		CallerPC:   CallerPC(0),
+	}
+	b, err := enc.Encode(e)
+	require.NoError(t, err)
+	s := b.String()
+
+	assert.Contains(t, s, `"severity":`)
+	assert.Contains(t, s, `"timestamp":`)
+	assert.Contains(t, s, `"logger_name":"myapp"`)
+	assert.Contains(t, s, `"message":"hello"`)
+	assert.Contains(t, s, `"source":`)
+
+	// Must be valid JSON.
+	var m map[string]interface{}
+	require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&m))
+	b.Free()
+}
+
+func TestJSONEncoderBuilderDisable(t *testing.T) {
+	enc := JSON().
+		DisableLevel().
+		DisableMsg().
+		DisableName().
+		DisableTime().
+		DisableCaller().
+		Build()
+
+	e := Entry{
+		Text:       "hello",
+		Level:      LevelInfo,
+		Time:       time.Now(),
+		LoggerName: "myapp",
+		CallerPC:   CallerPC(0),
+		Fields:     []Field{String("k", "v")},
+	}
+	b, err := enc.Encode(e)
+	require.NoError(t, err)
+	s := b.String()
+
+	assert.NotContains(t, s, `"level":`)
+	assert.NotContains(t, s, `"msg":`)
+	assert.NotContains(t, s, `"logger":`)
+	assert.NotContains(t, s, `"ts":`)
+	assert.NotContains(t, s, `"caller":`)
+	assert.Contains(t, s, `"k":"v"`)
+
+	var m map[string]interface{}
+	require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&m))
+	b.Free()
+}
+
+func TestJSONEncoderBuilderEncoders(t *testing.T) {
+	customDuration := func(d time.Duration, te TypeEncoder) {
+		te.EncodeTypeFloat64(d.Seconds())
+	}
+	customError := func(k string, err error, fe FieldEncoder) {
+		fe.EncodeFieldString(k+"_custom", err.Error())
+	}
+
+	enc := JSON().
+		EncodeDuration(customDuration).
+		EncodeError(customError).
+		Build()
+
+	e := Entry{
+		Fields: []Field{
+			Duration("dur", 2*time.Second),
+			NamedError("err", &verboseError{"bad", "detail"}),
+		},
+	}
+	b, err := enc.Encode(e)
+	require.NoError(t, err)
+	s := b.String()
+
+	assert.Contains(t, s, `"dur":2`)
+	assert.Contains(t, s, `"err_custom":"bad"`)
+	b.Free()
+}
+
+func TestJSONEncoderClone(t *testing.T) {
+	enc := JSON().Build()
+	clone := enc.Clone()
+	require.NotNil(t, clone)
+
+	// Both should produce identical output.
+	e := Entry{Text: "clone-test", Level: LevelInfo}
+	b1, err := enc.Encode(e)
+	require.NoError(t, err)
+	b2, err := clone.Encode(e)
+	require.NoError(t, err)
+	assert.Equal(t, b1.String(), b2.String())
+	b1.Free()
+	b2.Free()
+}
+
+func TestNewJSONEncoder(t *testing.T) {
+	enc := NewJSONEncoder(JSONEncoderConfig{
+		FieldKeyMsg:   "message",
+		FieldKeyLevel: "severity",
+	})
+	require.NotNil(t, enc)
+
+	e := Entry{Text: "direct", Level: LevelWarn}
+	b, err := enc.Encode(e)
+	require.NoError(t, err)
+	s := b.String()
+
+	assert.Contains(t, s, `"severity":"warn"`)
+	assert.Contains(t, s, `"message":"direct"`)
+
+	var m map[string]interface{}
+	require.NoError(t, json.NewDecoder(bytes.NewBuffer(b.Bytes())).Decode(&m))
+	b.Free()
+}
+
