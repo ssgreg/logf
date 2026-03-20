@@ -57,5 +57,5 @@ func thirdPartyLibrary(logger *slog.Logger, ctx context.Context) {
 	// The library doesn't know about logf, but context fields
 	// (request_id) appear in its logs automatically.
 	logger.InfoContext(ctx, "query executed", "rows", 42)
-	// → {"logger":"db","msg":"query executed","component":"postgres","request_id":"abc-123","rows":42}
+	// → {"logger":"db","msg":"query executed","request_id":"abc-123","component":"postgres","rows":42}
 }
