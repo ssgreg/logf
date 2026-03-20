@@ -7,12 +7,17 @@ import (
 	"sync"
 )
 
-// NewRouter returns a new RouterBuilder.
+// NewRouter returns a RouterBuilder for constructing a fan-out Handler
+// that sends log entries to multiple destinations. Each route groups
+// outputs that share an encoder, so one Encode call serves all outputs
+// in the group.
 func NewRouter() *RouterBuilder {
 	return &RouterBuilder{}
 }
 
-// RouterBuilder accumulates routes and builds a fan-out Handler.
+// RouterBuilder accumulates routes and builds a fan-out Handler. Add as
+// many routes as you need — each route has an encoder and one or more
+// outputs with independent level filters.
 //
 // Usage:
 //
@@ -27,8 +32,9 @@ type RouterBuilder struct {
 	err    error
 }
 
-// Route adds an encoder group with the given outputs. All outputs in a
-// group share one Encode call per entry.
+// Route adds an encoder group with the given outputs. All outputs in the
+// same route share a single Encode call per entry — so sending JSON to
+// both a file and a network socket costs exactly one encode, not two.
 func (b *RouterBuilder) Route(enc Encoder, opts ...RouteOption) *RouterBuilder {
 	g := encoderGroup{enc: enc}
 	for _, opt := range opts {
@@ -38,10 +44,10 @@ func (b *RouterBuilder) Route(enc Encoder, opts ...RouteOption) *RouterBuilder {
 	return b
 }
 
-// Build validates the configuration and returns the Router as a Handler.
-// The returned close function calls Flush and Sync on all writers.
-// Build returns an error if the configuration is invalid (no routes or
-// no outputs).
+// Build validates the configuration and returns the Router as a Handler,
+// plus a close function that flushes and syncs all writers. Always defer
+// the close function to ensure data reaches its destination. Build returns
+// an error if the configuration is invalid (no routes or no outputs).
 func (b *RouterBuilder) Build() (Handler, func() error, error) {
 	if b.err != nil {
 		return nil, nil, b.err
@@ -108,12 +114,13 @@ type output struct {
 	closeFn func() error // non-nil if the writer should be closed
 }
 
-// RouteOption configures a route within an encoder group.
+// RouteOption configures a destination within a Route's encoder group.
+// Use Output and OutputCloser to create RouteOptions.
 type RouteOption func(*encoderGroup)
 
 // Output returns a RouteOption that adds a destination with the given
-// level filter and writer. The caller goroutine writes encoded data
-// directly — no channel, no consumer goroutine, zero per-message
+// level filter and writer. Writes happen directly in the caller's
+// goroutine — no channel, no background goroutine, zero per-message
 // allocations. The Writer must be safe for concurrent use.
 //
 // For async I/O with batching and spike tolerance, wrap the writer in
@@ -130,9 +137,10 @@ func Output(level Level, w io.Writer) RouteOption {
 	}
 }
 
-// OutputCloser is like Output but the router's close function will call
-// Close on w after flushing. Use this to transfer ownership of a
-// SlabWriter (or any other resource) to the router:
+// OutputCloser is like Output but transfers ownership of the writer to
+// the router — the router's close function will call Close on w after
+// flushing. Perfect for SlabWriters and other resources you want the
+// router to manage:
 //
 //	sw := logf.NewSlabWriter(conn, 64*1024, 8)
 //	router, close, _ := logf.NewRouter().

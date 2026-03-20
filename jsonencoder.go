@@ -19,7 +19,10 @@ const (
 	DefaultFieldKeyCaller = "caller"
 )
 
-// JSONEncoderConfig allows to configure journal JSON Encoder.
+// JSONEncoderConfig controls how the JSON encoder formats log entries —
+// field keys, which fields to include, and how types like time, duration,
+// and errors are rendered. For a friendlier builder-style API, use JSON()
+// instead.
 type JSONEncoderConfig struct {
 	FieldKeyMsg    string
 	FieldKeyTime   string
@@ -47,8 +50,9 @@ type JSONEncoderConfig struct {
 	keyCaller []byte
 }
 
-// WithDefaults returns the new config in which all uninitialized fields are
-// filled with their default values.
+// WithDefaults returns a copy of the config with all zero-value fields
+// replaced by sensible defaults (RFC3339 timestamps, string durations,
+// short caller format, etc.).
 func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
 	// Handle default for predefined field names.
 	if c.FieldKeyMsg == "" {
@@ -93,106 +97,120 @@ func (c JSONEncoderConfig) WithDefaults() JSONEncoderConfig {
 	return c
 }
 
-// JSONEncoderBuilder configures and builds a JSON Encoder.
-// Use NewJSONEncoder() to create one, chain setter methods,
-// then call Build() or pass to LoggerBuilder.EncoderFrom().
+// JSONEncoderBuilder configures and builds a JSON Encoder using a clean
+// builder-style API. Create one with JSON(), chain methods to customize,
+// then call Build() or pass directly to LoggerBuilder.EncoderFrom().
 type JSONEncoderBuilder struct {
 	cfg JSONEncoderConfig
 }
 
-// JSON returns a new JSONEncoderBuilder with default settings.
+// JSON returns a new JSONEncoderBuilder with default settings. This is
+// the recommended way to create a JSON encoder — chain the methods you
+// need and call Build:
 //
-// Default:
 //	enc := logf.JSON().Build()
-//
-// Custom:
 //	enc := logf.JSON().TimeKey("time").LevelKey("severity").Build()
 func JSON() *JSONEncoderBuilder {
 	return &JSONEncoderBuilder{}
 }
 
+// TimeKey sets the JSON key for the timestamp field (default "ts").
 func (b *JSONEncoderBuilder) TimeKey(k string) *JSONEncoderBuilder {
 	b.cfg.FieldKeyTime = k
 	return b
 }
 
+// LevelKey sets the JSON key for the severity level field (default "level").
 func (b *JSONEncoderBuilder) LevelKey(k string) *JSONEncoderBuilder {
 	b.cfg.FieldKeyLevel = k
 	return b
 }
 
+// MsgKey sets the JSON key for the log message field (default "msg").
 func (b *JSONEncoderBuilder) MsgKey(k string) *JSONEncoderBuilder {
 	b.cfg.FieldKeyMsg = k
 	return b
 }
 
+// NameKey sets the JSON key for the logger name field (default "logger").
 func (b *JSONEncoderBuilder) NameKey(k string) *JSONEncoderBuilder {
 	b.cfg.FieldKeyName = k
 	return b
 }
 
+// CallerKey sets the JSON key for the caller location field (default "caller").
 func (b *JSONEncoderBuilder) CallerKey(k string) *JSONEncoderBuilder {
 	b.cfg.FieldKeyCaller = k
 	return b
 }
 
+// DisableTime omits the timestamp field from JSON output entirely.
 func (b *JSONEncoderBuilder) DisableTime() *JSONEncoderBuilder {
 	b.cfg.DisableFieldTime = true
 	return b
 }
 
+// DisableLevel omits the severity level field from JSON output entirely.
 func (b *JSONEncoderBuilder) DisableLevel() *JSONEncoderBuilder {
 	b.cfg.DisableFieldLevel = true
 	return b
 }
 
+// DisableMsg omits the message text field from JSON output entirely.
 func (b *JSONEncoderBuilder) DisableMsg() *JSONEncoderBuilder {
 	b.cfg.DisableFieldMsg = true
 	return b
 }
 
+// DisableName omits the logger name field from JSON output entirely.
 func (b *JSONEncoderBuilder) DisableName() *JSONEncoderBuilder {
 	b.cfg.DisableFieldName = true
 	return b
 }
 
+// DisableCaller omits the caller location field from JSON output entirely.
 func (b *JSONEncoderBuilder) DisableCaller() *JSONEncoderBuilder {
 	b.cfg.DisableFieldCaller = true
 	return b
 }
 
+// EncodeTime sets a custom TimeEncoder for formatting timestamps (default RFC3339).
 func (b *JSONEncoderBuilder) EncodeTime(e TimeEncoder) *JSONEncoderBuilder {
 	b.cfg.EncodeTime = e
 	return b
 }
 
+// EncodeDuration sets a custom DurationEncoder for formatting durations (default string representation).
 func (b *JSONEncoderBuilder) EncodeDuration(e DurationEncoder) *JSONEncoderBuilder {
 	b.cfg.EncodeDuration = e
 	return b
 }
 
+// EncodeLevel sets a custom LevelEncoder for formatting severity levels.
 func (b *JSONEncoderBuilder) EncodeLevel(e LevelEncoder) *JSONEncoderBuilder {
 	b.cfg.EncodeLevel = e
 	return b
 }
 
+// EncodeCaller sets a custom CallerEncoder for formatting caller locations (default short format).
 func (b *JSONEncoderBuilder) EncodeCaller(e CallerEncoder) *JSONEncoderBuilder {
 	b.cfg.EncodeCaller = e
 	return b
 }
 
+// EncodeError sets a custom ErrorEncoder for formatting error values.
 func (b *JSONEncoderBuilder) EncodeError(e ErrorEncoder) *JSONEncoderBuilder {
 	b.cfg.EncodeError = e
 	return b
 }
 
-// Build finalizes the configuration and returns a ready Encoder.
+// Build finalizes the configuration and returns a ready-to-use JSON Encoder.
 func (b *JSONEncoderBuilder) Build() Encoder {
 	return buildJSONEncoder(b.cfg)
 }
 
-// NewJSONEncoder creates a new JSON Encoder with the given config.
-// For a builder-style API, use JSON() instead.
+// NewJSONEncoder creates a JSON Encoder from a JSONEncoderConfig struct.
+// For a friendlier builder-style API, use JSON() instead.
 func NewJSONEncoder(cfg JSONEncoderConfig) Encoder {
 	return buildJSONEncoder(cfg)
 }
@@ -243,7 +261,7 @@ func (f *jsonEncoder) Clone() Encoder {
 
 func (f *jsonEncoder) Encode(e Entry) (*Buffer, error) {
 	clone := f.pool.Get().(*jsonEncoder)
-
+ 
 	buf := GetBuffer()
 	err := clone.encode(buf, e)
 
@@ -652,8 +670,9 @@ func (f *jsonEncoder) addKey(k string) {
 
 const hex = "0123456789abcdef"
 
-// EscapeString JSON-escapes s and appends the result to buf.
-// s can be a string or []byte.
+// EscapeString JSON-escapes s (which can be a string or []byte) and
+// appends the result to buf. It handles control characters, backslash,
+// quotes, and invalid UTF-8 sequences.
 func EscapeString[S []byte | string](buf *Buffer, s S) error {
 	p := 0
 	for i := 0; i < len(s); {

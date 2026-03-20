@@ -7,8 +7,9 @@ import (
 	"unsafe"
 )
 
-// CallerPC captures the program counter of the caller, skipping the
-// given number of frames. Returns 0 if the caller cannot be determined.
+// CallerPC captures the program counter of the caller, skipping the given
+// number of stack frames. Returns 0 if the caller cannot be determined.
+// You usually do not need to call this directly — the Logger handles it.
 func CallerPC(skip int) uintptr {
 	var pcs [1]uintptr
 	if runtime.Callers(skip+2, pcs[:]) < 1 {
@@ -51,10 +52,13 @@ func fileWithPackage(file string) string {
 	return file[found+1:]
 }
 
-// CallerEncoder is the function type to encode a caller program counter.
+// CallerEncoder is a function that resolves a program counter and writes
+// the caller location (file + line) into the log output via TypeEncoder.
 type CallerEncoder func(pc uintptr, m TypeEncoder)
 
-// ShortCallerEncoder resolves the given PC and encodes it as package/file:line.
+// ShortCallerEncoder formats the caller as "package/file.go:line" — compact
+// enough for log output while still letting you find the source. This is
+// the default CallerEncoder.
 func ShortCallerEncoder(pc uintptr, m TypeEncoder) {
 	file, line := callerFrame(pc)
 	var callerBuf [64]byte
@@ -68,7 +72,9 @@ func ShortCallerEncoder(pc uintptr, m TypeEncoder) {
 	runtime.KeepAlive(&b)
 }
 
-// FullCallerEncoder resolves the given PC and encodes it as full/path/file:line.
+// FullCallerEncoder formats the caller as the full filesystem path with
+// line number. More verbose than ShortCallerEncoder but unambiguous when
+// you have multiple packages with the same file name.
 func FullCallerEncoder(pc uintptr, m TypeEncoder) {
 	file, line := callerFrame(pc)
 	var callerBuf [256]byte

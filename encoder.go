@@ -5,61 +5,65 @@ import (
 	"unsafe"
 )
 
-// Encoder defines the interface to create your own log format.
+// Encoder is the interface that turns an Entry into bytes — it decides
+// your log format (JSON, text, or whatever you dream up). The built-in
+// JSON and Text encoders handle most needs, but implementing Encoder
+// lets you go fully custom.
 //
-// Encode serializes the Entry and returns a *Buffer obtained from the
-// pool. The caller must call Buffer.Free when done with the returned
-// buffer. Encode is safe for concurrent use — implementations must
-// handle internal cloning/pooling as needed.
+// Encode serializes the Entry and returns a pooled *Buffer. The caller
+// must call Buffer.Free when done. Encode is safe for concurrent use —
+// implementations handle internal cloning and buffer pooling.
 //
-// Clone returns an independent copy of the Encoder suitable for use in
-// another goroutine. The copy shares immutable configuration but has its
-// own mutable state (buffer pointers, counters, etc.).
+// Clone returns an independent copy that shares immutable config but
+// has its own mutable state, suitable for use in another goroutine.
 type Encoder interface {
 	Encode(Entry) (*Buffer, error)
 	Clone() Encoder
 }
 
-// ArrayEncoder defines the interface to create your own array logger.
+// ArrayEncoder lets your custom types serialize themselves as JSON arrays
+// (or whatever array representation the encoder uses). Implement
+// EncodeLogfArray and pass your type to logf.Array().
 //
 // Example:
 //
-// type stringArray []string
+//	type stringArray []string
 //
-// 	func (o stringArray) EncodeLogfArray(e TypeEncoder) error {
-// 		for i := range o {
-// 			e.EncodeTypeString(o[i])
-// 		}
-//
-// 		return nil
-// 	}
-//
+//	func (o stringArray) EncodeLogfArray(e TypeEncoder) error {
+//		for i := range o {
+//			e.EncodeTypeString(o[i])
+//		}
+//		return nil
+//	}
 type ArrayEncoder interface {
 	EncodeLogfArray(TypeEncoder) error
 }
 
-// ObjectEncoder defines the interface to create your own object logger.
+// ObjectEncoder lets your custom types serialize themselves as structured
+// objects with named fields. This is how you get zero-allocation logging
+// for your domain types — no reflection, no fmt.Sprintf, just direct
+// calls to the encoder.
 //
 // Example:
 //
-// 	type user struct {
-// 		Username string
-// 		Password string
-// 	}
+//	type user struct {
+//		Username string
+//		Password string
+//	}
 //
-// 	func (u user) EncodeLogfObject(e FieldEncoder) error {
-// 		e.EncodeFieldString("username", u.Username)
-// 		e.EncodeFieldString("password", u.Password)
-//
-// 		return nil
-// 	}
-//
+//	func (u user) EncodeLogfObject(e FieldEncoder) error {
+//		e.EncodeFieldString("username", u.Username)
+//		e.EncodeFieldString("password", u.Password)
+//		return nil
+//	}
 type ObjectEncoder interface {
 	EncodeLogfObject(FieldEncoder) error
 }
 
-// TypeEncoder defines the interface that allows to encode basic types.
-// Encoder companion.
+// TypeEncoder provides methods for encoding individual values (scalars,
+// slices, arrays, objects) without field names. It is the companion
+// interface used by TimeEncoder, DurationEncoder, LevelEncoder, and
+// CallerEncoder to write their output into the buffer.
 type TypeEncoder interface {
 	EncodeTypeAny(interface{})
 	EncodeTypeBool(bool)
@@ -79,8 +83,10 @@ type TypeEncoder interface {
 	EncodeTypeUnsafeBytes(unsafe.Pointer)
 }
 
-// FieldEncoder defines the interface that allows to encode basic types with
-// field names. Encoder companion.
+// FieldEncoder provides methods for encoding key-value pairs. It is the
+// interface that ObjectEncoder and ErrorEncoder receive to write named
+// fields into the output. Each method encodes one field with the given
+// key and typed value.
 type FieldEncoder interface {
 	EncodeFieldAny(string, interface{})
 	EncodeFieldBool(string, bool)
@@ -101,16 +107,17 @@ type FieldEncoder interface {
 	EncodeFieldGroup(string, []Field)
 }
 
-// TypeEncoderFactory defines the interface that allows to reuse Encoder
-// internal-defined TypeEncoder in other encoder.
-//
-// E.g. logf json encoder implements TypeEncoderFactory allowing all other
-// encoders to use json encoding functionality in some cases.
+// TypeEncoderFactory creates a TypeEncoder that writes into the given Buffer.
+// This lets one encoder borrow another encoder's formatting — for example,
+// the text encoder uses the JSON encoder's TypeEncoderFactory to render
+// nested objects and arrays in JSON syntax within otherwise plain-text output.
 type TypeEncoderFactory interface {
 	TypeEncoder(*Buffer) TypeEncoder
 }
 
-// EncoderBuilder can build an Encoder. Implemented by JSONEncoderBuilder.
+// EncoderBuilder builds an Encoder from accumulated configuration.
+// Implemented by JSONEncoderBuilder and TextEncoderBuilder, and accepted
+// by LoggerBuilder.EncoderFrom for composable builder chains.
 type EncoderBuilder interface {
 	Build() Encoder
 }

@@ -2,25 +2,27 @@ package logf
 
 import "fmt"
 
-// ErrorEncoder is the function type to encode the given error.
+// ErrorEncoder is a function that writes an error into the log output.
+// It receives the field key, the error, and a FieldEncoder so it can
+// emit one or more fields (e.g., a short message plus a verbose stack).
 type ErrorEncoder func(string, error, FieldEncoder)
 
-// DefaultErrorEncoder encodes the given error as a set of fields.
-//
-// A mandatory field with the given key and an optional field with the
-// full verbose error message.
+// DefaultErrorEncoder encodes an error as one or two fields: the error
+// message under the given key, and (if the error implements fmt.Formatter)
+// a verbose field with the full "%+v" output (stack traces, etc.).
 func DefaultErrorEncoder(key string, err error, enc FieldEncoder) {
 	NewErrorEncoder.Default()(key, err, enc)
 }
 
-// ErrorEncoderConfig allows to configure ErrorEncoder.
+// ErrorEncoderConfig controls how errors are encoded — specifically the
+// verbose field suffix and whether verbose output is included at all.
 type ErrorEncoderConfig struct {
 	VerboseFieldSuffix string
 	NoVerboseField     bool
 }
 
-// WithDefaults returns the new config in which all uninitialized fields are
-// filled with their default values.
+// WithDefaults returns a copy of the config with zero-value fields replaced
+// by defaults (verbose suffix ".verbose").
 func (c ErrorEncoderConfig) WithDefaults() ErrorEncoderConfig {
 	if c.VerboseFieldSuffix == "" {
 		c.VerboseFieldSuffix = ".verbose"
@@ -29,8 +31,8 @@ func (c ErrorEncoderConfig) WithDefaults() ErrorEncoderConfig {
 	return c
 }
 
-// NewErrorEncoder creates the new instance of the ErrorEncoder with the
-// given ErrorEncoderConfig.
+// NewErrorEncoder creates an ErrorEncoder with the given config. Call it
+// as a function: NewErrorEncoder(cfg) returns an ErrorEncoder.
 var NewErrorEncoder = errorEncoderGetter(
 	func(c ErrorEncoderConfig) ErrorEncoder {
 		return func(key string, err error, enc FieldEncoder) {

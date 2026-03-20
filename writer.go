@@ -6,24 +6,24 @@ import (
 	"syscall"
 )
 
-// Writer extends io.Writer with Flush and Sync operations.
-// Flush writes any buffered data to the underlying output.
-// Sync commits the written data to stable storage (e.g. fsync).
-//
-// Router calls Flush when its channel is empty (catch-up moment)
-// and Sync on close.
+// Writer extends io.Writer with Flush and Sync — the two operations
+// needed for reliable log delivery. Flush pushes buffered data to the
+// underlying output, and Sync commits it to stable storage (think
+// fsync). The Router calls Flush and Sync during its close sequence
+// to make sure nothing is left in flight.
 type Writer interface {
 	io.Writer
 	Flush() error
 	Sync() error
 }
 
-// WriterFromIO wraps a plain io.Writer into a Writer.
-// If w already implements Writer, it is returned as-is.
-// Otherwise, Flush and Sync are derived from the underlying type:
+// WriterFromIO upgrades a plain io.Writer to a Writer. If w already
+// implements Writer, it is returned as-is — no wrapping overhead.
+// Otherwise, the wrapper discovers Flush and Sync capabilities from
+// the underlying type:
 //   - Sync calls w.Sync() if available (e.g. *os.File)
 //   - Flush calls w.Flush() if available (e.g. *bufio.Writer)
-//   - Missing methods become no-ops.
+//   - Missing methods become no-ops
 func WriterFromIO(w io.Writer) Writer {
 	if sw, ok := w.(Writer); ok {
 		return sw

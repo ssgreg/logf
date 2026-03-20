@@ -21,12 +21,13 @@ type bagCache struct {
 // Slots are 1-based: 0 means "uninitialized / no caching".
 var nextSlot atomic.Int32
 
-// AllocEncoderSlot returns a unique slot index for an encoder to use
-// with Bag.LoadCache / Bag.StoreCache. Slots are 1-based; zero value
-// means "no slot" and cache methods become no-ops.
+// AllocEncoderSlot returns a unique 1-based slot index for an encoder to
+// use with Bag.LoadCache and Bag.StoreCache. Call this once when you
+// create an encoder — the slot lets the Bag cache encoded bytes per
+// encoder format so repeated encoding is nearly free.
 //
-// Call once per encoder at creation time. If all slots are taken,
-// returns 0 (no caching, graceful degradation).
+// If all slots are taken, returns 0 (no caching, graceful degradation —
+// everything still works, just without the cache speedup).
 func AllocEncoderSlot() int {
 	s := int(nextSlot.Add(1))
 	if s > maxCacheSlots {
@@ -35,9 +36,12 @@ func AllocEncoderSlot() int {
 	return s
 }
 
-// Bag is an immutable linked list of Fields.
-// Each With creates a new node pointing to the parent — O(1), no copies.
-// Bag is safe to share across goroutines.
+// Bag is an immutable, goroutine-safe linked list of Fields — the backbone
+// of logf's zero-copy field accumulation. Every call to With or WithGroup
+// creates a new node pointing to the parent in O(1) time with no field
+// copies. The encoder walks the chain at encoding time, and results are
+// cached per encoder so repeated encoding of the same Bag is essentially
+// free.
 type Bag struct {
 	fields []Field
 	parent *Bag
@@ -45,26 +49,30 @@ type Bag struct {
 	cache  atomic.Pointer[bagCache]
 }
 
-// NewBag creates a new Bag with the given fields.
+// NewBag creates a root Bag node with the given fields. Most of the time
+// you will not call this directly — Logger.With and logf.With handle Bag
+// creation for you.
 func NewBag(fs ...Field) *Bag {
 	return &Bag{fields: fs}
 }
 
-// With returns a new Bag that contains both the existing fields and the
-// given additional fields. The original Bag is not modified.
-// O(1): no field copy, new node points to parent.
+// With returns a new Bag that includes the given additional fields. The
+// original Bag is not modified — the new node simply points to the parent.
+// O(1) time, zero copies.
 func (b *Bag) With(fs ...Field) *Bag {
 	return &Bag{fields: fs, parent: b}
 }
 
-// WithGroup returns a new Bag that opens a named group.
-// All fields added to descendant nodes (via With) will be logically
-// nested under this group when encoded. The original Bag is not modified.
+// WithGroup returns a new Bag that opens a named group. All fields added
+// to descendant nodes via subsequent With calls will be logically nested
+// under this group name when encoded (e.g., as a nested JSON object).
+// The original Bag is not modified.
 func (b *Bag) WithGroup(name string) *Bag {
 	return &Bag{group: name, parent: b}
 }
 
-// Group returns the group name for this Bag node, or empty string.
+// Group returns the group name for this Bag node, or an empty string if
+// it is a regular field node.
 func (b *Bag) Group() string {
 	if b == nil {
 		return ""
@@ -72,9 +80,9 @@ func (b *Bag) Group() string {
 	return b.group
 }
 
-// Fields returns all fields in the Bag chain, parent-first order.
-// This allocates a new slice when the chain has more than one node.
-// For cache-aware encoding, use OwnFields + Parent instead.
+// Fields collects all fields across the entire Bag chain in parent-first
+// order. This allocates a new slice when the chain has more than one node,
+// so for hot-path encoding prefer walking OwnFields + Parent directly.
 func (b *Bag) Fields() []Field {
 	if b == nil {
 		return nil
@@ -100,8 +108,8 @@ func (b *Bag) Fields() []Field {
 	return all
 }
 
-// OwnFields returns only the fields stored in this Bag node,
-// not including parent fields.
+// OwnFields returns only the fields stored directly in this Bag node,
+// without walking up to parents. Useful for cache-aware encoding.
 func (b *Bag) OwnFields() []Field {
 	if b == nil {
 		return nil
@@ -109,7 +117,8 @@ func (b *Bag) OwnFields() []Field {
 	return b.fields
 }
 
-// Parent returns the parent Bag, or nil for a root node.
+// Parent returns the parent Bag in the linked list, or nil if this is
+// the root node.
 func (b *Bag) Parent() *Bag {
 	if b == nil {
 		return nil
@@ -117,8 +126,8 @@ func (b *Bag) Parent() *Bag {
 	return b.parent
 }
 
-// LoadCache returns cached encoded bytes for the given encoder slot,
-// or nil on cache miss. Slot 0 (uninitialized) always returns nil.
+// LoadCache returns previously cached encoded bytes for the given encoder
+// slot, or nil on a cache miss. Slot 0 (no caching) always returns nil.
 func (b *Bag) LoadCache(slot int) []byte {
 	if slot == 0 || b == nil {
 		return nil
@@ -130,9 +139,9 @@ func (b *Bag) LoadCache(slot int) []byte {
 	return c.slots[slot-1]
 }
 
-// StoreCache stores encoded bytes in the cache for the given encoder
-// slot. Slot 0 (uninitialized) is a no-op. The bagCache is allocated
-// lazily on first store.
+// StoreCache saves encoded bytes for the given encoder slot so future
+// Encode calls can skip re-encoding this Bag. Slot 0 (no caching) is a
+// no-op. The internal cache structure is allocated lazily on first store.
 func (b *Bag) StoreCache(slot int, data []byte) {
 	if slot == 0 || b == nil {
 		return
@@ -147,7 +156,8 @@ func (b *Bag) StoreCache(slot int, data []byte) {
 	c.slots[slot-1] = data
 }
 
-// HasField reports whether the Bag chain contains a field with the given key.
+// HasField reports whether any node in the Bag chain contains a field with
+// the given key. Walks the full chain from this node up to the root.
 func (b *Bag) HasField(key string) bool {
 	for node := b; node != nil; node = node.parent {
 		for i := range node.fields {
@@ -162,12 +172,15 @@ func (b *Bag) HasField(key string) bool {
 
 type bagKey struct{}
 
-// ContextWithBag returns a new context with the given Bag associated.
+// ContextWithBag returns a new context carrying the given Bag. This is
+// the low-level API — most callers should use logf.With(ctx, fields...)
+// instead, which handles Bag creation and chaining automatically.
 func ContextWithBag(ctx context.Context, bag *Bag) context.Context {
 	return context.WithValue(ctx, bagKey{}, bag)
 }
 
-// BagFromContext returns the Bag associated with the context, or nil.
+// BagFromContext returns the Bag stored in the context, or nil if none
+// was set. Safe to call on any context.
 func BagFromContext(ctx context.Context) *Bag {
 	bag, _ := ctx.Value(bagKey{}).(*Bag)
 
