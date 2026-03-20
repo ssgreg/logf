@@ -329,6 +329,68 @@ func TestLoggerSlogNoName(t *testing.T) {
 	assert.Equal(t, "", sink.Entry.LoggerName)
 }
 
+func TestContextlessMethods(t *testing.T) {
+	w := &testHandler{}
+	logger := New(w).WithCaller(false)
+
+	logger.Debugx("debug", String("k", "v"))
+	logger.Infox("info")
+	logger.Warnx("warn")
+	logger.Errorx("error")
+
+	require.Equal(t, 4, len(w.Entries))
+	assert.Equal(t, "debug", w.Entries[0].Text)
+	assert.Equal(t, LevelDebug, w.Entries[0].Level)
+	assert.Equal(t, "info", w.Entries[1].Text)
+	assert.Equal(t, LevelInfo, w.Entries[1].Level)
+	assert.Equal(t, "warn", w.Entries[2].Text)
+	assert.Equal(t, LevelWarn, w.Entries[2].Level)
+	assert.Equal(t, "error", w.Entries[3].Text)
+	assert.Equal(t, LevelError, w.Entries[3].Level)
+
+	// Fields are passed through.
+	require.Equal(t, 1, len(w.Entries[0].Fields))
+	assert.Equal(t, "k", w.Entries[0].Fields[0].Key)
+
+	// Disabled level: nothing logged.
+	w2 := newLeveledTestHandler(LevelError)
+	logger2 := New(w2).WithCaller(false)
+
+	logger2.Debugx("nope")
+	logger2.Infox("nope")
+	logger2.Warnx("nope")
+	assert.Equal(t, 0, len(w2.Entries))
+
+	logger2.Errorx("yes")
+	require.Equal(t, 1, len(w2.Entries))
+	assert.Equal(t, "yes", w2.Entries[0].Text)
+}
+
+func TestNilContext(t *testing.T) {
+	w := &testHandler{}
+	logger := New(w).WithCaller(false)
+
+	// Use a typed nil to avoid SA1012 lint warnings.
+	// We intentionally test nil ctx support here.
+	var noCtx context.Context
+
+	logger.Debug(noCtx, "debug", String("k", "v"))
+	logger.Info(noCtx, "info")
+	logger.Warn(noCtx, "warn")
+	logger.Error(noCtx, "error")
+	logger.Log(noCtx, LevelInfo, "log")
+	logger.AtLevel(noCtx, LevelInfo, func(log LogFunc) {
+		log(noCtx, "at-level")
+	})
+
+	require.Equal(t, 6, len(w.Entries))
+	assert.Equal(t, "debug", w.Entries[0].Text)
+	assert.Equal(t, "at-level", w.Entries[5].Text)
+
+	// Enabled must not panic with nil context.
+	assert.True(t, logger.Enabled(noCtx, LevelInfo))
+}
+
 func TestContext(t *testing.T) {
 	// Check if no logger is associated with the Context — returns DisabledLogger.
 	assert.Equal(t, DisabledLogger(), FromContext(context.Background()))
