@@ -417,8 +417,76 @@ type Field struct {
 // Accept dispatches the Field to the appropriate FieldEncoder method based
 // on its FieldType. This is the bridge between the type-erased Field
 // storage and the strongly-typed encoder interface.
+// If returns the field unchanged when cond is true, or an empty field
+// that encoders silently skip when cond is false.
+//
+//	logf.String("trace", traceID).If(tracing)
+func (fd Field) If(cond bool) Field {
+	if !cond {
+		return Field{}
+	}
+	return fd
+}
+
+// Optional returns the field unchanged when it carries a non-zero value,
+// or an empty field that encoders silently skip when the value is the
+// zero value for its type (empty string, 0, nil error, zero time, etc.).
+//
+//	logf.String("user_id", userID).Optional()   // skipped if ""
+//	logf.Int("retry", count).Optional()         // skipped if 0
+//	logf.Error(err).Optional()                  // skipped if nil
+func (fd Field) Optional() Field {
+	switch fd.Type {
+	case FieldTypeBool, FieldTypeInt64, FieldTypeUint64, FieldTypeFloat64, FieldTypeDuration:
+		if fd.Val == 0 {
+			return Field{}
+		}
+	case FieldTypeError, FieldTypeAny, FieldTypeArray, FieldTypeObject:
+		if isNilValue(fd.Any) {
+			return Field{}
+		}
+	case FieldTypeTime:
+		// Zero time: Val==0 and Any==nil (no location).
+		if fd.Val == 0 && fd.Any == nil {
+			return Field{}
+		}
+	case FieldTypeBytes, FieldTypeBytesToString,
+		FieldTypeBytesToInts64, FieldTypeBytesToFloats64,
+		FieldTypeBytesToDurations, FieldTypeBytesToStrings:
+		// Val holds the length for all Ptr-based types.
+		if fd.Val == 0 {
+			return Field{}
+		}
+	case FieldTypeGroup:
+		if fd.Any == nil {
+			return Field{}
+		}
+		if len(fd.Any.([]Field)) == 0 {
+			return Field{}
+		}
+	}
+	return fd
+}
+
+// isNilValue reports whether v is nil, including typed nil pointers,
+// channels, maps, slices, and functions wrapped in an interface.
+func isNilValue(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Ptr, reflect.Chan, reflect.Map, reflect.Slice, reflect.Func, reflect.Interface:
+		return rv.IsNil()
+	}
+	return false
+}
+
 func (fd Field) Accept(v FieldEncoder) {
 	switch fd.Type {
+	case FieldTypeUnknown:
+		// Skip — empty field produced by If(false) or Optional().
+		return
 	case FieldTypeAny:
 		v.EncodeFieldAny(fd.Key, fd.Any)
 	case FieldTypeBool:

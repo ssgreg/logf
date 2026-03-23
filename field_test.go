@@ -1,6 +1,8 @@
 package logf
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"net"
 	"testing"
@@ -355,6 +357,14 @@ func TestFieldAnyStringer(t *testing.T) {
 	assert.Equal(t, "192.168.1.1", e.result["k"])
 }
 
+func TestFieldTimeZeroAccept(t *testing.T) {
+	// Zero time (Val==0, Any==nil) should encode as time.Time{}.
+	f := Time("k", time.Time{})
+	e := newTestFieldEncoder()
+	f.Accept(e)
+	assert.Equal(t, time.Time{}, e.result["k"])
+}
+
 func TestFieldAnyWithCustomType(t *testing.T) {
 	type customType struct{}
 	customTypeValue := customType{}
@@ -688,4 +698,145 @@ func TestFieldAccept(t *testing.T) {
 		})
 	}
 
+}
+
+func TestFieldIf(t *testing.T) {
+	// If(true) returns the field unchanged.
+	f := String("k", "v").If(true)
+	assert.Equal(t, FieldTypeBytesToString, f.Type)
+	assert.Equal(t, "k", f.Key)
+
+	// If(false) returns an empty field.
+	f = String("k", "v").If(false)
+	assert.Equal(t, FieldTypeUnknown, f.Type)
+	assert.Equal(t, "", f.Key)
+
+	// Empty field is silently skipped by Accept.
+	e := newTestFieldEncoder()
+	f.Accept(e)
+	assert.Empty(t, e.result)
+}
+
+func TestFieldOptional(t *testing.T) {
+	// Non-zero values pass through.
+	assert.Equal(t, FieldTypeBytesToString, String("k", "v").Optional().Type)
+	assert.Equal(t, FieldTypeInt64, Int("k", 42).Optional().Type)
+	assert.Equal(t, FieldTypeError, NamedError("k", errors.New("x")).Optional().Type)
+	assert.Equal(t, FieldTypeDuration, Duration("k", time.Second).Optional().Type)
+	assert.Equal(t, FieldTypeBool, Bool("k", true).Optional().Type)
+	assert.Equal(t, FieldTypeFloat64, Float64("k", 3.14).Optional().Type)
+	assert.Equal(t, FieldTypeTime, Time("k", time.Now()).Optional().Type)
+	assert.Equal(t, FieldTypeBytes, Bytes("k", []byte{1}).Optional().Type)
+	assert.Equal(t, FieldTypeBytesToStrings, Strings("k", []string{"a"}).Optional().Type)
+	assert.Equal(t, FieldTypeBytesToInts64, Ints64("k", []int64{1}).Optional().Type)
+
+	// Non-zero: remaining types.
+	assert.Equal(t, FieldTypeUint64, Uint64("k", 1).Optional().Type)
+	assert.Equal(t, FieldTypeFloat64, Float32("k", 1.5).Optional().Type)
+	assert.Equal(t, FieldTypeBytesToFloats64, Floats64("k", []float64{1}).Optional().Type)
+	assert.Equal(t, FieldTypeBytesToDurations, Durations("k", []time.Duration{time.Second}).Optional().Type)
+	assert.Equal(t, FieldTypeBytesToString, Any("k", "val").Optional().Type)                            // Any(string) → String
+	assert.Equal(t, FieldTypeBytesToString, Stringer("k", bytes.NewBufferString("x")).Optional().Type) // Stringer → String
+	assert.Equal(t, FieldTypeAny, Any("k", struct{}{}).Optional().Type)                                // Any(struct) stays FieldTypeAny
+	assert.Equal(t, FieldTypeObject, Object("k", &testObjectEncoder{}).Optional().Type)
+	assert.Equal(t, FieldTypeGroup, Group("k", String("a", "b")).Optional().Type)
+
+	// Zero values are skipped.
+	assert.Equal(t, FieldTypeUnknown, String("k", "").Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Int("k", 0).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Uint64("k", 0).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Float32("k", 0).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, NamedError("k", nil).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Duration("k", 0).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Bool("k", false).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Float64("k", 0).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Time("k", time.Time{}).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Bytes("k", nil).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Bytes("k", []byte{}).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Strings("k", nil).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Strings("k", []string{}).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Ints64("k", nil).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Ints64("k", []int64{}).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Floats64("k", nil).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Floats64("k", []float64{}).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Durations("k", nil).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Durations("k", []time.Duration{}).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Any("k", nil).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Any("k", (*int)(nil)).Optional().Type)       // typed nil pointer
+	assert.Equal(t, FieldTypeUnknown, Any("k", (error)(nil)).Optional().Type)      // typed nil interface
+	assert.Equal(t, FieldTypeUnknown, Any("k", ([]string)(nil)).Optional().Type)   // nil slice via Any
+	assert.Equal(t, FieldTypeUnknown, Any("k", (map[string]int)(nil)).Optional().Type) // nil map
+	assert.Equal(t, FieldTypeUnknown, Group("k").Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Group("k", []Field{}...).Optional().Type)
+	assert.Equal(t, FieldTypeUnknown, Field{Type: FieldTypeGroup, Key: "k"}.Optional().Type) // nil Any in group
+
+	// Empty field is skipped by encoder.
+	e := newTestFieldEncoder()
+	String("k", "").Optional().Accept(e)
+	assert.Empty(t, e.result)
+}
+
+func TestFieldIfWithEncoder(t *testing.T) {
+	// Verify that If(false) fields are skipped in a real encoding scenario.
+	e := newTestFieldEncoder()
+	fields := []Field{
+		String("always", "yes"),
+		String("maybe", "no").If(false),
+		Int("count", 42).If(true),
+	}
+	for _, f := range fields {
+		f.Accept(e)
+	}
+	assert.Equal(t, "yes", e.result["always"])
+	assert.Equal(t, int64(42), e.result["count"])
+	assert.NotContains(t, e.result, "maybe")
+}
+
+func TestFieldIfAndOptionalJSON(t *testing.T) {
+	// End-to-end: verify skipped fields produce no JSON artifacts.
+	var buf bytes.Buffer
+	logger := NewLogger().Output(&buf).Build().WithCaller(false)
+
+	logger.Info(context.Background(), "test",
+		String("a", "1"),
+		String("b", "").Optional(),
+		Int("c", 0).Optional(),
+		String("d", "skip").If(false),
+		Error(nil).Optional(),
+		Int("e", 5),
+	)
+
+	got := buf.String()
+	assert.Contains(t, got, `"a":"1"`)
+	assert.Contains(t, got, `"e":5`)
+	assert.NotContains(t, got, `"b"`)
+	assert.NotContains(t, got, `"c"`)
+	assert.NotContains(t, got, `"d"`)
+	assert.NotContains(t, got, `"error"`)
+	// No double commas or trailing commas.
+	assert.NotContains(t, got, ",,")
+	assert.NotContains(t, got, ",}")
+
+	// Text encoder: same check.
+	buf.Reset()
+	loggerText := NewLogger().Output(&buf).
+		EncoderFrom(Text().NoColor().DisableTime().DisableCaller()).
+		Build()
+
+	loggerText.Info(context.Background(), "test",
+		String("a", "1"),
+		String("b", "").Optional(),
+		Int("c", 0).Optional(),
+		String("d", "skip").If(false),
+		Error(nil).Optional(),
+		Int("e", 5),
+	)
+
+	gotText := buf.String()
+	assert.Contains(t, gotText, "a=1")
+	assert.Contains(t, gotText, "e=5")
+	assert.NotContains(t, gotText, "b=")
+	assert.NotContains(t, gotText, "c=")
+	assert.NotContains(t, gotText, "d=")
+	assert.NotContains(t, gotText, "error=")
 }
