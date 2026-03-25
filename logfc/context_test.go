@@ -103,6 +103,18 @@ func TestLevels(t *testing.T) {
 	}
 }
 
+func TestLog(t *testing.T) {
+	w := &mockHandler{}
+	logger := logf.New(w)
+	ctx := New(context.Background(), logger)
+
+	Log(ctx, logf.LevelWarn, "custom level", logf.String("k", "v"))
+	assert.Equal(t, 1, len(w.entries))
+	assert.Equal(t, "custom level", w.entries[0].Text)
+	assert.Equal(t, logf.LevelWarn, w.entries[0].Level)
+	assert.Equal(t, 1, len(w.entries[0].Fields))
+}
+
 func TestAtLevelCallerPointsToCallSite(t *testing.T) {
 	w := &mockHandler{}
 	logger := logf.New(w)
