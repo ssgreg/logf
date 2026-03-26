@@ -71,3 +71,8 @@ func Warn(ctx context.Context, text string, fs ...logf.Field) {
 func Error(ctx context.Context, text string, fs ...logf.Field) {
 	logf.LogDepth(Get(ctx), ctx, 1, logf.LevelError, text, fs...)
 }
+
+// Log logs a message at an arbitrary level using the logger from ctx.
+func Log(ctx context.Context, level logf.Level, text string, fs ...logf.Field) {
+	logf.LogDepth(Get(ctx), ctx, 1, level, text, fs...)
+}
